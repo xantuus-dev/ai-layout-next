@@ -1,0 +1,66 @@
+name: Database Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy migrations'
+        required: true
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Prisma migrations (Production)
+        if: github.event.inputs.environment == 'production'
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Run Prisma migrations (Staging)
+        if: github.event.inputs.environment == 'staging'
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+
+      - name: Run Prisma migrations (Development)
+        if: github.event.inputs.environment == 'development'
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DEV_DIRECT_URL }}
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Seed database (if requested)
+        if: github.event.inputs.environment != 'production'
+        run: npx prisma db seed
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Migration Status
+        run: |
+          echo "✅ Database migrations completed successfully for ${{ github.event.inputs.environment }}"

@@ -1,0 +1,180 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth.js Models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+
+  // Subscription & Billing
+  stripeCustomerId       String?   @unique
+  stripeSubscriptionId   String?   @unique
+  stripePriceId          String?
+  stripeCurrentPeriodEnd DateTime?
+
+  // RevenueCat Integration
+  revenueCatUserId       String?   @unique
+  revenueCatCustomerId   String?   // Original transaction app user ID
+
+  // Plan & Limits
+  plan                   String    @default("free") // free, pro, enterprise
+  monthlyCredits         Int       @default(1000)
+  creditsUsed            Int       @default(0)
+  creditsResetAt         DateTime  @default(now())
+
+  // Google Integrations
+  googleAccessToken      String?   @db.Text
+  googleRefreshToken     String?   @db.Text
+  googleTokenExpiry      DateTime?
+  googleDriveEnabled     Boolean   @default(false)
+  googleGmailEnabled     Boolean   @default(false)
+  googleCalendarEnabled  Boolean   @default(false)
+
+  // Usage tracking
+  usageRecords UsageRecord[]
+  apiKeys      ApiKey[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Subscription & Usage Models
+model UsageRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      String   // "chat", "api", "automation", etc.
+  model     String?  // AI model used
+  tokens    Int      @default(0)
+  credits   Int      @default(1) // Credits consumed
+
+  metadata  Json?    // Additional data
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  key       String   @unique
+  lastUsed  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Prompt Template System
+model PromptTemplateCategory {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  icon        String?          // Icon name or emoji
+  order       Int              @default(0)
+
+  templates   PromptTemplate[]
+
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model PromptTemplate {
+  id          String   @id @default(cuid())
+
+  // Template Info
+  title       String
+  description String?
+  template    String   @db.Text // The prompt with {{variable}} placeholders
+
+  // Organization
+  categoryId  String?
+  category    PromptTemplateCategory? @relation(fields: [categoryId], references: [id])
+  tags        String[] // For additional filtering
+
+  // Variables Configuration
+  // JSON structure: [{ name: "variable_name", label: "Display Label", type: "text|number|select", placeholder: "...", options: [] }]
+  variables   Json     @default("[]")
+
+  // Visibility & Status
+  isPublic    Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+
+  // Analytics
+  usageCount  Int      @default(0)
+
+  // Premium/Tier System
+  tier                 String   @default("free") // 'free', 'pro', 'enterprise'
+
+  // Integration Requirements
+  requiresGoogleDrive  Boolean  @default(false)
+  requiresGmail        Boolean  @default(false)
+  requiresCalendar     Boolean  @default(false)
+  supportsImageGen     Boolean  @default(false)
+
+  // Admin tracking
+  createdBy   String?  // Admin user ID
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([isPublic, isActive])
+  @@index([tier, isActive])
+}

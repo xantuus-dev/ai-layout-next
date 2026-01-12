@@ -1,0 +1,28 @@
+<svg width="1200" height="200" viewBox="0 0 1200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- X Symbol - Turquoise crossed lines forming an X with sparkle effect -->
+  <g transform="translate(50, 50)">
+    <!-- Main diagonal from top-left to bottom-right -->
+    <path d="M 10 20 L 150 130" stroke="#6FDED6" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Main diagonal from bottom-left to top-right -->
+    <path d="M 10 130 L 150 20" stroke="#6FDED6" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Horizontal line through center -->
+    <path d="M 30 75 L 130 75" stroke="#6FDED6" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Vertical line through center -->
+    <path d="M 80 25 L 80 125" stroke="#6FDED6" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- XANTUUS Text -->
+  <text x="280" y="140" font-family="Arial Black, Arial, sans-serif" font-size="110" font-weight="900" fill="#000000" letter-spacing="-2">XANTUUS</text>
+
+  <!-- Star/Sparkle Symbol -->
+  <g transform="translate(950, 80)">
+    <!-- Four-pointed star/sparkle -->
+    <path d="M 20 0 L 23 17 L 40 20 L 23 23 L 20 40 L 17 23 L 0 20 L 17 17 Z" fill="#6FDED6"/>
+  </g>
+
+  <!-- AI Text -->
+  <text x="1000" y="140" font-family="Arial Black, Arial, sans-serif" font-size="110" font-weight="900" fill="#000000" letter-spacing="-2">AI</text>
+</svg>
