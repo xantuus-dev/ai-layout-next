@@ -48,7 +48,7 @@ export async function GET() {
     // Create a map of dates to usage data
     const usageMap = new Map();
 
-    usageRecords.forEach((record) => {
+    usageRecords.forEach((record: any) => {
       const dateKey = format(new Date(record.createdAt), 'yyyy-MM-dd');
       if (!usageMap.has(dateKey)) {
         usageMap.set(dateKey, {

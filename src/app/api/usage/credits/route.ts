@@ -77,14 +77,14 @@ export async function GET(request: NextRequest) {
     });
 
     // Format daily usage for charting
-    const formattedDailyUsage = dailyUsage.map(day => ({
+    const formattedDailyUsage = dailyUsage.map((day: any) => ({
       date: day.createdAt.toISOString(),
       credits: day._sum.credits || 0,
       requests: day._count.id || 0,
     }));
 
     // Format usage history
-    const formattedUsageHistory = usageHistory.map(record => ({
+    const formattedUsageHistory = usageHistory.map((record: any) => ({
       date: record.createdAt.toISOString(),
       credits: record.credits,
       description: `${record.type} request${record.tokens ? ` (${record.tokens} tokens)` : ''}`,
