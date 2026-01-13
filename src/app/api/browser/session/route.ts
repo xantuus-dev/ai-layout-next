@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      select: { id: true, credits: true, plan: true },
+      select: { id: true, monthlyCredits: true, creditsUsed: true, plan: true },
     });
 
     if (!user) {
@@ -50,38 +50,34 @@ export async function POST(req: NextRequest) {
     }
 
     // Check credits
-    if (user.credits < BROWSER_SESSION_COST) {
+    const availableCredits = user.monthlyCredits - user.creditsUsed;
+    if (availableCredits < BROWSER_SESSION_COST) {
       return NextResponse.json(
         {
           error: 'Insufficient credits',
           required: BROWSER_SESSION_COST,
-          available: user.credits,
+          available: availableCredits,
         },
         { status: 402 }
       );
     }
 
     // Deduct credits
-    await deductCredits(user.id, BROWSER_SESSION_COST, 'browser_session');
+    await deductCredits(user.id, BROWSER_SESSION_COST, {
+      type: 'browser_session',
+      description: 'Browser automation session created',
+    });
 
     // Create browser session
     const sessionId = await browserControl.createSession(user.id);
 
-    // Log usage
-    await prisma.usageLog.create({
-      data: {
-        userId: user.id,
-        credits: BROWSER_SESSION_COST,
-        action: 'browser_session',
-        metadata: { sessionId },
-      },
-    });
+    // Note: Usage is logged by deductCredits function
 
     return NextResponse.json({
       success: true,
       sessionId,
       creditsUsed: BROWSER_SESSION_COST,
-      creditsRemaining: user.credits - BROWSER_SESSION_COST,
+      creditsRemaining: availableCredits - BROWSER_SESSION_COST,
       rateLimitRemaining: rateLimit.remaining,
     });
   } catch (error: any) {

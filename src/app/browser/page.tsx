@@ -25,7 +25,7 @@ export default async function BrowserPage() {
 
   const user = await prisma.user.findUnique({
     where: { email: session.user.email },
-    select: { plan: true, credits: true },
+    select: { plan: true, monthlyCredits: true, creditsUsed: true },
   });
 
   if (!user) {
@@ -60,7 +60,8 @@ export default async function BrowserPage() {
             </p>
             <div className="mt-4 p-4 bg-muted rounded-lg">
               <p className="text-sm">
-                <strong>Available Credits:</strong> {user.credits.toLocaleString()}
+                <strong>Available Credits:</strong>{' '}
+                {(user.monthlyCredits - user.creditsUsed).toLocaleString()} / {user.monthlyCredits.toLocaleString()}
               </p>
             </div>
           </div>

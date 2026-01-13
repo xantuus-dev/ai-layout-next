@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      select: { id: true, credits: true, plan: true },
+      select: { id: true, monthlyCredits: true, creditsUsed: true, plan: true },
     });
 
     if (!user) {
@@ -55,14 +55,15 @@ export async function POST(req: NextRequest) {
     }
 
     const actionCost = ACTION_COSTS[action.type];
+    const availableCredits = user.monthlyCredits - user.creditsUsed;
 
     // Check credits
-    if (user.credits < actionCost) {
+    if (availableCredits < actionCost) {
       return NextResponse.json(
         {
           error: 'Insufficient credits',
           required: actionCost,
-          available: user.credits,
+          available: availableCredits,
         },
         { status: 402 }
       );
@@ -74,11 +75,11 @@ export async function POST(req: NextRequest) {
       const injectionCheck = browserControl.detectPromptInjection(target as string);
       if (injectionCheck.isInjection) {
         // Log security incident
-        await prisma.usageLog.create({
+        await prisma.usageRecord.create({
           data: {
             userId: user.id,
+            type: 'security_alert',
             credits: 0,
-            action: 'security_alert',
             metadata: {
               type: 'prompt_injection',
               patterns: injectionCheck.patterns,
@@ -118,30 +119,19 @@ export async function POST(req: NextRequest) {
 
     // Deduct credits on success
     if (result.success) {
-      await deductCredits(user.id, actionCost, `browser_${action.type}`);
-
-      // Log usage
-      await prisma.usageLog.create({
-        data: {
-          userId: user.id,
-          credits: actionCost,
-          action: `browser_${action.type}`,
-          metadata: {
-            sessionId,
-            actionType: action.type,
-            securityWarnings: result.securityWarnings || [],
-          },
-        },
+      await deductCredits(user.id, actionCost, {
+        type: `browser_${action.type}`,
+        description: `Browser ${action.type} action executed`,
       });
     }
 
     // Log security warnings
     if (result.securityWarnings && result.securityWarnings.length > 0) {
-      await prisma.usageLog.create({
+      await prisma.usageRecord.create({
         data: {
           userId: user.id,
+          type: 'security_warning',
           credits: 0,
-          action: 'security_warning',
           metadata: {
             sessionId,
             warnings: result.securityWarnings,
@@ -154,7 +144,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ...result,
       creditsUsed: result.success ? actionCost : 0,
-      creditsRemaining: result.success ? user.credits - actionCost : user.credits,
+      creditsRemaining: result.success ? availableCredits - actionCost : availableCredits,
     });
   } catch (error: any) {
     console.error('Browser action execution error:', error);
