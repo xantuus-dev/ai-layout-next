@@ -38,7 +38,7 @@
     "puppeteer": "^24.35.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "react": "^18.2.0",
+    "react": "^19.2.3",
     "react-dom": "^18.2.0",
     "recharts": "^3.6.0",
     "stripe": "^20.1.2",
@@ -48,7 +48,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.10.5",
-    "@types/react": "^18.2.46",
+    "@types/react": "^19.2.8",
     "@types/react-dom": "^18.2.18",
     "autoprefixer": "^10.4.17",
     "eslint": "^8.56.0",
