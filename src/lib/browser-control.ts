@@ -9,7 +9,7 @@
  * - Rate limiting per user
  */
 
-import puppeteer, { Browser, Page, PuppeteerLaunchOptions } from 'puppeteer';
+import puppeteer, { Browser, Page } from 'puppeteer';
 
 // Security configuration
 const BROWSER_CONFIG = {
@@ -194,7 +194,7 @@ class BrowserControlService {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Secure launch options
-    const launchOptions: PuppeteerLaunchOptions = {
+    const launchOptions = {
       headless: true,
       args: [
         '--no-sandbox',
@@ -346,7 +346,8 @@ class BrowserControlService {
           if (!action.selector) {
             return { success: false, error: 'Selector required for click' };
           }
-          await page.click(action.selector, { timeout: 10000 });
+          await page.waitForSelector(action.selector, { timeout: 10000 });
+          await page.click(action.selector);
           result.data = { clicked: action.selector };
           break;
 
