@@ -63,3 +63,4 @@ Thumbs.db
 
 # Deployment scripts with secrets
 setup-stripe-prod.sh
+.env*.local
