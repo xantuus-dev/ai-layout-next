@@ -45,6 +45,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check if user already has an active subscription
+    if (user.stripeSubscriptionId) {
+      // User already subscribed - redirect to billing portal instead
+      return NextResponse.json(
+        {
+          error: 'Already subscribed',
+          redirect: '/settings/billing',
+          message: 'You already have an active subscription. Use the billing portal to manage it.'
+        },
+        { status: 400 }
+      );
+    }
+
     // Create or get Stripe customer
     let customerId = user.stripeCustomerId;
 
@@ -80,6 +93,11 @@ export async function POST(req: NextRequest) {
       cancel_url: `${process.env.NEXTAUTH_URL}/pricing?canceled=true`,
       metadata: {
         userId: user.id,
+      },
+      subscription_data: {
+        metadata: {
+          userId: user.id,
+        },
       },
     });
 

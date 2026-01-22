@@ -4,6 +4,7 @@ import { ClaudeChatInput } from '@/components/ui/claude-style-chat-input';
 import { TemplateSelector } from '@/components/ui/TemplateSelector';
 import { TemplateVariableForm } from '@/components/ui/TemplateVariableForm';
 import { TemplateUpgradeBanner } from '@/components/ui/TemplateUpgradeBanner';
+import { FeaturedTemplates } from '@/components/FeaturedTemplates';
 import { useState, useRef } from 'react';
 
 interface Message {
@@ -174,6 +175,13 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
 
   return (
     <div className="w-full space-y-4">
+      {/* Featured Templates - Show only when no messages */}
+      {messages.length === 0 && (
+        <div className="max-w-4xl mx-auto">
+          <FeaturedTemplates onSelectTemplate={handleSelectTemplate} />
+        </div>
+      )}
+
       {/* Messages Display */}
       {messages.length > 0 && (
         <div className="space-y-4 mb-8 max-w-2xl mx-auto">

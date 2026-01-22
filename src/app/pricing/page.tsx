@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { Check, ChevronDown } from 'lucide-react';
 import { PLANS } from '@/lib/stripe';
-import { initRevenueCat, loginRevenueCat } from '@/lib/revenuecat';
 import {
   Select,
   SelectContent,
@@ -57,15 +56,7 @@ export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
-  // Initialize RevenueCat when user logs in
-  useEffect(() => {
-    if (session?.user?.id) {
-      initRevenueCat();
-      loginRevenueCat(session.user.id);
-    }
-  }, [session?.user?.id]);
-
-  const handleSubscribe = async (priceId: string | null | undefined, planName: string, productId?: string) => {
+  const handleSubscribe = async (priceId: string | null | undefined, planName: string) => {
     if (!session) {
       router.push('/?auth=signin');
       return;
@@ -79,23 +70,34 @@ export default function PricingPage() {
     setIsLoading(planName);
 
     try {
-      // Use RevenueCat checkout endpoint
-      const response = await fetch('/api/revenuecat/checkout', {
+      // Use Stripe checkout endpoint
+      const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           priceId,
-          productId: productId || planName.toLowerCase(),
         }),
       });
 
       const data = await response.json();
+
+      if (data.error) {
+        // Handle errors (e.g., already subscribed)
+        if (data.redirect) {
+          alert(data.message || data.error);
+          router.push(data.redirect);
+        } else {
+          alert(data.error);
+        }
+        return;
+      }
 
       if (data.url) {
         window.location.href = data.url;
       }
     } catch (error) {
       console.error('Error creating checkout session:', error);
+      alert('Failed to start checkout. Please try again.');
     } finally {
       setIsLoading(null);
     }
@@ -253,7 +255,7 @@ export default function PricingPage() {
             </CardContent>
             <CardFooter>
               <button
-                onClick={() => handleSubscribe(PLANS.PRO.priceId, 'PRO', 'pro_monthly')}
+                onClick={() => handleSubscribe(PLANS.PRO.priceId, 'PRO')}
                 disabled={isLoading === 'PRO' || currentPlan === 'pro'}
                 className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -293,7 +295,7 @@ export default function PricingPage() {
             </CardContent>
             <CardFooter>
               <button
-                onClick={() => handleSubscribe(PLANS.ENTERPRISE.priceId, 'ENTERPRISE', 'enterprise_monthly')}
+                onClick={() => handleSubscribe(PLANS.ENTERPRISE.priceId, 'ENTERPRISE')}
                 disabled={isLoading === 'ENTERPRISE' || currentPlan === 'enterprise'}
                 className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >

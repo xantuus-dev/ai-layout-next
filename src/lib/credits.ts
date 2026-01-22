@@ -1,12 +1,6 @@
 import { prisma } from './prisma';
 import { addMonths, isAfter } from 'date-fns';
-
-// Plan credit limits
-export const PLAN_CREDITS: Record<string, number> = {
-  free: 1000,
-  pro: 50000,
-  enterprise: 250000,
-};
+import { PLAN_CREDITS, getCreditsForPlan } from './plans';
 
 // Model credit costs (per 1000 tokens)
 export const MODEL_CREDITS_PER_1K: Record<string, number> = {

@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
     const tag = searchParams.get('tag');
     const search = searchParams.get('search');
     const featured = searchParams.get('featured') === 'true';
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
 
     const where: any = {
       isPublic: true,
@@ -48,6 +49,7 @@ export async function GET(req: NextRequest) {
         { usageCount: 'desc' },
         { createdAt: 'desc' },
       ],
+      take: limit,
     });
 
     return NextResponse.json(templates);

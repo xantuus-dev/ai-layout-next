@@ -6,6 +6,7 @@ import { QuickActionButtons } from './QuickActionButtons';
 import { TemplateSelector } from './TemplateSelector';
 import { TemplateVariableForm } from './TemplateVariableForm';
 import { TemplateUpgradeBanner } from './TemplateUpgradeBanner';
+import { MainPageTemplates } from '../MainPageTemplates';
 import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 
@@ -237,6 +238,21 @@ export default function PromptCard() {
     setSelectedTemplate(null);
   };
 
+  const handleMainTemplateSelect = (templateText: string) => {
+    // Check if user is authenticated before allowing template access
+    if (!isAuthenticated) {
+      setPendingAction(() => () => setDraftMessage(templateText));
+      setShowAuthModal(true);
+      return;
+    }
+    // Populate the chat input with the template text
+    setDraftMessage(templateText);
+    // Optionally scroll to the input
+    if (chatInputRef.current) {
+      chatInputRef.current.focus?.();
+    }
+  };
+
   return (
     <div className="w-full">
       {/* Auth Modal */}
@@ -248,11 +264,22 @@ export default function PromptCard() {
 
       <div className="w-full space-y-6">
         <div className="w-full rounded-2xl border border-gray-200 bg-white/80 shadow-lg dark:border-gray-700 dark:bg-gray-800/80 overflow-hidden">
-        {/* Header Section - Fixed */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        {/* Header Section */}
+        <div className="p-6 bg-white dark:bg-gray-800">
           <h2 className="mb-4 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
             What do you want to build?
           </h2>
+
+          {/* Claude Chat Input - Directly under heading */}
+          <div className="mb-6">
+            <ClaudeChatInput
+              ref={chatInputRef}
+              onSendMessage={handleSendMessage}
+              initialMessage={draftMessage}
+              onMessageChange={setDraftMessage}
+              onOpenTemplateSelector={handleOpenTemplateSelector}
+            />
+          </div>
 
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Choose a suggestion or describe your project
@@ -274,11 +301,18 @@ export default function PromptCard() {
           <QuickActionButtons onCategorySelect={handleCategorySelect} />
         </div>
 
+        {/* Template Cards - Show only when no messages */}
+        {messages.length === 0 && (
+          <div className="px-6 py-6 bg-gray-50/50 dark:bg-gray-900/20 border-t border-gray-200 dark:border-gray-700">
+            <MainPageTemplates onTemplateSelect={handleMainTemplateSelect} />
+          </div>
+        )}
+
         {/* Messages Display - Scrollable */}
         {messages.length > 0 && (
           <div
             ref={messagesContainerRef}
-            className="max-h-[500px] overflow-y-auto px-6 py-4 space-y-4 bg-gray-50/50 dark:bg-gray-900/20"
+            className="max-h-[500px] overflow-y-auto px-6 py-4 space-y-4 bg-gray-50/50 dark:bg-gray-900/20 border-t border-gray-200 dark:border-gray-700"
             style={{ scrollBehavior: 'smooth' }}
           >
             {messages.map((msg) => (
@@ -312,17 +346,6 @@ export default function PromptCard() {
             <div ref={messagesEndRef} />
           </div>
         )}
-
-        {/* Claude Chat Input - Fixed at bottom */}
-        <div className="p-6 bg-white dark:bg-gray-800">
-          <ClaudeChatInput
-            ref={chatInputRef}
-            onSendMessage={handleSendMessage}
-            initialMessage={draftMessage}
-            onMessageChange={setDraftMessage}
-            onOpenTemplateSelector={handleOpenTemplateSelector}
-          />
-        </div>
       </div>
       </div>
 

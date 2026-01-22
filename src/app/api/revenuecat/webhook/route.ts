@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
+import { getCreditsForPlan } from '@/lib/plans';
 
 // RevenueCat webhook event types
 type RevenueCatEvent =
@@ -40,7 +41,7 @@ interface RevenueCatWebhookPayload {
   api_version: string;
 }
 
-// Verify webhook signature (optional but recommended)
+// Verify webhook signature (required in production)
 function verifyWebhookSignature(
   payload: string,
   signature: string | null
@@ -48,9 +49,15 @@ function verifyWebhookSignature(
   // RevenueCat webhook secret from environment
   const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
 
+  // In production, webhook secret is REQUIRED
   if (!webhookSecret) {
-    console.warn('REVENUECAT_WEBHOOK_SECRET not configured');
-    return true; // Allow in development
+    if (process.env.NODE_ENV === 'production') {
+      console.error('REVENUECAT_WEBHOOK_SECRET not configured in production!');
+      return false; // REJECT in production
+    } else {
+      console.warn('REVENUECAT_WEBHOOK_SECRET not configured - allowing in development only');
+      return true; // Allow in development only
+    }
   }
 
   if (!signature) {
@@ -78,22 +85,12 @@ function getPlanFromEntitlements(entitlements: string[]): string {
   return 'free';
 }
 
-// Get credits for plan
-function getCreditsForPlan(plan: string): number {
-  switch (plan) {
-    case 'enterprise':
-      return 500000;
-    case 'pro':
-      return 50000;
-    case 'free':
-    default:
-      return 1000;
-  }
-}
-
 export async function POST(req: NextRequest) {
+  let body: string = '';
+  let payload: RevenueCatWebhookPayload | null = null;
+
   try {
-    const body = await req.text();
+    body = await req.text();
     const signature = headers().get('x-revenuecat-signature');
 
     // Verify webhook signature
@@ -105,8 +102,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const payload: RevenueCatWebhookPayload = JSON.parse(body);
+    payload = JSON.parse(body);
     const { event } = payload;
+
+    // Create unique event ID from RevenueCat transaction ID and event type
+    const eventId = `rc_${event.transaction_id}_${event.type}`;
+
+    // Check for duplicate webhook events (idempotency)
+    const existingEvent = await prisma.webhookEvent.findUnique({
+      where: { eventId },
+    });
+
+    if (existingEvent) {
+      console.log(`RevenueCat webhook event ${eventId} already processed, skipping`);
+      return NextResponse.json({ received: true, duplicate: true });
+    }
 
     console.log(`RevenueCat webhook: ${event.type} for user ${event.app_user_id}`);
 
@@ -199,9 +209,38 @@ export async function POST(req: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
+    // Record the webhook event to prevent duplicate processing
+    await prisma.webhookEvent.create({
+      data: {
+        eventId: `rc_${event.transaction_id}_${event.type}`,
+        provider: 'revenuecat',
+        eventType: event.type,
+        processed: true,
+        payload: payload as any,
+      },
+    });
+
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('RevenueCat webhook error:', error);
+
+    // Log the failed webhook attempt
+    if (payload) {
+      try {
+        await prisma.webhookEvent.create({
+          data: {
+            eventId: `rc_${payload.event.transaction_id}_${payload.event.type}`,
+            provider: 'revenuecat',
+            eventType: payload.event.type,
+            processed: false,
+            payload: { error: String(error), event: payload as any },
+          },
+        });
+      } catch (logError) {
+        console.error('Failed to log RevenueCat webhook error:', logError);
+      }
+    }
+
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }

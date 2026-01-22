@@ -120,6 +120,21 @@ model ApiKey {
   @@index([userId])
 }
 
+// Webhook Event Tracking (for idempotency)
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  provider  String   // 'stripe' or 'revenuecat'
+  eventId   String   @unique // The event ID from the provider
+  eventType String   // Event type (e.g., 'customer.subscription.updated')
+  processed Boolean  @default(true)
+  payload   Json?    // Optional: store the full payload for debugging
+
+  createdAt DateTime @default(now())
+
+  @@index([provider, eventId])
+  @@index([createdAt])
+}
+
 // Prompt Template System
 model PromptTemplateCategory {
   id          String           @id @default(cuid())

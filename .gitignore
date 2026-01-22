@@ -64,3 +64,7 @@ Thumbs.db
 # Deployment scripts with secrets
 setup-stripe-prod.sh
 .env*.local
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.agent/rules/snyk_rules.md
+demo/

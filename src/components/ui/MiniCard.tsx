@@ -13,9 +13,9 @@ interface MiniCardProps {
 
 export default function MiniCard({ title, children, badges, cta }: MiniCardProps) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white/80 p-6 shadow-lg">
-      <h3 className="mb-1.5 text-lg font-bold">{title}</h3>
-      <p className="mb-4 text-sm text-gray-600">{children}</p>
+    <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 p-6 shadow-lg">
+      <h3 className="mb-1.5 text-lg font-bold text-gray-900 dark:text-white">{title}</h3>
+      <div className="mb-4 text-sm">{children}</div>
       
       {badges && badges.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">

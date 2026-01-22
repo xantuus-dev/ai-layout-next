@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { CreditCard, ExternalLink, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { PLAN_DEFINITIONS } from '@/lib/plans';
 
 function BillingPageContent() {
   const { data: session } = useSession();
@@ -136,65 +137,16 @@ function BillingPageContent() {
           <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
             <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Plan Features</h3>
             <ul className="space-y-2">
-              {plan === 'free' && (
-                <>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    1,000 credits per month
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    Basic AI models
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    Email support
-                  </li>
-                </>
-              )}
-              {plan === 'pro' && (
-                <>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    50,000 credits per month
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    All AI models
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    Priority support
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    API access
-                  </li>
-                </>
-              )}
-              {plan === 'enterprise' && (
-                <>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    500,000 credits per month
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    All AI models
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    Dedicated support
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    Unlimited API access
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Check className="w-4 h-4 text-green-500" />
-                    SLA guarantee
-                  </li>
-                </>
+              {PLAN_DEFINITIONS[plan as keyof typeof PLAN_DEFINITIONS]?.features.map((feature, index) => (
+                <li key={index} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <Check className="w-4 h-4 text-green-500" />
+                  {feature}
+                </li>
+              )) || (
+                <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <Check className="w-4 h-4 text-green-500" />
+                  Basic features
+                </li>
               )}
             </ul>
           </div>
