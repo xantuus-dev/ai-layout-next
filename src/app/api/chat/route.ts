@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAuthenticatedUserId } from '@/lib/api-auth';
+import { aiRouter } from '@/lib/ai-providers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,19 +82,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize Anthropic client
-    const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
-
-    // Map model IDs to Anthropic model names
+    // Map legacy model IDs to new full model names for backward compatibility
     const modelMap: Record<string, string> = {
       'opus-4.5': 'claude-opus-4-5-20251101',
       'sonnet-4.5': 'claude-sonnet-4-5-20250929',
       'haiku-4.5': 'claude-haiku-4-5-20250529',
     };
 
-    const anthropicModel = modelMap[model] || 'claude-sonnet-4-5-20250929';
+    // Use full model ID or map from legacy ID
+    const modelId = modelMap[model] || model || 'claude-sonnet-4-5-20250929';
+
+    // Verify model exists
+    const modelInfo = aiRouter.getModel(modelId);
+    if (!modelInfo) {
+      return NextResponse.json(
+        { error: `Model "${modelId}" not found or not configured` },
+        { status: 400 }
+      );
+    }
 
     // Build message content with support for images and text
     const contentBlocks: any[] = [];
@@ -145,10 +150,13 @@ export async function POST(request: NextRequest) {
     // Determine max tokens and extended thinking based on settings
     const maxTokens = isThinkingEnabled ? 8192 : 4096;
 
-    // Call Anthropic API with content blocks
-    const apiParams: any = {
-      model: anthropicModel,
-      max_tokens: maxTokens,
+    // Prepare thinking config (only for Anthropic models that support it)
+    const thinkingConfig = isThinkingEnabled && modelInfo.capabilities.includes('thinking')
+      ? { type: 'enabled' as const, budget_tokens: 2048 }
+      : undefined;
+
+    // Call AI router with content blocks
+    const response = await aiRouter.chat(modelId, {
       messages: [
         {
           role: 'user',
@@ -157,53 +165,32 @@ export async function POST(request: NextRequest) {
             : contentBlocks,
         },
       ],
-    };
+      maxTokens,
+      thinking: thinkingConfig,
+    });
 
-    // Add extended thinking if enabled
-    if (isThinkingEnabled) {
-      apiParams.thinking = {
-        type: 'enabled',
-        budget_tokens: 2048,
-      };
-    }
-
-    const response = await anthropic.messages.create(apiParams);
-
-    // Extract text content from response
-    let responseText = '';
-    if (response.content && response.content.length > 0) {
-      for (const block of response.content) {
-        if (block.type === 'text') {
-          responseText += block.text;
-        }
-      }
-    }
-
-    if (!responseText) {
-      console.error('No text content in Anthropic response:', JSON.stringify(response.content));
+    if (!response.content) {
+      console.error('No text content in AI response');
       throw new Error('Unable to generate response - no text content received');
     }
 
-    // Calculate credits based on usage (input + output tokens)
-    const inputTokens = response.usage.input_tokens;
-    const outputTokens = response.usage.output_tokens;
-    const totalTokens = inputTokens + outputTokens;
-
-    // Credit calculation: 1 credit per 1000 tokens (adjust as needed)
-    const creditsUsed = Math.max(1, Math.ceil(totalTokens / 1000));
+    // Calculate credits based on usage
+    const { inputTokens, outputTokens, totalTokens } = response.usage;
+    const creditsUsed = aiRouter.estimateCredits(modelId, totalTokens);
 
     // Record usage in database
     await prisma.usageRecord.create({
       data: {
         userId: user.id,
         type: 'chat',
-        model: anthropicModel,
+        model: modelId,
         tokens: totalTokens,
         credits: creditsUsed,
         metadata: {
           inputTokens,
           outputTokens,
           modelRequested: model,
+          provider: response.provider,
         },
       },
     });
@@ -221,8 +208,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        response: responseText,
-        model: model,
+        response: response.content,
+        model: modelId,
+        provider: response.provider,
         timestamp: new Date().toISOString(),
         usage: {
           inputTokens,

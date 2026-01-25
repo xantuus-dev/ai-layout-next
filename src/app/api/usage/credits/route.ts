@@ -91,13 +91,27 @@ export async function GET(request: NextRequest) {
       model: record.model || undefined,
     }));
 
+    const creditsRemaining = user.monthlyCredits - user.creditsUsed;
+    const dailyRefreshCredits = 500; // Daily refresh amount
+    const freeCredits = Math.max(0, creditsRemaining);
+
     return NextResponse.json({
+      // Legacy format
       currentPlan: user.plan.toUpperCase(),
       creditsUsed: user.creditsUsed,
       creditsTotal: user.monthlyCredits,
       resetDate: user.creditsResetAt.toISOString(),
       usageHistory: formattedUsageHistory,
       dailyUsage: formattedDailyUsage,
+
+      // New format for CreditsCard
+      totalCredits: creditsRemaining,
+      monthlyCredits: user.monthlyCredits,
+      creditsRemaining: creditsRemaining,
+      plan: user.plan,
+      dailyRefreshCredits: dailyRefreshCredits,
+      freeCredits: freeCredits,
+      nextResetTime: user.creditsResetAt.toISOString(),
     });
   } catch (error) {
     console.error('Error fetching usage data:', error);

@@ -142,6 +142,7 @@ const PastedContentCard: React.FC<PastedContentCardProps> = ({ content, onRemove
 interface Model {
     id: string;
     name: string;
+    provider: string;
     description: string;
     badge?: string;
 }
@@ -188,7 +189,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ models, selectedModel, on
             </button>
 
             {isOpen && (
-                <div className="absolute bottom-full right-0 mb-2 w-[260px] bg-white dark:bg-[#212121] border border-[#DDDDDD] dark:border-[#30302E] rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col p-1.5 animate-fade-in origin-bottom-right">
+                <div className="absolute top-full right-0 mt-2 w-[260px] bg-white dark:bg-[#212121] border border-[#DDDDDD] dark:border-[#30302E] rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col p-1.5 animate-fade-in origin-top-right max-h-[400px] overflow-y-auto">
                     {models.map(model => (
                         <button
                             key={model.id}
@@ -202,6 +203,9 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ models, selectedModel, on
                                 <div className="flex items-center gap-2">
                                     <span className="text-[13px] font-semibold text-text-100 dark:text-[#ECECEC]">
                                         {model.name}
+                                    </span>
+                                    <span className="px-1.5 py-[1px] rounded text-[9px] font-medium bg-bg-200 dark:bg-[#30302E] text-text-400 dark:text-[#999999] uppercase tracking-wide">
+                                        {model.provider}
                                     </span>
                                     {model.badge && (
                                         <span className={`px-1.5 py-[1px] rounded-full text-[10px] font-medium border ${model.badge === 'Upgrade'
@@ -266,7 +270,7 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void },
     const [files, setFiles] = useState<AttachedFile[]>([]);
     const [pastedContent, setPastedContent] = useState<AttachedFile[]>([]);
     const [isDragging, setIsDragging] = useState(false);
-    const [selectedModel, setSelectedModel] = useState("sonnet-4.5");
+    const [selectedModel, setSelectedModel] = useState("claude-sonnet-4-5-20250929");
     const [isThinkingEnabled, setIsThinkingEnabled] = useState(false);
     const [showFileMenu, setShowFileMenu] = useState(false);
 
@@ -281,10 +285,23 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void },
     const fileInputRef = useRef<HTMLInputElement>(null);
     const fileMenuRef = useRef<HTMLDivElement>(null);
 
+    // Multi-provider model list
     const models = [
-        { id: "opus-4.5", name: "Opus 4.5", description: "Most capable for complex work" },
-        { id: "sonnet-4.5", name: "Sonnet 4.5", description: "Best for everyday tasks" },
-        { id: "haiku-4.5", name: "Haiku 4.5", description: "Fastest for quick answers" }
+        // Anthropic (Claude)
+        { id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5", provider: "Anthropic", description: "Most capable for complex work", badge: "Premium" },
+        { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: "Anthropic", description: "Best for everyday tasks", badge: "" },
+        { id: "claude-haiku-4-5-20250529", name: "Claude Haiku 4.5", provider: "Anthropic", description: "Fastest for quick answers", badge: "Fastest" },
+
+        // OpenAI (GPT)
+        { id: "gpt-4-turbo", name: "GPT-4 Turbo", provider: "OpenAI", description: "Best for code and reasoning", badge: "Code Expert" },
+        { id: "gpt-4o", name: "GPT-4o", provider: "OpenAI", description: "Multimodal powerhouse", badge: "" },
+        { id: "gpt-4o-mini", name: "GPT-4o Mini", provider: "OpenAI", description: "Fast and affordable", badge: "Budget" },
+        { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", provider: "OpenAI", description: "Legacy fast model", badge: "" },
+
+        // Google (Gemini)
+        { id: "gemini-2.0-flash-exp", name: "Gemini 2.0 Flash", provider: "Google", description: "Ultra-fast multimodal", badge: "Cheapest" },
+        { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", provider: "Google", description: "Long context powerhouse", badge: "2M Context" },
+        { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", provider: "Google", description: "Fast and efficient", badge: "" },
     ];
 
     // Auto-resize textarea

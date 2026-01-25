@@ -1,12 +1,27 @@
 import { prisma } from './prisma';
 import { addMonths, isAfter } from 'date-fns';
 import { PLAN_CREDITS, getCreditsForPlan } from './plans';
+import { aiRouter } from './ai-providers';
 
-// Model credit costs (per 1000 tokens)
+// Model credit costs (per 1000 tokens) - Multi-Provider Support
+// Note: This is now dynamically managed by the AI Router
+// These are fallback values if the router is unavailable
 export const MODEL_CREDITS_PER_1K: Record<string, number> = {
+  // Anthropic (Claude)
   'claude-haiku-4-5-20250529': 1,
   'claude-sonnet-4-5-20250929': 3,
   'claude-opus-4-5-20251101': 15,
+
+  // OpenAI (GPT)
+  'gpt-3.5-turbo': 0.5,
+  'gpt-4o-mini': 0.15,
+  'gpt-4o': 5,
+  'gpt-4-turbo': 10,
+
+  // Google (Gemini)
+  'gemini-1.5-flash': 0.075,
+  'gemini-2.0-flash-exp': 0.075,
+  'gemini-1.5-pro': 1.25,
 };
 
 /**
@@ -57,10 +72,17 @@ export async function checkAndResetCredits(userId: string) {
 
 /**
  * Calculate credits required for a given model and token count
+ * Uses AI Router for accurate pricing across all providers
  */
 export function calculateCredits(model: string, tokens: number): number {
-  const creditsPerThousand = MODEL_CREDITS_PER_1K[model] || 3; // Default to Sonnet pricing
-  return Math.max(1, Math.ceil((tokens / 1000) * creditsPerThousand));
+  try {
+    // Try to use AI Router for accurate multi-provider pricing
+    return aiRouter.estimateCredits(model, tokens);
+  } catch (error) {
+    // Fallback to static pricing if router fails
+    const creditsPerThousand = MODEL_CREDITS_PER_1K[model] || 3; // Default to Sonnet pricing
+    return Math.max(1, Math.ceil((tokens / 1000) * creditsPerThousand));
+  }
 }
 
 /**

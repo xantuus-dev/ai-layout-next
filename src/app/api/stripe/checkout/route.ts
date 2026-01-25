@@ -47,15 +47,43 @@ export async function POST(req: NextRequest) {
 
     // Check if user already has an active subscription
     if (user.stripeSubscriptionId) {
-      // User already subscribed - redirect to billing portal instead
-      return NextResponse.json(
-        {
-          error: 'Already subscribed',
-          redirect: '/settings/billing',
-          message: 'You already have an active subscription. Use the billing portal to manage it.'
-        },
-        { status: 400 }
-      );
+      // User wants to change their plan - update existing subscription instead of creating new one
+      try {
+        const subscription = await stripeClient.subscriptions.retrieve(user.stripeSubscriptionId);
+
+        // Update the subscription with the new price
+        const updatedSubscription = await stripeClient.subscriptions.update(user.stripeSubscriptionId, {
+          items: [{
+            id: subscription.items.data[0].id,
+            price: priceId,
+          }],
+          proration_behavior: 'create_prorations', // Prorate the charges
+          metadata: {
+            userId: user.id,
+            previousPriceId: subscription.items.data[0].price.id,
+          },
+        });
+
+        console.log(`Updated subscription ${user.stripeSubscriptionId} to new price ${priceId}`);
+
+        // Redirect to billing page with success message
+        return NextResponse.json({
+          success: true,
+          redirect: '/settings/billing?updated=true',
+          message: 'Your subscription has been updated successfully.',
+        });
+      } catch (error) {
+        console.error('Error updating subscription:', error);
+        // If update fails, redirect to billing portal
+        return NextResponse.json(
+          {
+            error: 'Could not update subscription',
+            redirect: '/settings/billing',
+            message: 'Please use the billing portal to change your plan.'
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Create or get Stripe customer

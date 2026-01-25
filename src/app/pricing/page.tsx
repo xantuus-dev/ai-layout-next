@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, AlertCircle } from 'lucide-react';
 import { PLANS } from '@/lib/stripe';
 import {
   Select,
@@ -14,39 +14,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-const CREDITS_OPTIONS = [
-  "8,000 credits / month",
-  "12,000 credits / month",
-  "16,000 credits / month",
-  "20,000 credits / month",
-  "40,000 credits / month",
-  "63,000 credits / month",
-  "85,000 credits / month",
-  "110,000 credits / month",
-  "170,000 credits / month",
-  "230,000 credits / month",
-  "350,000 credits / month",
-  "480,000 credits / month",
-  "1,200,000 credits / month",
-];
-
-// Pricing map based on credits
-const CREDITS_PRICING: Record<string, number> = {
-  "8,000 credits / month": 40,
-  "12,000 credits / month": 60,
-  "16,000 credits / month": 80,
-  "20,000 credits / month": 100,
-  "40,000 credits / month": 185,
-  "63,000 credits / month": 280,
-  "85,000 credits / month": 370,
-  "110,000 credits / month": 475,
-  "170,000 credits / month": 725,
-  "230,000 credits / month": 975,
-  "350,000 credits / month": 1470,
-  "480,000 credits / month": 2010,
-  "1,200,000 credits / month": 5000,
-};
+import {
+  CREDIT_TIER_PRICES,
+  getAvailableCreditOptions,
+  getCreditsFromDisplayName,
+  getPriceId,
+  getCostPer1KCredits,
+  isPriceIdConfigured,
+  isPricingConfigured,
+} from '@/lib/pricing-config';
 
 export default function PricingPage() {
   const { data: session } = useSession();
@@ -55,34 +31,70 @@ export default function PricingPage() {
   const [selectedCredits, setSelectedCredits] = useState<string>("12,000 credits / month");
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [pricingError, setPricingError] = useState<string | null>(null);
 
-  const handleSubscribe = async (priceId: string | null | undefined, planName: string) => {
+  // Check if pricing is properly configured
+  useEffect(() => {
+    if (!isPricingConfigured()) {
+      setPricingError('Pricing is not fully configured. Please contact support.');
+    }
+  }, []);
+
+  const handleSubscribe = async (priceId: string | null | undefined, planName: string, isProTier: boolean = false) => {
+    console.log('handleSubscribe called:', { priceId, planName, isProTier, session: !!session });
+
     if (!session) {
+      console.log('No session, redirecting to signin');
       router.push('/?auth=signin');
       return;
     }
 
-    if (!priceId) {
-      // Free plan - no checkout needed
+    // For Pro tier, use dynamic price ID based on selected credits and billing cycle
+    let finalPriceId = priceId;
+    if (isProTier) {
+      const credits = getCreditsFromDisplayName(selectedCredits);
+      console.log('Pro tier - selected credits:', selectedCredits, 'parsed:', credits);
+      if (credits) {
+        finalPriceId = getPriceId(credits, billingCycle);
+        console.log('Final price ID for Pro:', finalPriceId);
+      }
+    }
+
+    if (!finalPriceId) {
+      console.error('No price ID available');
+      alert('This plan is not available yet. Please contact support or choose a different plan.');
       return;
     }
 
+    if (!isPriceIdConfigured(finalPriceId)) {
+      console.error('Price ID not configured:', finalPriceId);
+      alert('This pricing tier is not configured. Please contact support.');
+      return;
+    }
+
+    console.log('Starting checkout with price ID:', finalPriceId);
     setIsLoading(planName);
 
     try {
-      // Use Stripe checkout endpoint
+      const requestBody = {
+        priceId: finalPriceId,
+        billingCycle,
+        credits: isProTier ? getCreditsFromDisplayName(selectedCredits) : undefined,
+      };
+      console.log('Sending checkout request:', requestBody);
+
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          priceId,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log('Checkout response status:', response.status);
       const data = await response.json();
+      console.log('Checkout response data:', data);
 
       if (data.error) {
-        // Handle errors (e.g., already subscribed)
+        console.error('Checkout error:', data.error);
         if (data.redirect) {
           alert(data.message || data.error);
           router.push(data.redirect);
@@ -93,7 +105,11 @@ export default function PricingPage() {
       }
 
       if (data.url) {
+        console.log('Redirecting to Stripe checkout:', data.url);
         window.location.href = data.url;
+      } else {
+        console.error('No checkout URL in response');
+        alert('Failed to get checkout URL. Please try again.');
       }
     } catch (error) {
       console.error('Error creating checkout session:', error);
@@ -105,19 +121,30 @@ export default function PricingPage() {
 
   const currentPlan = session?.user?.plan || 'free';
 
-  // Calculate pricing based on billing cycle (20% off for yearly)
-  const calculatePrice = (monthlyPrice: number) => {
-    if (billingCycle === 'yearly') {
-      return Math.round(monthlyPrice * 12 * 0.8); // 20% discount on yearly
-    }
-    return monthlyPrice;
+  // Get current tier pricing
+  const getCurrentTierPrice = () => {
+    const credits = getCreditsFromDisplayName(selectedCredits);
+    if (!credits) return { monthly: 0, yearly: 0 };
+
+    const tier = CREDIT_TIER_PRICES[credits.toString()];
+    if (!tier) return { monthly: 0, yearly: 0 };
+
+    return {
+      monthly: tier.monthlyPrice,
+      yearly: tier.yearlyPrice,
+    };
   };
 
-  const calculateSavings = (monthlyPrice: number) => {
-    const yearlyFull = monthlyPrice * 12;
-    const yearlyDiscounted = monthlyPrice * 12 * 0.8;
-    return Math.round(yearlyFull - yearlyDiscounted);
-  };
+  const currentTierPrice = getCurrentTierPrice();
+  const displayPrice = billingCycle === 'monthly' ? currentTierPrice.monthly : currentTierPrice.yearly;
+  const monthlySavings = currentTierPrice.monthly * 12 - currentTierPrice.yearly;
+
+  // Get cost per 1K credits
+  const costPer1K = (() => {
+    const credits = getCreditsFromDisplayName(selectedCredits);
+    if (!credits) return 0;
+    return getCostPer1KCredits(credits, currentTierPrice.monthly);
+  })();
 
   // Create dynamic Pro plan features based on selected credits
   const getProFeatures = (): string[] => {
@@ -129,6 +156,21 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
+        {/* Pricing Configuration Error */}
+        {pricingError && (
+          <div className="mb-8 max-w-3xl mx-auto bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-yellow-900 dark:text-yellow-100">
+                Configuration Notice
+              </h3>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                {pricingError}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-16">
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-4">
@@ -190,6 +232,11 @@ export default function PricingPage() {
             </CardContent>
             <CardFooter>
               <button
+                onClick={() => {
+                  if (!session) {
+                    router.push('/?auth=signin');
+                  }
+                }}
                 disabled={currentPlan === 'free'}
                 className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -208,14 +255,14 @@ export default function PricingPage() {
               <CardDescription>For professionals and teams</CardDescription>
               <div className="mt-4">
                 <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                  ${calculatePrice(CREDITS_PRICING[selectedCredits] || 60)}
+                  ${displayPrice.toLocaleString()}
                 </span>
                 <span className="text-gray-600 dark:text-gray-400">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
               </div>
               {billingCycle === 'yearly' && (
                 <div className="mt-2">
                   <span className="text-sm text-green-600 dark:text-green-400 font-semibold">
-                    Save ${calculateSavings(CREDITS_PRICING[selectedCredits] || 60)}/year
+                    Save ${monthlySavings.toLocaleString()}/year
                   </span>
                 </div>
               )}
@@ -226,7 +273,7 @@ export default function PricingPage() {
                     <SelectValue placeholder="Select credits per month" />
                   </SelectTrigger>
                   <SelectContent>
-                    {CREDITS_OPTIONS.map((option) => (
+                    {getAvailableCreditOptions().map((option) => (
                       <SelectItem key={option} value={option}>
                         {option}
                       </SelectItem>
@@ -236,10 +283,10 @@ export default function PricingPage() {
               </div>
               <div className="mt-2 flex items-center justify-between text-xs">
                 <span className="text-gray-500 dark:text-gray-400">
-                  {selectedCredits.split(' ')[0]} credits {billingCycle === 'monthly' ? 'per month' : 'per month'}
+                  {selectedCredits.split(' ')[0]} credits per month
                 </span>
                 <span className="text-blue-600 dark:text-blue-400 font-medium">
-                  ${((CREDITS_PRICING[selectedCredits] || 60) / (parseInt(selectedCredits.replace(/,/g, '')) / 1000)).toFixed(2)}/1K credits
+                  ${costPer1K.toFixed(2)}/1K credits
                 </span>
               </div>
             </CardHeader>
@@ -255,7 +302,7 @@ export default function PricingPage() {
             </CardContent>
             <CardFooter>
               <button
-                onClick={() => handleSubscribe(PLANS.PRO.priceId, 'PRO')}
+                onClick={() => handleSubscribe(null, 'PRO', true)}
                 disabled={isLoading === 'PRO' || currentPlan === 'pro'}
                 className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -271,14 +318,14 @@ export default function PricingPage() {
               <CardDescription>For large organizations</CardDescription>
               <div className="mt-4">
                 <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                  ${calculatePrice(199)}
+                  ${billingCycle === 'monthly' ? '199' : '1,910'}
                 </span>
                 <span className="text-gray-600 dark:text-gray-400">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
               </div>
               {billingCycle === 'yearly' && (
                 <div className="mt-2">
                   <span className="text-sm text-green-600 dark:text-green-400 font-semibold">
-                    Save ${calculateSavings(199)}/year
+                    Save $478/year
                   </span>
                 </div>
               )}
@@ -295,7 +342,7 @@ export default function PricingPage() {
             </CardContent>
             <CardFooter>
               <button
-                onClick={() => handleSubscribe(PLANS.ENTERPRISE.priceId, 'ENTERPRISE')}
+                onClick={() => handleSubscribe(PLANS.ENTERPRISE.priceId, 'ENTERPRISE', false)}
                 disabled={isLoading === 'ENTERPRISE' || currentPlan === 'enterprise'}
                 className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
