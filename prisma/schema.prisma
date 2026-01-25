@@ -54,26 +54,43 @@ model User {
   stripeCurrentPeriodEnd DateTime?
 
   // RevenueCat Integration
-  revenueCatUserId       String?   @unique
-  revenueCatCustomerId   String?   // Original transaction app user ID
+  revenueCatUserId     String? @unique
+  revenueCatCustomerId String? // Original transaction app user ID
 
   // Plan & Limits
-  plan                   String    @default("free") // free, pro, enterprise
-  monthlyCredits         Int       @default(1000)
-  creditsUsed            Int       @default(0)
-  creditsResetAt         DateTime  @default(now())
+  plan           String   @default("free") // free, pro, enterprise
+  monthlyCredits Int      @default(1000)
+  creditsUsed    Int      @default(0)
+  creditsResetAt DateTime @default(now())
+  billingCycle   String? // monthly, yearly
+
+  // Payment Status
+  paymentFailed   Boolean   @default(false)
+  paymentFailedAt DateTime?
 
   // Google Integrations
-  googleAccessToken      String?   @db.Text
-  googleRefreshToken     String?   @db.Text
-  googleTokenExpiry      DateTime?
-  googleDriveEnabled     Boolean   @default(false)
-  googleGmailEnabled     Boolean   @default(false)
-  googleCalendarEnabled  Boolean   @default(false)
+  googleAccessToken     String?   @db.Text
+  googleRefreshToken    String?   @db.Text
+  googleTokenExpiry     DateTime?
+  googleDriveEnabled    Boolean   @default(false)
+  googleGmailEnabled    Boolean   @default(false)
+  googleCalendarEnabled Boolean   @default(false)
 
   // Usage tracking
   usageRecords UsageRecord[]
   apiKeys      ApiKey[]
+
+  // Workspace features
+  workspaces    Workspace[]
+  conversations Conversation[]
+  projects      Project[]
+  tasks         Task[]
+
+  // Referral system
+  referralCode     String?    @unique // User's own referral code
+  referredBy       String? // Referral code of user who referred them
+  referredUsers    Referral[] @relation("Referrer")
+  referralReceived Referral?  @relation("Referred")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -89,16 +106,16 @@ model VerificationToken {
 
 // Subscription & Usage Models
 model UsageRecord {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type      String   // "chat", "api", "automation", etc.
-  model     String?  // AI model used
-  tokens    Int      @default(0)
-  credits   Int      @default(1) // Credits consumed
+  type    String // "chat", "api", "automation", etc.
+  model   String? // AI model used
+  tokens  Int     @default(0)
+  credits Int     @default(1) // Credits consumed
 
-  metadata  Json?    // Additional data
+  metadata Json? // Additional data
 
   createdAt DateTime @default(now())
 
@@ -106,13 +123,13 @@ model UsageRecord {
 }
 
 model ApiKey {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name      String
-  key       String   @unique
-  lastUsed  DateTime?
+  name     String
+  key      String    @unique
+  lastUsed DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -122,12 +139,12 @@ model ApiKey {
 
 // Webhook Event Tracking (for idempotency)
 model WebhookEvent {
-  id        String   @id @default(cuid())
-  provider  String   // 'stripe' or 'revenuecat'
-  eventId   String   @unique // The event ID from the provider
-  eventType String   // Event type (e.g., 'customer.subscription.updated')
-  processed Boolean  @default(true)
-  payload   Json?    // Optional: store the full payload for debugging
+  id        String  @id @default(cuid())
+  provider  String // 'stripe' or 'revenuecat'
+  eventId   String  @unique // The event ID from the provider
+  eventType String // Event type (e.g., 'customer.subscription.updated')
+  processed Boolean @default(true)
+  payload   Json? // Optional: store the full payload for debugging
 
   createdAt DateTime @default(now())
 
@@ -137,59 +154,280 @@ model WebhookEvent {
 
 // Prompt Template System
 model PromptTemplateCategory {
-  id          String           @id @default(cuid())
-  name        String           @unique
+  id          String  @id @default(cuid())
+  name        String  @unique
   description String?
-  icon        String?          // Icon name or emoji
-  order       Int              @default(0)
+  icon        String? // Icon name or emoji
+  order       Int     @default(0)
 
-  templates   PromptTemplate[]
+  templates PromptTemplate[]
 
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model PromptTemplate {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Template Info
   title       String
   description String?
-  template    String   @db.Text // The prompt with {{variable}} placeholders
+  template    String  @db.Text // The prompt with {{variable}} placeholders
 
   // Organization
-  categoryId  String?
-  category    PromptTemplateCategory? @relation(fields: [categoryId], references: [id])
-  tags        String[] // For additional filtering
+  categoryId String?
+  category   PromptTemplateCategory? @relation(fields: [categoryId], references: [id])
+  tags       String[] // For additional filtering
 
   // Variables Configuration
   // JSON structure: [{ name: "variable_name", label: "Display Label", type: "text|number|select", placeholder: "...", options: [] }]
-  variables   Json     @default("[]")
+  variables Json @default("[]")
 
   // Visibility & Status
-  isPublic    Boolean  @default(true)
-  isActive    Boolean  @default(true)
-  isFeatured  Boolean  @default(false)
+  isPublic   Boolean @default(true)
+  isActive   Boolean @default(true)
+  isFeatured Boolean @default(false)
 
   // Analytics
-  usageCount  Int      @default(0)
+  usageCount Int @default(0)
 
   // Premium/Tier System
-  tier                 String   @default("free") // 'free', 'pro', 'enterprise'
+  tier String @default("free") // 'free', 'pro', 'enterprise'
 
   // Integration Requirements
-  requiresGoogleDrive  Boolean  @default(false)
-  requiresGmail        Boolean  @default(false)
-  requiresCalendar     Boolean  @default(false)
-  supportsImageGen     Boolean  @default(false)
+  requiresGoogleDrive Boolean @default(false)
+  requiresGmail       Boolean @default(false)
+  requiresCalendar    Boolean @default(false)
+  supportsImageGen    Boolean @default(false)
 
   // Admin tracking
-  createdBy   String?  // Admin user ID
+  createdBy String? // Admin user ID
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([categoryId])
   @@index([isPublic, isActive])
   @@index([tier, isActive])
+}
+
+// Workspace Models
+model Project {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  name        String
+  description String? @db.Text
+  color       String? // Hex color for project identification
+  icon        String? // Icon identifier
+
+  tasks Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([workspaceId])
+}
+
+model Task {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  title       String
+  description String? @db.Text
+  status      String  @default("pending") // pending, in_progress, completed, cancelled
+  priority    String  @default("medium") // low, medium, high, urgent
+
+  // Agent/AI Configuration
+  agentModel  String? // Which AI model/agent to use for this task
+  agentConfig Json? // Agent-specific configuration
+
+  // Task metadata
+  dueDate     DateTime?
+  completedAt DateTime?
+  tags        String[]
+
+  // Execution tracking
+  attempts  Int       @default(0)
+  lastRunAt DateTime?
+  result    Json? // Store execution results
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+// Referral System
+model Referral {
+  id String @id @default(cuid())
+
+  referrerId String
+  referrer   User   @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+
+  referredId String @unique
+  referred   User   @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+
+  creditsAwarded Int    @default(500) // Credits given to both parties
+  status         String @default("pending") // pending, completed
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([referrerId])
+  @@index([referredId])
+}
+
+// Workspace System Models
+
+// Workspace - Groups projects and conversations per user
+model Workspace {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String? @db.Text
+  icon        String? // Icon identifier or emoji
+  color       String? // Hex color for workspace identification
+  isDefault   Boolean @default(false) // One default workspace per user
+
+  // Relations
+  projects      Project[]
+  conversations Conversation[]
+  members       WorkspaceMember[]
+
+  // Organization
+  order Int @default(0) // For custom ordering in sidebar
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isDefault])
+  @@index([userId, order])
+}
+
+// Conversation - Persistent chat threads
+model Conversation {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  title   String  @default("Untitled Conversation") // Auto-generated from first message or user-defined
+  summary String? @db.Text // AI-generated summary of conversation
+
+  // Organization
+  isPinned   Boolean  @default(false)
+  isFavorite Boolean  @default(false)
+  isArchived Boolean  @default(false)
+  tags       String[] // User-defined tags for organization
+  folder     String? // Folder path for hierarchical organization
+
+  // Metadata
+  model         String? // Primary AI model used
+  messageCount  Int      @default(0)
+  lastMessageAt DateTime @default(now())
+
+  // Relations
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([userId, lastMessageAt])
+  @@index([userId, isArchived])
+  @@index([userId, folder])
+}
+
+// Message - Individual chat messages
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role    String // "user" | "assistant" | "system"
+  content String @db.Text
+
+  // AI metadata
+  model           String? // AI model used for this response
+  tokens          Int? // Token count for this message
+  credits         Int? // Credits consumed for this message
+  thinkingEnabled Boolean @default(false)
+
+  // Attachments
+  attachments MessageAttachment[]
+
+  // Message metadata
+  isEdited        Boolean   @default(false)
+  editedAt        DateTime?
+  parentMessageId String? // For future threading support
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([conversationId, createdAt])
+  @@index([conversationId])
+}
+
+// MessageAttachment - File uploads with messages
+model MessageAttachment {
+  id        String  @id @default(cuid())
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  fileName String
+  fileType String // MIME type
+  fileSize Int // In bytes
+  fileUrl  String? @db.Text // S3/storage URL if applicable
+  fileData String? @db.Text // Base64 encoded data for small files
+
+  // Image-specific metadata
+  width     Int?
+  height    Int?
+  thumbnail String? @db.Text // Thumbnail for images
+
+  createdAt DateTime @default(now())
+
+  @@index([messageId])
+}
+
+// WorkspaceMember - For future collaboration features
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  userId      String // Member user ID
+  role        String @default("member") // "owner" | "admin" | "member" | "viewer"
+  permissions Json? // Granular permissions
+
+  invitedBy String? // User ID who sent invite
+  invitedAt DateTime  @default(now())
+  joinedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
 }

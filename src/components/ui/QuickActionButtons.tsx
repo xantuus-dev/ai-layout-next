@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -57,44 +57,49 @@ export function QuickActionButtons({ onCategorySelect }: QuickActionButtonsProps
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm text-gray-500 dark:text-gray-400 mr-2">
+    <div className="flex flex-wrap items-center gap-2 py-2">
+      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
         Quick actions:
       </span>
 
-      {/* Top Category Buttons */}
+      {/* Top 5 Category Buttons */}
       {topCategories.map((category) => (
         <Button
           key={category.id}
           variant="outline"
           size="sm"
           onClick={() => onCategorySelect(category.id, category.name)}
-          className="gap-2"
+          className="gap-1.5 h-8 px-2.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
-          {category.icon && <span>{category.icon}</span>}
-          {category.name}
+          {category.icon && <span className="text-sm">{category.icon}</span>}
+          <span className="font-medium">{category.name}</span>
         </Button>
       ))}
 
-      {/* More Dropdown */}
+      {/* More Dropdown - 6th Button */}
       {remainingCategories.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1">
-              More
-              <ChevronDown className="w-3 h-3" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              aria-label="More categories"
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-56">
             {remainingCategories.map((category) => (
               <DropdownMenuItem
                 key={category.id}
                 onClick={() => onCategorySelect(category.id, category.name)}
+                className="cursor-pointer"
               >
-                {category.icon && <span className="mr-2">{category.icon}</span>}
-                {category.name}
+                {category.icon && <span className="mr-2 text-base">{category.icon}</span>}
+                <span className="font-medium">{category.name}</span>
                 {category._count && category._count.templates > 0 && (
-                  <span className="ml-auto text-xs text-gray-500">
+                  <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
                     {category._count.templates}
                   </span>
                 )}

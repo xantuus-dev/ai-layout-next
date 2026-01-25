@@ -50,6 +50,7 @@ export default function WorkspacePage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -58,11 +59,13 @@ export default function WorkspacePage() {
   }, [status, router]);
 
   useEffect(() => {
-    if (session?.user) {
+    if (status === 'authenticated' && session?.user) {
       fetchTasks();
       fetchProjects();
+    } else if (status === 'unauthenticated') {
+      setLoading(false);
     }
-  }, [session]);
+  }, [session, status]);
 
   const fetchTasks = async () => {
     try {
@@ -70,6 +73,11 @@ export default function WorkspacePage() {
       if (response.ok) {
         const data = await response.json();
         setTasks(data.tasks || []);
+      } else if (response.status === 401) {
+        console.error('Authentication failed - redirecting to login');
+        router.push('/');
+      } else {
+        console.error('Failed to fetch tasks:', response.status);
       }
     } catch (error) {
       console.error('Failed to fetch tasks:', error);
@@ -84,6 +92,10 @@ export default function WorkspacePage() {
       if (response.ok) {
         const data = await response.json();
         setProjects(data.projects || []);
+      } else if (response.status === 401) {
+        console.error('Authentication failed for projects');
+      } else {
+        console.error('Failed to fetch projects:', response.status);
       }
     } catch (error) {
       console.error('Failed to fetch projects:', error);
@@ -94,10 +106,25 @@ export default function WorkspacePage() {
     project.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (status === 'loading' || loading) {
+  if (status === 'loading') {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return null; // Will redirect via useEffect
+  }
+
+  if (loading && status === 'authenticated') {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">Loading workspace...</p>
+        </div>
       </div>
     );
   }

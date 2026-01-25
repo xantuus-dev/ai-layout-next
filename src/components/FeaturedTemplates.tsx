@@ -8,17 +8,22 @@ import { Sparkles, FileText, Mail, Code, Briefcase, PenTool } from 'lucide-react
 interface PromptTemplate {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   template: string;
-  variables: Array<{
-    name: string;
-    label: string;
-    type: string;
-    placeholder?: string;
-  }>;
+  variables: any[];
   categoryId?: string;
+  category: {
+    id: string;
+    name: string;
+    icon: string | null;
+  } | null;
+  tags: string[];
   isFeatured: boolean;
   tier: string;
+  usageCount: number;
+  requiresGoogleDrive: boolean;
+  requiresGmail: boolean;
+  requiresCalendar: boolean;
 }
 
 interface FeaturedTemplatesProps {

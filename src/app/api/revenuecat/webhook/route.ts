@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    payload = JSON.parse(body);
+    payload = JSON.parse(body) as RevenueCatWebhookPayload;
     const { event } = payload;
 
     // Create unique event ID from RevenueCat transaction ID and event type

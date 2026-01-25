@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { stripe, PLANS, isStripeEnabled, getPlanByPriceId } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
+import { getPriceTierByPriceId, getBillingCycleFromPriceId } from '@/lib/pricing-config';
 
 export async function POST(req: NextRequest) {
   if (!isStripeEnabled() || !stripe) {
@@ -125,8 +126,85 @@ export async function POST(req: NextRequest) {
             subscription
           );
 
+          // Clear any payment failed status
+          const user = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { stripeCustomerId: subscription.customer as string },
+                { stripeSubscriptionId: subscription.id },
+              ],
+            },
+          });
+
+          if (user) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                paymentFailed: false,
+                paymentFailedAt: null,
+              },
+            });
+          }
+
           // NOTE: Credit reset is now handled by the credit system (credits.ts)
           // based on creditsResetAt. We only update the subscription fields here.
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+
+        // Access subscription through bracket notation
+        const subscriptionField = (invoice as any).subscription;
+        const subscriptionId = typeof subscriptionField === 'string'
+          ? subscriptionField
+          : subscriptionField?.id;
+
+        if (subscriptionId) {
+          // Find user by subscription ID or customer ID
+          const user = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { stripeSubscriptionId: subscriptionId },
+                { stripeCustomerId: invoice.customer as string },
+              ],
+            },
+          });
+
+          if (user) {
+            // Mark payment as failed
+            await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                paymentFailed: true,
+                paymentFailedAt: new Date(),
+              },
+            });
+
+            console.log(`Payment failed for user ${user.id}, subscription ${subscriptionId}`);
+            // TODO: Send email notification to user about failed payment
+          }
+        }
+        break;
+      }
+
+      case 'customer.subscription.trial_will_end': {
+        const subscription = event.data.object as Stripe.Subscription;
+
+        // Find user and notify them about trial ending
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { stripeSubscriptionId: subscription.id },
+              { stripeCustomerId: subscription.customer as string },
+            ],
+          },
+        });
+
+        if (user) {
+          console.log(`Trial ending soon for user ${user.id}, subscription ${subscription.id}`);
+          // TODO: Send email notification about trial ending
         }
         break;
       }
@@ -197,7 +275,29 @@ async function updateUserSubscription(
 
   const priceId = subscription.items.data[0].price.id;
 
-  // Use centralized plan lookup
+  // First check if this is a custom pricing tier
+  const priceTier = getPriceTierByPriceId(priceId);
+  const billingCycle = getBillingCycleFromPriceId(priceId);
+
+  if (priceTier) {
+    // Custom pricing tier (Pro with variable credits)
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        stripeSubscriptionId: subscription.id,
+        stripePriceId: priceId,
+        stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+        plan: 'pro', // All custom tiers are Pro plan
+        monthlyCredits: priceTier.credits,
+        billingCycle: billingCycle || 'monthly',
+      },
+    });
+
+    console.log(`Updated user ${userId} to Pro plan (${billingCycle}) with ${priceTier.credits} credits`);
+    return;
+  }
+
+  // Fall back to standard plan lookup
   const plan = getPlanByPriceId(priceId);
 
   if (!plan) {

@@ -5,6 +5,7 @@ import MiniCard from '@/components/ui/MiniCard';
 import AuthModal from '@/components/ui/AuthModal';
 import ThemeToggle from '@/components/ThemeToggle';
 import UserProfileDropdown from '@/components/UserProfileDropdown';
+import { CreditsCard } from '@/components/CreditsCard';
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 
@@ -48,12 +49,20 @@ export default function Home() {
               Templates
             </a>
             {isAuthenticated && (
-              <a
-                href="/settings/account"
-                className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                Settings
-              </a>
+              <>
+                <a
+                  href="/workspace"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                  Workspace
+                </a>
+                <a
+                  href="/settings/account"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                  Settings
+                </a>
+              </>
             )}
           </nav>
 
@@ -75,7 +84,10 @@ export default function Home() {
                 </button>
               </>
             ) : (
-              <UserProfileDropdown />
+              <>
+                <CreditsCard />
+                <UserProfileDropdown />
+              </>
             )}
           </div>
         </div>
