@@ -9,6 +9,7 @@ import { TemplateUpgradeBanner } from './TemplateUpgradeBanner';
 import { MainPageTemplates } from '../MainPageTemplates';
 import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { Loader2 } from 'lucide-react';
 
 const chipSuggestions = [
   { id: 1, text: 'AI Agent', fill: 'AI agent for IT helpdesk with approvals + audit logs' },
@@ -52,6 +53,7 @@ export default function PromptCard() {
   const { data: session, status } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
   const [draftMessage, setDraftMessage] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
@@ -90,62 +92,45 @@ export default function PromptCard() {
       return;
     }
 
-    // Add user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: data.message,
-      files: data.files,
-      model: data.model,
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
-    setDraftMessage(''); // Clear draft after sending
+    setIsCreatingWorkspace(true);
 
     try {
-      // Call the API
-      const response = await fetch('/api/chat', {
+      // Step 1: Create workspace and conversation
+      const response = await fetch('/api/workspace/create-agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          prompt: data.message,
+          model: data.model,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create workspace');
+      }
+
+      const { workspaceId, conversationId } = await response.json();
+
+      // Step 2: Store execution data in sessionStorage for the workspace page
+      sessionStorage.setItem(
+        'pendingExecution',
+        JSON.stringify({
+          conversationId,
           message: data.message,
           files: data.files,
           pastedContent: data.pastedContent,
           model: data.model,
           isThinkingEnabled: data.isThinkingEnabled,
-        }),
-      });
+        })
+      );
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: result.response,
-        model: result.model,
-        timestamp: new Date(result.timestamp),
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      // Step 3: Redirect to workspace page
+      window.location.href = `/workspace/${workspaceId}`;
     } catch (error) {
-      console.error('Error sending message:', error);
-
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'Sorry, there was an error processing your message. Please try again.',
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => [...prev, errorMessage]);
+      console.error('Error creating workspace:', error);
+      alert('Failed to create workspace. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsCreatingWorkspace(false);
     }
   };
 
@@ -383,6 +368,18 @@ export default function PromptCard() {
           missingIntegrations={upgradeInfo.missingIntegrations}
           onClose={handleCloseUpgradeBanner}
         />
+      )}
+
+      {/* Creating Workspace Loading Modal */}
+      {isCreatingWorkspace && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <p className="text-gray-900 dark:text-white font-medium">
+              Creating agent workspace...
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

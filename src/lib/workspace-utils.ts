@@ -103,3 +103,48 @@ export function generateConversationTitle(firstMessage: string): string {
 
   return truncated + '...';
 }
+
+/**
+ * Create a new workspace for agent execution
+ * Auto-generates workspace with conversation and returns workspace ID
+ */
+export async function createAgentWorkspace(
+  userId: string,
+  prompt: string,
+  model: string
+): Promise<{ workspaceId: string; conversationId: string }> {
+  // Create workspace with auto-generated name from prompt
+  const workspaceName = generateConversationTitle(prompt);
+
+  const result = await prisma.$transaction(async (tx) => {
+    // Create workspace
+    const workspace = await tx.workspace.create({
+      data: {
+        userId,
+        name: `Agent: ${workspaceName}`,
+        description: 'AI agent execution workspace',
+        icon: '🤖',
+        color: '#6366f1',
+        isDefault: false,
+        order: 0,
+      },
+    });
+
+    // Create conversation within workspace
+    const conversation = await tx.conversation.create({
+      data: {
+        userId,
+        workspaceId: workspace.id,
+        title: workspaceName,
+        model,
+      },
+    });
+
+    return {
+      workspaceId: workspace.id,
+      conversationId: conversation.id,
+    };
+  });
+
+  return result;
+}
