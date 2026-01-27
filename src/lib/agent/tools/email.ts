@@ -5,7 +5,7 @@
  */
 
 import { AgentTool, AgentContext, ToolResult } from '../types';
-import { sendEmail } from '@/lib/google-gmail';
+// import { GoogleGmailClient } from '@/lib/google-gmail';
 
 /**
  * Send an email

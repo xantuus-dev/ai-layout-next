@@ -65,7 +65,7 @@ export async function GET(
       );
     }
 
-    let content: string;
+    let content: string = '';
     let contentType: string;
     let filename: string;
 
@@ -112,7 +112,7 @@ export async function GET(
     const responseContent = contentBuffer || content;
     const contentLength = contentBuffer
       ? contentBuffer.length
-      : Buffer.byteLength(content);
+      : Buffer.byteLength(content || '');
 
     return new NextResponse(responseContent, {
       status: 200,

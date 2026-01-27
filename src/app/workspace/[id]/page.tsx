@@ -6,7 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Loader2, AlertCircle, CheckCircle, Home, Download, FileText, File, Mail } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ClaudeStyleChatInput } from '@/components/ui/claude-style-chat-input';
+import ClaudeChatInput from '@/components/ui/claude-style-chat-input';
 import { InlineQuickActionButtons } from '@/components/workspace/InlineQuickActionButtons';
 import { ConversationSidebar } from '@/components/ConversationSidebar';
 import { Button } from '@/components/ui/button';
@@ -475,7 +475,7 @@ export default function WorkspacePage() {
         {conversation && !isStreaming && executionStatus !== 'thinking' && (
           <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
             <div className="max-w-4xl mx-auto">
-              <ClaudeStyleChatInput
+              <ClaudeChatInput
                 value={inputMessage}
                 onChange={setInputMessage}
                 onSend={(message, files) => sendMessage(message, files)}
