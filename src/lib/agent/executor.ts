@@ -503,9 +503,9 @@ Provide a brief (1-2 sentences) explanation of why this action makes sense.`;
         where: { id: taskId },
         data: {
           status: result.status,
-          result: result.result,
+          result: result.result as any,
           error: result.error,
-          executionTrace: result.trace,
+          executionTrace: result.trace as any,
           totalTokens: result.tokensUsed,
           totalCredits: result.creditsUsed,
           executionTime: result.duration,

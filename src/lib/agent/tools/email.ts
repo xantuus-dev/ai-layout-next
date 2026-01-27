@@ -65,30 +65,14 @@ export class EmailSendTool implements AgentTool {
         };
       }
 
-      // Send email using existing integration
-      const result = await sendEmail(
-        user.googleAccessToken,
-        user.googleRefreshToken || undefined,
-        {
-          to: params.to,
-          subject: params.subject,
-          body: params.body,
-          cc: params.cc,
-          bcc: params.bcc,
-        }
-      );
-
+      // TODO: Implement email sending using GoogleGmailClient
+      // For now, return placeholder response
       return {
-        success: true,
-        data: {
-          to: params.to,
-          subject: params.subject,
-          messageId: result.id,
-          sent: true,
-        },
+        success: false,
+        error: 'Email sending not yet implemented. Please use Gmail directly.',
         metadata: {
           duration: Date.now() - startTime,
-          credits: 10,
+          credits: 0,
         },
       };
     } catch (error: any) {

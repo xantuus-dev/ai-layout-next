@@ -476,12 +476,9 @@ export default function WorkspacePage() {
           <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
             <div className="max-w-4xl mx-auto">
               <ClaudeChatInput
-                value={inputMessage}
-                onChange={setInputMessage}
-                onSend={(message, files) => sendMessage(message, files)}
-                onFilesChange={setInputFiles}
-                placeholder="Ask a follow-up question or request changes..."
-                disabled={isStreaming || executionStatus === 'thinking'}
+                onSendMessage={(data) => sendMessage(data.message, data.files)}
+                initialMessage={inputMessage}
+                onMessageChange={setInputMessage}
               />
             </div>
           </div>
