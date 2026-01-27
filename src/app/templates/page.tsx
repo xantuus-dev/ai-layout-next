@@ -96,8 +96,44 @@ export default function TemplatesGalleryPage() {
     }
   };
 
-  const handleTemplateSelect = (template: Template) => {
-    router.push(`/templates/${template.id}`);
+  const handleTemplateSelect = async (template: Template) => {
+    try {
+      // Create workspace with template
+      const res = await fetch('/api/workspace/create-agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: template.title,
+          description: template.description,
+          initialPrompt: template.template,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to create workspace');
+      }
+
+      const data = await res.json();
+
+      // Store pending execution with template prompt
+      sessionStorage.setItem(
+        'pendingExecution',
+        JSON.stringify({
+          conversationId: data.conversationId,
+          message: template.template,
+          files: [],
+          pastedContent: null,
+          model: 'claude-sonnet-4-5-20250929',
+          isThinkingEnabled: false,
+        })
+      );
+
+      // Navigate to workspace
+      router.push(`/workspace/${data.workspaceId}`);
+    } catch (error) {
+      console.error('Failed to start from template:', error);
+      alert('Failed to create workspace. Please try again.');
+    }
   };
 
   const filteredTemplates = templates.filter((template) =>

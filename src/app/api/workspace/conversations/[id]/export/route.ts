@@ -70,7 +70,24 @@ export async function GET(
     let filename: string;
 
     // Generate export based on format
+    let contentBuffer: Buffer | undefined;
+
     switch (format) {
+      case 'pdf':
+        const { generatePDF } = await import('@/lib/pdf-generator');
+        contentBuffer = await generatePDF(conversation);
+        contentType = 'application/pdf';
+        filename = `conversation-${conversation.id}.pdf`;
+        break;
+
+      case 'docx':
+        const { generateDOCX } = await import('@/lib/docx-generator');
+        contentBuffer = await generateDOCX(conversation);
+        contentType =
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        filename = `conversation-${conversation.id}.docx`;
+        break;
+
       case 'json':
         content = JSON.stringify(conversation, null, 2);
         contentType = 'application/json';
@@ -92,12 +109,17 @@ export async function GET(
     }
 
     // Return file for download
-    return new NextResponse(content, {
+    const responseContent = contentBuffer || content;
+    const contentLength = contentBuffer
+      ? contentBuffer.length
+      : Buffer.byteLength(content);
+
+    return new NextResponse(responseContent, {
       status: 200,
       headers: {
         'Content-Type': contentType,
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': Buffer.byteLength(content).toString(),
+        'Content-Length': contentLength.toString(),
       },
     });
   } catch (error) {

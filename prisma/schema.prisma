@@ -245,22 +245,44 @@ model Task {
 
   title       String
   description String? @db.Text
-  status      String  @default("pending") // pending, in_progress, completed, cancelled
+  status      String  @default("pending") // pending, planning, executing, paused, completed, failed, cancelled
   priority    String  @default("medium") // low, medium, high, urgent
 
   // Agent/AI Configuration
+  agentType   String? // "browser_automation", "email_campaign", "data_processing", "research"
   agentModel  String? // Which AI model/agent to use for this task
   agentConfig Json? // Agent-specific configuration
 
-  // Task metadata
-  dueDate     DateTime?
-  completedAt DateTime?
-  tags        String[]
+  // Execution plan
+  plan         Json?   // Execution plan from planner
+  planTokens   Int     @default(0) // Tokens used for planning
+  planCredits  Int     @default(0) // Credits used for planning
 
   // Execution tracking
-  attempts  Int       @default(0)
-  lastRunAt DateTime?
-  result    Json? // Store execution results
+  currentStep    Int       @default(0) // Which step is currently executing
+  totalSteps     Int       @default(0) // Total steps in plan
+  attempts       Int       @default(0)
+  lastRunAt      DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  failedAt       DateTime?
+
+  // Results and state
+  result         Json?     // Final result
+  executionTrace Json?     // Full trace of what agent did
+  error          String?   @db.Text // Error message if failed
+
+  // Resource usage
+  totalTokens    Int       @default(0)
+  totalCredits   Int       @default(0)
+  executionTime  Int       @default(0) // Milliseconds
+
+  // Task metadata
+  dueDate     DateTime?
+  tags        String[]
+
+  // Relations
+  executions  TaskExecution[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -269,6 +291,7 @@ model Task {
   @@index([projectId])
   @@index([userId, status])
   @@index([userId, createdAt])
+  @@index([status, priority]) // For queue polling
 }
 
 // Referral System
@@ -430,4 +453,53 @@ model WorkspaceMember {
   @@unique([workspaceId, userId])
   @@index([workspaceId])
   @@index([userId])
+}
+
+// Agent Execution System
+// Detailed execution log for each step of an agent's execution
+model TaskExecution {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  step        Int    // Which step this execution represents
+  action      String // What action was taken (e.g., "browser.navigate")
+  tool        String? // Which tool was used
+  input       Json   // Input to the tool
+  output      Json?  // Output from the tool
+  reasoning   String? @db.Text // Agent's reasoning for this step
+
+  status      String // "running", "completed", "failed"
+  error       String? @db.Text
+
+  tokens      Int    @default(0)
+  credits     Int    @default(0)
+  duration    Int    @default(0) // Milliseconds
+
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([taskId, step])
+  @@index([taskId, createdAt])
+}
+
+// Agent health and metrics tracking
+model AgentMetrics {
+  id String @id @default(cuid())
+
+  agentType      String // "browser_automation", "email_campaign", etc.
+  tasksCompleted Int    @default(0)
+  tasksFailed    Int    @default(0)
+  totalTokens    Int    @default(0)
+  totalCredits   Int    @default(0)
+  avgDuration    Int    @default(0) // Average milliseconds
+  successRate    Float  @default(0) // 0-100
+
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([agentType, date])
+  @@index([agentType])
+  @@index([date])
 }
