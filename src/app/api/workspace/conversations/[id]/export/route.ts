@@ -109,12 +109,10 @@ export async function GET(
     }
 
     // Return file for download
-    const responseContent = contentBuffer || content;
-    const contentLength = contentBuffer
-      ? contentBuffer.length
-      : Buffer.byteLength(content || '');
+    const responseContent = contentBuffer ? contentBuffer : Buffer.from(content || '', 'utf-8');
+    const contentLength = responseContent.length;
 
-    return new NextResponse(responseContent, {
+    return new NextResponse(responseContent as any, {
       status: 200,
       headers: {
         'Content-Type': contentType,
