@@ -139,6 +139,8 @@ export async function POST(req: NextRequest) {
 
     // Handle guest checkout (no session)
     console.log('Creating guest checkout session with priceId:', priceId);
+    console.log('Stripe client initialized:', !!stripeClient);
+    console.log('About to call Stripe API...');
 
     // Validate price ID format
     if (!priceId.startsWith('price_')) {
@@ -149,7 +151,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const guestCheckoutSession = await stripeClient.checkout.sessions.create({
+    try {
+      console.log('Calling stripe.checkout.sessions.create...');
+      const guestCheckoutSession = await stripeClient.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [
@@ -179,8 +183,19 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    console.log('Guest checkout session created successfully:', guestCheckoutSession.id);
-    return NextResponse.json({ url: guestCheckoutSession.url });
+      console.log('Guest checkout session created successfully:', guestCheckoutSession.id);
+      return NextResponse.json({ url: guestCheckoutSession.url });
+    } catch (stripeError: any) {
+      console.error('Stripe API error:', {
+        message: stripeError.message,
+        type: stripeError.type,
+        code: stripeError.code,
+        statusCode: stripeError.statusCode,
+        raw: JSON.stringify(stripeError.raw || {}),
+        stack: stripeError.stack,
+      });
+      throw stripeError;
+    }
   } catch (error: any) {
     console.error('Error creating checkout session:', {
       message: error.message,
