@@ -7,6 +7,15 @@ export type { PlanType, PlanId } from './plans';
 // Gracefully handle missing Stripe key (e.g., when using only RevenueCat)
 const stripeKey = process.env.STRIPE_SECRET_KEY;
 
+// Debug logging for production
+if (process.env.NODE_ENV === 'production') {
+  console.log('Stripe Configuration:', {
+    keyPresent: !!stripeKey,
+    keyPrefix: stripeKey?.substring(0, 10),
+    nodeEnv: process.env.NODE_ENV,
+  });
+}
+
 export const stripe = stripeKey
   ? new Stripe(stripeKey, {
       // @ts-ignore - Using stable API version instead of beta version
