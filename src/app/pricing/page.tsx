@@ -88,12 +88,16 @@ export default function PricingPage() {
       console.log('Checkout response data:', data);
 
       if (data.error) {
-        console.error('Checkout error:', data.error);
+        console.error('Checkout error:', data.error, 'Details:', data.details);
+        const errorMsg = data.details
+          ? `${data.error} (${data.details})`
+          : data.error;
+
         if (data.redirect) {
-          alert(data.message || data.error);
+          alert(data.message || errorMsg);
           router.push(data.redirect);
         } else {
-          alert(data.error);
+          alert(`Error: ${errorMsg}\n\nPlease try again or contact support if the issue persists.`);
         }
         return;
       }

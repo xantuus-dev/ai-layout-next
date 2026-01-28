@@ -131,7 +131,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Handle guest checkout (no session)
-    console.log('Creating guest checkout session');
+    console.log('Creating guest checkout session with priceId:', priceId);
+
+    // Validate price ID format
+    if (!priceId.startsWith('price_')) {
+      console.error('Invalid price ID format:', priceId);
+      return NextResponse.json(
+        { error: 'Invalid price ID format' },
+        { status: 400 }
+      );
+    }
 
     const guestCheckoutSession = await stripeClient.checkout.sessions.create({
       mode: 'subscription',
@@ -144,7 +153,7 @@ export async function POST(req: NextRequest) {
       ],
       success_url: `${process.env.NEXTAUTH_URL}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXTAUTH_URL}/pricing?canceled=true`,
-      customer_email: undefined, // Stripe will collect email
+      // Omit customer_email to let Stripe collect it during checkout
       allow_promotion_codes: true,
       billing_address_collection: 'required',
       metadata: {
@@ -163,11 +172,21 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    console.log('Guest checkout session created successfully:', guestCheckoutSession.id);
     return NextResponse.json({ url: guestCheckoutSession.url });
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
+  } catch (error: any) {
+    console.error('Error creating checkout session:', {
+      message: error.message,
+      type: error.type,
+      code: error.code,
+      statusCode: error.statusCode,
+      raw: error.raw,
+    });
+
+    // Return more specific error message if available
+    const errorMessage = error.message || 'Failed to create checkout session';
     return NextResponse.json(
-      { error: 'Failed to create checkout session' },
+      { error: errorMessage, details: error.type || 'unknown' },
       { status: 500 }
     );
   }
