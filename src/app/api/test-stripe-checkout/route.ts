@@ -21,6 +21,13 @@ export async function GET() {
 
     console.log('Attempting to create a test checkout session...');
 
+    const successUrl = 'https://ai.xantuus.com/?success=true';
+    const cancelUrl = 'https://ai.xantuus.com/?canceled=true';
+
+    console.log('Success URL:', successUrl, 'Length:', successUrl.length);
+    console.log('Cancel URL:', cancelUrl, 'Length:', cancelUrl.length);
+    console.log('NEXTAUTH_URL:', process.env.NEXTAUTH_URL);
+
     // Try to create a minimal checkout session
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -29,8 +36,8 @@ export async function GET() {
         price: 'price_1SsrtPD47f8Khc6JRyr0k3xH',
         quantity: 1,
       }],
-      success_url: 'https://ai.xantuus.com/?success=true',
-      cancel_url: 'https://ai.xantuus.com/?canceled=true',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
     });
 
     console.log('Session created successfully:', session.id);
