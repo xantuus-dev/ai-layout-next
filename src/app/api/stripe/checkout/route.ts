@@ -9,6 +9,12 @@ export async function POST(req: NextRequest) {
     // Initialize Stripe client directly in the handler
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
+    console.log('=== STRIPE CHECKOUT DEBUG ===');
+    console.log('Has Stripe key:', !!stripeSecretKey);
+    console.log('Key prefix:', stripeSecretKey?.substring(0, 15));
+    console.log('Node env:', process.env.NODE_ENV);
+    console.log('Next URL:', process.env.NEXTAUTH_URL);
+
     if (!stripeSecretKey) {
       return NextResponse.json(
         { error: 'Stripe is not configured' },
@@ -16,11 +22,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Try a simple fetch first to test connectivity
+    console.log('Testing direct Stripe API connectivity...');
+    try {
+      const testResponse = await fetch('https://api.stripe.com/v1/customers', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+        },
+      });
+      console.log('Direct API test status:', testResponse.status);
+      console.log('Direct API test ok:', testResponse.ok);
+    } catch (fetchError: any) {
+      console.error('Direct API test failed:', fetchError.message);
+    }
+
+    console.log('Initializing Stripe SDK...');
     const Stripe = (await import('stripe')).default;
     const stripeClient = new Stripe(stripeSecretKey, {
       apiVersion: '2024-06-20' as any,
       typescript: true,
+      timeout: 30000, // 30 second timeout
+      maxNetworkRetries: 2,
     });
+    console.log('Stripe SDK initialized');
 
     const session = await getServerSession(authOptions);
     const { priceId, billingCycle, credits } = await req.json();
