@@ -5,6 +5,7 @@
  */
 
 import { AgentTool, AgentContext, ToolResult } from '../types';
+import { browserControl } from '@/lib/browser-control';
 
 /**
  * Navigate to a URL
@@ -31,33 +32,53 @@ export class BrowserNavigateTool implements AgentTool {
     const startTime = Date.now();
 
     try {
-      // In production, this would use your existing browser control system
-      // For now, we'll simulate it
       console.log(`[Browser] Navigating to ${params.url}`);
 
-      // TODO: Integrate with src/lib/browser-control.ts
-      // const browserSession = await createBrowserSession(context.userId);
-      // await browserSession.navigate(params.url);
+      // Create browser session
+      const sessionId = await browserControl.createSession(context.userId);
 
-      return {
-        success: true,
-        data: {
-          url: params.url,
-          status: 'loaded',
-          title: 'Page Title', // Would get from actual page
-        },
-        metadata: {
-          duration: Date.now() - startTime,
-          credits: 10, // Cost for navigation
-        },
-      };
+      try {
+        // Execute navigation
+        const result = await browserControl.executeAction(sessionId, {
+          type: 'navigate',
+          target: params.url,
+        });
+
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error || 'Navigation failed',
+            metadata: {
+              duration: Date.now() - startTime,
+              credits: 25,
+            },
+          };
+        }
+
+        return {
+          success: true,
+          data: {
+            url: result.data?.url || params.url,
+            status: 'loaded',
+            html: result.html,
+            securityWarnings: result.securityWarnings,
+          },
+          metadata: {
+            duration: Date.now() - startTime,
+            credits: 25,
+          },
+        };
+      } finally {
+        // Always cleanup session
+        await browserControl.closeSession(sessionId);
+      }
     } catch (error: any) {
       return {
         success: false,
         error: error.message,
         metadata: {
           duration: Date.now() - startTime,
-          credits: 10,
+          credits: 25,
         },
       };
     }
@@ -83,34 +104,63 @@ export class BrowserExtractTool implements AgentTool {
     return { valid: true };
   }
 
-  async execute(params: { selector: string }, context: AgentContext): Promise<ToolResult> {
+  async execute(params: { selector: string; url?: string }, context: AgentContext): Promise<ToolResult> {
     const startTime = Date.now();
 
     try {
       console.log(`[Browser] Extracting: ${params.selector}`);
 
-      // TODO: Integrate with src/lib/browser-control.ts
-      // const extracted = await browserSession.extract(params.selector);
+      // Create browser session
+      const sessionId = await browserControl.createSession(context.userId);
 
-      return {
-        success: true,
-        data: {
+      try {
+        // Navigate first if URL provided
+        if (params.url) {
+          await browserControl.executeAction(sessionId, {
+            type: 'navigate',
+            target: params.url,
+          });
+        }
+
+        // Extract content
+        const result = await browserControl.executeAction(sessionId, {
+          type: 'extract',
           selector: params.selector,
-          text: 'Extracted content', // Would be actual extracted text
-          elements: 1,
-        },
-        metadata: {
-          duration: Date.now() - startTime,
-          credits: 10,
-        },
-      };
+        });
+
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error || 'Extraction failed',
+            metadata: {
+              duration: Date.now() - startTime,
+              credits: 15,
+            },
+          };
+        }
+
+        return {
+          success: true,
+          data: {
+            selector: params.selector,
+            text: result.data?.extracted || '',
+            securityWarnings: result.securityWarnings,
+          },
+          metadata: {
+            duration: Date.now() - startTime,
+            credits: 15,
+          },
+        };
+      } finally {
+        await browserControl.closeSession(sessionId);
+      }
     } catch (error: any) {
       return {
         success: false,
         error: error.message,
         metadata: {
           duration: Date.now() - startTime,
-          credits: 10,
+          credits: 15,
         },
       };
     }
@@ -136,33 +186,63 @@ export class BrowserClickTool implements AgentTool {
     return { valid: true };
   }
 
-  async execute(params: { selector: string }, context: AgentContext): Promise<ToolResult> {
+  async execute(params: { selector: string; url?: string }, context: AgentContext): Promise<ToolResult> {
     const startTime = Date.now();
 
     try {
       console.log(`[Browser] Clicking: ${params.selector}`);
 
-      // TODO: Integrate with browser control
-      // await browserSession.click(params.selector);
+      // Create browser session
+      const sessionId = await browserControl.createSession(context.userId);
 
-      return {
-        success: true,
-        data: {
+      try {
+        // Navigate first if URL provided
+        if (params.url) {
+          await browserControl.executeAction(sessionId, {
+            type: 'navigate',
+            target: params.url,
+          });
+        }
+
+        // Click element
+        const result = await browserControl.executeAction(sessionId, {
+          type: 'click',
           selector: params.selector,
-          clicked: true,
-        },
-        metadata: {
-          duration: Date.now() - startTime,
-          credits: 5,
-        },
-      };
+        });
+
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error || 'Click failed',
+            metadata: {
+              duration: Date.now() - startTime,
+              credits: 10,
+            },
+          };
+        }
+
+        return {
+          success: true,
+          data: {
+            selector: params.selector,
+            clicked: true,
+            securityWarnings: result.securityWarnings,
+          },
+          metadata: {
+            duration: Date.now() - startTime,
+            credits: 10,
+          },
+        };
+      } finally {
+        await browserControl.closeSession(sessionId);
+      }
     } catch (error: any) {
       return {
         success: false,
         error: error.message,
         metadata: {
           duration: Date.now() - startTime,
-          credits: 5,
+          credits: 10,
         },
       };
     }
@@ -185,33 +265,62 @@ export class BrowserScreenshotTool implements AgentTool {
     return { valid: true };
   }
 
-  async execute(params: any, context: AgentContext): Promise<ToolResult> {
+  async execute(params: { url?: string }, context: AgentContext): Promise<ToolResult> {
     const startTime = Date.now();
 
     try {
       console.log(`[Browser] Taking screenshot`);
 
-      // TODO: Integrate with browser control
-      // const screenshot = await browserSession.screenshot();
+      // Create browser session
+      const sessionId = await browserControl.createSession(context.userId);
 
-      return {
-        success: true,
-        data: {
-          screenshot: 'base64_encoded_image_data',
-          format: 'png',
-        },
-        metadata: {
-          duration: Date.now() - startTime,
-          credits: 15,
-        },
-      };
+      try {
+        // Navigate first if URL provided
+        if (params.url) {
+          await browserControl.executeAction(sessionId, {
+            type: 'navigate',
+            target: params.url,
+          });
+        }
+
+        // Take screenshot
+        const result = await browserControl.executeAction(sessionId, {
+          type: 'screenshot',
+        });
+
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error || 'Screenshot failed',
+            metadata: {
+              duration: Date.now() - startTime,
+              credits: 20,
+            },
+          };
+        }
+
+        return {
+          success: true,
+          data: {
+            screenshot: result.screenshot,
+            format: 'png',
+            securityWarnings: result.securityWarnings,
+          },
+          metadata: {
+            duration: Date.now() - startTime,
+            credits: 20,
+          },
+        };
+      } finally {
+        await browserControl.closeSession(sessionId);
+      }
     } catch (error: any) {
       return {
         success: false,
         error: error.message,
         metadata: {
           duration: Date.now() - startTime,
-          credits: 15,
+          credits: 20,
         },
       };
     }
@@ -238,7 +347,7 @@ export class BrowserWaitForTool implements AgentTool {
   }
 
   async execute(
-    params: { selector: string; timeout?: number },
+    params: { selector: string; timeout?: number; url?: string },
     context: AgentContext
   ): Promise<ToolResult> {
     const startTime = Date.now();
@@ -247,20 +356,65 @@ export class BrowserWaitForTool implements AgentTool {
     try {
       console.log(`[Browser] Waiting for: ${params.selector}`);
 
-      // TODO: Integrate with browser control
-      // await browserSession.waitFor(params.selector, timeout);
+      // Create browser session
+      const sessionId = await browserControl.createSession(context.userId);
 
-      return {
-        success: true,
-        data: {
-          selector: params.selector,
-          appeared: true,
-        },
-        metadata: {
-          duration: Date.now() - startTime,
-          credits: 5,
-        },
-      };
+      try {
+        // Navigate first if URL provided
+        if (params.url) {
+          await browserControl.executeAction(sessionId, {
+            type: 'navigate',
+            target: params.url,
+          });
+        }
+
+        // Wait for element by repeatedly trying to extract it
+        const checkInterval = 500; // Check every 500ms
+        const maxAttempts = Math.floor(timeout / checkInterval);
+        let appeared = false;
+
+        for (let i = 0; i < maxAttempts; i++) {
+          const result = await browserControl.executeAction(sessionId, {
+            type: 'extract',
+            selector: params.selector,
+          });
+
+          if (result.success && result.data?.extracted) {
+            appeared = true;
+            break;
+          }
+
+          // Wait before next attempt
+          if (i < maxAttempts - 1) {
+            await new Promise(resolve => setTimeout(resolve, checkInterval));
+          }
+        }
+
+        if (!appeared) {
+          return {
+            success: false,
+            error: `Element ${params.selector} did not appear within ${timeout}ms`,
+            metadata: {
+              duration: Date.now() - startTime,
+              credits: 5,
+            },
+          };
+        }
+
+        return {
+          success: true,
+          data: {
+            selector: params.selector,
+            appeared: true,
+          },
+          metadata: {
+            duration: Date.now() - startTime,
+            credits: 5,
+          },
+        };
+      } finally {
+        await browserControl.closeSession(sessionId);
+      }
     } catch (error: any) {
       return {
         success: false,

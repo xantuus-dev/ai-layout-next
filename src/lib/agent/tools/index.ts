@@ -19,6 +19,24 @@ import {
   EmailSendBatchTool,
 } from './email';
 
+// Google Drive tools
+import {
+  DriveUploadTool,
+  DriveListTool,
+  DriveCreateDocTool,
+  DriveCreateSheetTool,
+  DriveDownloadTool,
+  DriveShareTool,
+} from './drive';
+
+// Google Calendar tools
+import {
+  CalendarCreateEventTool,
+  CalendarListEventsTool,
+  CalendarUpdateEventTool,
+  CalendarDeleteEventTool,
+} from './calendar';
+
 // HTTP tools
 import {
   HttpGetTool,
@@ -46,6 +64,20 @@ export function initializeTools(): void {
   // Email tools
   toolRegistry.register(new EmailSendTool());
   toolRegistry.register(new EmailSendBatchTool());
+
+  // Google Drive tools
+  toolRegistry.register(new DriveUploadTool());
+  toolRegistry.register(new DriveListTool());
+  toolRegistry.register(new DriveCreateDocTool());
+  toolRegistry.register(new DriveCreateSheetTool());
+  toolRegistry.register(new DriveDownloadTool());
+  toolRegistry.register(new DriveShareTool());
+
+  // Google Calendar tools
+  toolRegistry.register(new CalendarCreateEventTool());
+  toolRegistry.register(new CalendarListEventsTool());
+  toolRegistry.register(new CalendarUpdateEventTool());
+  toolRegistry.register(new CalendarDeleteEventTool());
 
   // HTTP tools
   toolRegistry.register(new HttpGetTool());

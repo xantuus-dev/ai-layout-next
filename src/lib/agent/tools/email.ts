@@ -5,7 +5,7 @@
  */
 
 import { AgentTool, AgentContext, ToolResult } from '../types';
-// import { GoogleGmailClient } from '@/lib/google-gmail';
+import { GoogleGmailClient } from '@/lib/google-gmail';
 
 /**
  * Send an email
@@ -57,7 +57,7 @@ export class EmailSendTool implements AgentTool {
       if (!user?.googleGmailEnabled || !user.googleAccessToken) {
         return {
           success: false,
-          error: 'Gmail not connected. Please connect Gmail in settings.',
+          error: 'Gmail not connected. Please connect Gmail in /settings/integrations',
           metadata: {
             duration: Date.now() - startTime,
             credits: 0,
@@ -65,14 +65,34 @@ export class EmailSendTool implements AgentTool {
         };
       }
 
-      // TODO: Implement email sending using GoogleGmailClient
-      // For now, return placeholder response
+      // Initialize Gmail client
+      const gmail = new GoogleGmailClient(
+        user.googleAccessToken,
+        user.googleRefreshToken,
+        user.googleTokenExpiry
+      );
+
+      // Send email
+      const result = await gmail.sendEmail({
+        to: params.to,
+        cc: params.cc,
+        bcc: params.bcc,
+        subject: params.subject,
+        body: params.body,
+        isHtml: false, // Default to plain text
+      });
+
       return {
-        success: false,
-        error: 'Email sending not yet implemented. Please use Gmail directly.',
+        success: true,
+        data: {
+          messageId: result.id,
+          threadId: result.threadId,
+          to: params.to,
+          subject: params.subject,
+        },
         metadata: {
           duration: Date.now() - startTime,
-          credits: 0,
+          credits: 10,
         },
       };
     } catch (error: any) {
