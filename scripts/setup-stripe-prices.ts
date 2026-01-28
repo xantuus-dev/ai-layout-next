@@ -112,7 +112,7 @@ if (!stripeKey) {
 }
 
 const stripe = new Stripe(stripeKey, {
-  apiVersion: '2025-12-15.clover',
+  apiVersion: '2024-06-20' as any,
   typescript: true,
 });
 
