@@ -32,9 +32,18 @@ export default function Home() {
           <nav className="flex items-center gap-6">
             <a
               href="/"
-              className="text-lg font-bold text-gray-900 dark:text-white"
+              className="flex items-center"
             >
-              Xantuus AI
+              <img
+                src="/xantuus-logo.svg"
+                alt="Xantuus AI"
+                className="h-8 w-auto dark:hidden"
+              />
+              <img
+                src="/xantuus-logo-dark.svg"
+                alt="Xantuus AI"
+                className="h-8 w-auto hidden dark:block"
+              />
             </a>
             <a
               href="/pricing"
