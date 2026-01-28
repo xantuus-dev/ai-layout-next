@@ -6,14 +6,21 @@ import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
   try {
-    if (!isStripeEnabled() || !stripe) {
+    // Initialize Stripe client directly in the handler
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+    if (!stripeSecretKey) {
       return NextResponse.json(
         { error: 'Stripe is not configured' },
         { status: 503 }
       );
     }
 
-    const stripeClient = stripe;
+    const Stripe = (await import('stripe')).default;
+    const stripeClient = new Stripe(stripeSecretKey, {
+      apiVersion: '2024-06-20' as any,
+      typescript: true,
+    });
 
     const session = await getServerSession(authOptions);
     const { priceId, billingCycle, credits } = await req.json();
