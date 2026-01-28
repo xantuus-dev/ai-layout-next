@@ -43,12 +43,6 @@ export default function PricingPage() {
   const handleSubscribe = async (priceId: string | null | undefined, planName: string, isProTier: boolean = false) => {
     console.log('handleSubscribe called:', { priceId, planName, isProTier, session: !!session });
 
-    if (!session) {
-      console.log('No session, redirecting to signin');
-      router.push('/?auth=signin');
-      return;
-    }
-
     // For Pro tier, use dynamic price ID based on selected credits and billing cycle
     let finalPriceId = priceId;
     if (isProTier) {
@@ -233,9 +227,7 @@ export default function PricingPage() {
             <CardFooter>
               <button
                 onClick={() => {
-                  if (!session) {
-                    router.push('/?auth=signin');
-                  }
+                  router.push('/?auth=signin');
                 }}
                 disabled={currentPlan === 'free'}
                 className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"

@@ -61,10 +61,47 @@ export async function POST(req: NextRequest) {
           const subscriptionId = session.subscription as string;
           const subscription = await stripeClient.subscriptions.retrieve(subscriptionId);
 
-          await updateUserSubscription(
-            session.metadata?.userId || subscription.metadata?.userId,
-            subscription
-          );
+          // Handle guest checkout - create user account
+          if (session.metadata?.isGuestCheckout === 'true' && session.customer_email) {
+            console.log('Processing guest checkout for:', session.customer_email);
+
+            // Check if user already exists
+            let user = await prisma.user.findUnique({
+              where: { email: session.customer_email },
+            });
+
+            if (!user) {
+              // Create new user account
+              const credits = parseInt(session.metadata.credits || '4000');
+              const billingCycle = session.metadata.billingCycle || 'monthly';
+
+              user = await prisma.user.create({
+                data: {
+                  email: session.customer_email,
+                  name: session.customer_details?.name || session.customer_email.split('@')[0],
+                  stripeCustomerId: session.customer as string,
+                  stripeSubscriptionId: subscriptionId,
+                  stripePriceId: session.metadata.priceId,
+                  stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+                  plan: credits > 4000 ? 'pro' : 'free',
+                  monthlyCredits: credits,
+                  billingCycle: billingCycle as string,
+                  creditsResetAt: new Date(),
+                },
+              });
+
+              console.log(`Created new user account for ${session.customer_email} with ${credits} credits`);
+            } else {
+              // User exists, update their subscription
+              await updateUserSubscription(user.id, subscription);
+            }
+          } else {
+            // Regular authenticated checkout
+            await updateUserSubscription(
+              session.metadata?.userId || subscription.metadata?.userId,
+              subscription
+            );
+          }
         }
         break;
       }
