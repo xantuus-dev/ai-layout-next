@@ -18,8 +18,7 @@ if (process.env.NODE_ENV === 'production') {
 
 export const stripe = stripeKey
   ? new Stripe(stripeKey, {
-      // @ts-ignore - Using stable API version instead of beta version
-      apiVersion: '2024-06-20',
+      apiVersion: '2024-06-20' as any,
       typescript: true,
     })
   : null;
