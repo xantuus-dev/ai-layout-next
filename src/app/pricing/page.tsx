@@ -318,14 +318,14 @@ export default function PricingPage() {
               <CardDescription>For large organizations</CardDescription>
               <div className="mt-4">
                 <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                  ${billingCycle === 'monthly' ? '199' : '1,910'}
+                  ${billingCycle === 'monthly' ? '185' : '1,776'}
                 </span>
                 <span className="text-gray-600 dark:text-gray-400">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
               </div>
               {billingCycle === 'yearly' && (
                 <div className="mt-2">
                   <span className="text-sm text-green-600 dark:text-green-400 font-semibold">
-                    Save $478/year
+                    Save $444/year
                   </span>
                 </div>
               )}
@@ -342,7 +342,11 @@ export default function PricingPage() {
             </CardContent>
             <CardFooter>
               <button
-                onClick={() => handleSubscribe(PLANS.ENTERPRISE.priceId, 'ENTERPRISE', false)}
+                onClick={() => {
+                  // Enterprise = 40K credits tier
+                  const enterprisePriceId = getPriceId(40000, billingCycle);
+                  handleSubscribe(enterprisePriceId, 'ENTERPRISE', false);
+                }}
                 disabled={isLoading === 'ENTERPRISE' || currentPlan === 'enterprise'}
                 className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
