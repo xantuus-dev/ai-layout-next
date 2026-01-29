@@ -88,14 +88,9 @@ export default function Home() {
               className="flex items-center"
             >
               <img
-                src="/xantuus-logo.svg"
+                src="/xantuus-logo.png"
                 alt="Xantuus AI"
-                className="h-8 w-auto dark:hidden"
-              />
-              <img
-                src="/xantuus-logo-dark.svg"
-                alt="Xantuus AI"
-                className="h-8 w-auto hidden dark:block"
+                className="h-12 w-auto object-contain"
               />
             </a>
             <a
