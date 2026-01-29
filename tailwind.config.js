@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const tailwindColors = require('tailwindcss/colors');
+
 module.exports = {
     darkMode: ['class'],
     content: [
@@ -9,54 +11,46 @@ module.exports = {
   theme: {
   	extend: {
   		colors: {
-  			// Custom theme colors using CSS variables
-  			bg: {
-  				0: 'var(--bg-0)',
-  				000: 'var(--bg-000)',
-  				100: 'var(--bg-100)',
-  				200: 'var(--bg-200)',
-  				300: 'var(--bg-300)',
-  			},
-  			text: {
-  				100: 'var(--text-100)',
-  				200: 'var(--text-200)',
-  				300: 'var(--text-300)',
-  				400: 'var(--text-400)',
-  				500: 'var(--text-500)',
-  			},
-  			accent: {
-  				DEFAULT: 'var(--accent)',
-  				hover: 'var(--accent-hover)',
-  			},
-  			// Standard colors for shadcn/ui components
-  			background: 'var(--color-background)',
-  			foreground: 'var(--color-foreground)',
-  			card: {
-  				DEFAULT: 'var(--color-card)',
-  				foreground: 'var(--color-card-foreground)'
-  			},
-  			popover: {
-  				DEFAULT: 'var(--color-popover)',
-  				foreground: 'var(--color-popover-foreground)'
-  			},
+  			// www.xantuus.com design system - HSL-based colors
+  			border: 'hsl(var(--border))',
+  			input: 'hsl(var(--input))',
+  			ring: 'hsl(var(--ring))',
+  			background: 'hsl(var(--background))',
+  			foreground: 'hsl(var(--foreground))',
   			primary: {
-  				DEFAULT: 'var(--color-primary)',
-  				foreground: 'var(--color-primary-foreground)'
+  				DEFAULT: 'hsl(var(--primary))',
+  				foreground: 'hsl(var(--primary-foreground))',
   			},
   			secondary: {
-  				DEFAULT: 'var(--color-secondary)',
-  				foreground: 'var(--color-secondary-foreground)'
+  				DEFAULT: 'hsl(var(--secondary))',
+  				foreground: 'hsl(var(--secondary-foreground))',
   			},
-  			muted: {
-  				DEFAULT: 'var(--color-muted)',
-  				foreground: 'var(--color-muted-foreground)'
+  			accent: {
+  				DEFAULT: 'hsl(var(--accent))',
+  				foreground: 'hsl(var(--accent-foreground))',
   			},
   			destructive: {
-  				DEFAULT: 'var(--color-destructive)',
+  				DEFAULT: 'hsl(var(--destructive))',
+  				foreground: 'hsl(var(--destructive-foreground))',
   			},
-  			border: 'var(--color-border)',
-  			input: 'var(--color-input)',
-  			ring: 'var(--color-ring)',
+  			muted: {
+  				DEFAULT: 'hsl(var(--muted))',
+  				foreground: 'hsl(var(--muted-foreground))',
+  			},
+  			card: {
+  				DEFAULT: 'hsl(var(--card))',
+  				foreground: 'hsl(var(--card-foreground))',
+  			},
+  			popover: {
+  				DEFAULT: 'hsl(var(--popover))',
+  				foreground: 'hsl(var(--popover-foreground))',
+  			},
+  			// Add Tailwind colors for gradients
+  			lime: tailwindColors.lime,
+  			emerald: tailwindColors.emerald,
+  			teal: tailwindColors.teal,
+  			cyan: tailwindColors.cyan,
+  			slate: tailwindColors.slate,
   		},
   		borderRadius: {
   			lg: 'var(--radius)',

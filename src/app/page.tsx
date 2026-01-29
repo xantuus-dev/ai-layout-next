@@ -33,7 +33,7 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-bg-0">
+    <main className="min-h-screen bg-background">
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
@@ -80,7 +80,7 @@ export default function Home() {
         </div>
       )}
 
-      <header className="sticky top-0 z-50 border-b border-bg-300 bg-bg-100/80 backdrop-blur-sm">
+      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex justify-between items-center">
           <nav className="flex items-center gap-6">
             <a
@@ -88,20 +88,20 @@ export default function Home() {
               className="flex items-center"
             >
               <img
-                src="/xantuus-logo.png"
+                src="/xantuus-logo-light.png"
                 alt="Xantuus AI"
                 className="h-[7em] w-auto object-contain"
               />
             </a>
             <a
               href="/pricing"
-              className="text-sm font-medium text-text-300 hover:text-text-100 transition-colors"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               Pricing
             </a>
             <a
               href="/templates"
-              className="text-sm font-medium text-text-300 hover:text-text-100 transition-colors"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               Templates
             </a>
@@ -109,13 +109,13 @@ export default function Home() {
               <>
                 <a
                   href="/workspace"
-                  className="text-sm font-medium text-text-300 hover:text-text-100 transition-colors"
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Workspace
                 </a>
                 <a
                   href="/settings/account"
-                  className="text-sm font-medium text-text-300 hover:text-text-100 transition-colors"
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Settings
                 </a>
@@ -129,13 +129,13 @@ export default function Home() {
               <>
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="px-4 py-2 text-sm font-medium text-text-300 hover:text-text-100 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Sign In
                 </button>
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="px-6 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent-hover rounded-full transition-colors shadow-md"
+                  className="px-6 py-2 text-sm font-semibold gradient-primary hover:gradient-primary-hover rounded-full transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
                 >
                   Sign Up
                 </button>
@@ -162,7 +162,7 @@ export default function Home() {
                 { text: 'Learn More', href: '/contact', variant: 'primary' }
               ]}
             >
-              <p className="text-text-300">
+              <p className="text-muted-foreground">
                 Build intelligent agents that automate complex workflows and decision-making.
               </p>
             </MiniCard>
@@ -174,7 +174,7 @@ export default function Home() {
                 { text: 'Get Started', href: '/contact', variant: 'primary' }
               ]}
             >
-              <p className="text-text-300">
+              <p className="text-muted-foreground">
                 Streamline operations with AI-powered automation solutions.
               </p>
             </MiniCard>
