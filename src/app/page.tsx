@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 
 export default function Home() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false);
 
@@ -90,7 +90,7 @@ export default function Home() {
               <img
                 src="/xantuus-logo.png"
                 alt="Xantuus AI"
-                className="h-12 w-auto object-contain"
+                className="h-[7em] w-auto object-contain"
               />
             </a>
             <a
