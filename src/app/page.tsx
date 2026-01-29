@@ -33,7 +33,7 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <main className="min-h-screen bg-bg-0">
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
@@ -43,7 +43,7 @@ export default function Home() {
       {/* Checkout Success Banner */}
       {showCheckoutSuccess && !isAuthenticated && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-md w-full mx-4">
-          <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-500 rounded-lg p-6 shadow-xl">
+          <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-500 rounded-lg p-6 shadow-xl backdrop-blur-sm">
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0">
                 <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -80,7 +80,7 @@ export default function Home() {
         </div>
       )}
 
-      <header className="sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+      <header className="sticky top-0 z-50 border-b border-bg-300 bg-bg-100/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex justify-between items-center">
           <nav className="flex items-center gap-6">
             <a
@@ -100,13 +100,13 @@ export default function Home() {
             </a>
             <a
               href="/pricing"
-              className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="text-sm font-medium text-text-300 hover:text-text-100 transition-colors"
             >
               Pricing
             </a>
             <a
               href="/templates"
-              className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="text-sm font-medium text-text-300 hover:text-text-100 transition-colors"
             >
               Templates
             </a>
@@ -114,13 +114,13 @@ export default function Home() {
               <>
                 <a
                   href="/workspace"
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="text-sm font-medium text-text-300 hover:text-text-100 transition-colors"
                 >
                   Workspace
                 </a>
                 <a
                   href="/settings/account"
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="text-sm font-medium text-text-300 hover:text-text-100 transition-colors"
                 >
                   Settings
                 </a>
@@ -134,13 +134,13 @@ export default function Home() {
               <>
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-text-300 hover:text-text-100 transition-colors"
                 >
                   Sign In
                 </button>
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="px-6 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full hover:opacity-90 transition-opacity shadow-md"
+                  className="px-6 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent-hover rounded-full transition-colors shadow-md"
                 >
                   Sign Up
                 </button>
@@ -167,7 +167,7 @@ export default function Home() {
                 { text: 'Learn More', href: '/contact', variant: 'primary' }
               ]}
             >
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-text-300">
                 Build intelligent agents that automate complex workflows and decision-making.
               </p>
             </MiniCard>
@@ -179,7 +179,7 @@ export default function Home() {
                 { text: 'Get Started', href: '/contact', variant: 'primary' }
               ]}
             >
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-text-300">
                 Streamline operations with AI-powered automation solutions.
               </p>
             </MiniCard>

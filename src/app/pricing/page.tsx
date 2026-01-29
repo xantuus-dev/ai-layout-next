@@ -152,7 +152,7 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-bg-0">
       <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
         {/* Pricing Configuration Error */}
         {pricingError && (
@@ -171,10 +171,10 @@ export default function PricingPage() {
 
         {/* Header */}
         <div className="text-center mb-16">
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-4">
+          <h1 className="text-5xl md:text-6xl font-bold text-text-100 mb-4">
             Simple, transparent pricing
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="text-xl text-text-300 max-w-2xl mx-auto">
             Choose the perfect plan for your needs. Upgrade or downgrade at any time.
           </p>
 
@@ -184,8 +184,8 @@ export default function PricingPage() {
               onClick={() => setBillingCycle('monthly')}
               className={`px-6 py-2 rounded-lg font-semibold transition-all ${
                 billingCycle === 'monthly'
-                  ? 'bg-blue-500 text-white shadow-md'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  ? 'bg-accent text-white shadow-md'
+                  : 'bg-bg-200 text-text-200 hover:bg-bg-300'
               }`}
             >
               Monthly
@@ -194,8 +194,8 @@ export default function PricingPage() {
               onClick={() => setBillingCycle('yearly')}
               className={`px-6 py-2 rounded-lg font-semibold transition-all relative ${
                 billingCycle === 'yearly'
-                  ? 'bg-blue-500 text-white shadow-md'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  ? 'bg-accent text-white shadow-md'
+                  : 'bg-bg-200 text-text-200 hover:bg-bg-300'
               }`}
             >
               Yearly
@@ -209,13 +209,13 @@ export default function PricingPage() {
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {/* Free Plan */}
-          <Card className="relative flex flex-col border-2 hover:border-blue-200 dark:hover:border-blue-800 transition-all">
+          <Card className="relative flex flex-col border-2 border-bg-300 hover:border-accent/30 transition-all">
             <CardHeader>
               <CardTitle className="text-2xl">Free</CardTitle>
               <CardDescription>Perfect for getting started</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold text-gray-900 dark:text-white">$0</span>
-                <span className="text-gray-600 dark:text-gray-400">/month</span>
+                <span className="text-4xl font-bold text-text-100">$0</span>
+                <span className="text-text-300">/month</span>
               </div>
             </CardHeader>
             <CardContent className="flex-grow">
@@ -223,7 +223,7 @@ export default function PricingPage() {
                 {PLANS.FREE.features.map((feature, i) => (
                   <li key={i} className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-gray-700 dark:text-gray-300">{feature}</span>
+                    <span className="text-text-200">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -234,7 +234,7 @@ export default function PricingPage() {
                   router.push('/?auth=signin');
                 }}
                 disabled={currentPlan === 'free'}
-                className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-bg-200 text-text-100 hover:bg-bg-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {currentPlan === 'free' ? 'Current Plan' : 'Get Started'}
               </button>
@@ -242,18 +242,18 @@ export default function PricingPage() {
           </Card>
 
           {/* Pro Plan */}
-          <Card className="relative flex flex-col border-2 border-blue-500 dark:border-blue-600 shadow-xl scale-105">
+          <Card className="relative flex flex-col border-2 border-accent shadow-xl scale-105">
             <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-              <Badge className="bg-blue-500 text-white px-4 py-1 text-sm">Most Popular</Badge>
+              <Badge className="bg-accent text-white px-4 py-1 text-sm">Most Popular</Badge>
             </div>
             <CardHeader>
               <CardTitle className="text-2xl">Pro</CardTitle>
               <CardDescription>For professionals and teams</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                <span className="text-4xl font-bold text-text-100">
                   ${displayPrice.toLocaleString()}
                 </span>
-                <span className="text-gray-600 dark:text-gray-400">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+                <span className="text-text-300">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
               </div>
               {billingCycle === 'yearly' && (
                 <div className="mt-2">
@@ -278,10 +278,10 @@ export default function PricingPage() {
                 </Select>
               </div>
               <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-gray-500 dark:text-gray-400">
+                <span className="text-text-400">
                   {selectedCredits.split(' ')[0]} credits per month
                 </span>
-                <span className="text-blue-600 dark:text-blue-400 font-medium">
+                <span className="text-accent font-medium">
                   ${costPer1K.toFixed(2)}/1K credits
                 </span>
               </div>
@@ -291,7 +291,7 @@ export default function PricingPage() {
                 {getProFeatures().map((feature, i) => (
                   <li key={i} className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-gray-700 dark:text-gray-300">{feature}</span>
+                    <span className="text-text-200">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -300,7 +300,7 @@ export default function PricingPage() {
               <button
                 onClick={() => handleSubscribe(null, 'PRO', true)}
                 disabled={isLoading === 'PRO' || currentPlan === 'pro'}
-                className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-accent hover:bg-accent-hover text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading === 'PRO' ? 'Loading...' : currentPlan === 'pro' ? 'Current Plan' : 'Get Started'}
               </button>
@@ -308,15 +308,15 @@ export default function PricingPage() {
           </Card>
 
           {/* Enterprise Plan */}
-          <Card className="relative flex flex-col border-2 hover:border-purple-200 dark:hover:border-purple-800 transition-all">
+          <Card className="relative flex flex-col border-2 border-bg-300 hover:border-accent/30 transition-all">
             <CardHeader>
               <CardTitle className="text-2xl">Enterprise</CardTitle>
               <CardDescription>For large organizations</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                <span className="text-4xl font-bold text-text-100">
                   ${billingCycle === 'monthly' ? '185' : '1,776'}
                 </span>
-                <span className="text-gray-600 dark:text-gray-400">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+                <span className="text-text-300">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
               </div>
               {billingCycle === 'yearly' && (
                 <div className="mt-2">
@@ -331,7 +331,7 @@ export default function PricingPage() {
                 {PLANS.ENTERPRISE.features.map((feature, i) => (
                   <li key={i} className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-gray-700 dark:text-gray-300">{feature}</span>
+                    <span className="text-text-200">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -344,7 +344,7 @@ export default function PricingPage() {
                   handleSubscribe(enterprisePriceId, 'ENTERPRISE', false);
                 }}
                 disabled={isLoading === 'ENTERPRISE' || currentPlan === 'enterprise'}
-                className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-text-100 hover:bg-text-200 text-bg-0 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading === 'ENTERPRISE' ? 'Loading...' : currentPlan === 'enterprise' ? 'Current Plan' : 'Get Started'}
               </button>
