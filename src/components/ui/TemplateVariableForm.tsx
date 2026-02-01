@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Copy, Send, X, HardDrive, Mail, Calendar as CalendarIcon } from 'lucide-react';
 import { GoogleIntegrationBadge } from './GoogleIntegrationBadge';
 import { GoogleConnectPrompt } from './GoogleConnectPrompt';
+import { TemplateVariableHighlighter } from './TemplateVariableHighlighter';
 
 interface Variable {
   name: string;
@@ -388,9 +389,12 @@ export function TemplateVariableForm({
               </CardHeader>
               <CardContent>
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 min-h-[200px] max-h-[400px] overflow-y-auto">
-                  <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans">
-                    {populatedPrompt}
-                  </pre>
+                  <div className="text-sm text-gray-700 dark:text-gray-300 font-sans">
+                    <TemplateVariableHighlighter
+                      text={populatedPrompt}
+                      variables={template.variables}
+                    />
+                  </div>
                 </div>
 
                 <div className="flex gap-2 mt-4">

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { X, Wand2 } from 'lucide-react';
+import { TemplateVariableHighlighter } from '@/components/ui/TemplateVariableHighlighter';
 
 interface TemplateVariable {
   name: string;
@@ -192,7 +193,10 @@ export function TemplateVariableInput({
             Preview:
           </h4>
           <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-900 dark:text-gray-100 leading-relaxed">
-            {renderPreviewWithHighlights()}
+            <TemplateVariableHighlighter
+              text={previewText}
+              variables={template.variables}
+            />
           </div>
         </div>
 

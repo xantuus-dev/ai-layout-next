@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Copy, Check, Sparkles, Loader2 } from 'lucide-react';
+import { TemplateVariableHighlighter } from '@/components/ui/TemplateVariableHighlighter';
 
 interface TemplateVariable {
   name: string;
@@ -296,9 +297,12 @@ export default function TemplateDetailPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="relative">
-                  <pre className="text-sm bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto whitespace-pre-wrap">
-                    {generatedPrompt}
-                  </pre>
+                  <div className="text-sm bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto">
+                    <TemplateVariableHighlighter
+                      text={generatedPrompt}
+                      variables={template.variables as TemplateVariable[]}
+                    />
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
