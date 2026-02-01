@@ -291,11 +291,11 @@ export default function WorkspacePage() {
     <div
       className={`p-4 rounded-lg ${
         message.role === 'user'
-          ? 'bg-blue-50 dark:bg-blue-900/20 ml-8'
-          : 'bg-white dark:bg-gray-800 mr-8 shadow-sm'
+          ? 'bg-violet-50 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900/50 ml-8'
+          : 'bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 mr-8 shadow-sm'
       }`}
     >
-      <div className="text-xs font-semibold mb-2 text-gray-500 dark:text-gray-400">
+      <div className="text-xs font-semibold mb-2 text-gray-500 dark:text-zinc-400">
         {message.role === 'user' ? 'You' : 'AI Agent'}
         {message.model && ` (${message.model})`}
       </div>
@@ -303,7 +303,7 @@ export default function WorkspacePage() {
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
       </div>
       {message.tokens && (
-        <div className="mt-2 text-xs text-gray-400">
+        <div className="mt-2 text-xs text-gray-400 dark:text-zinc-500">
           {message.tokens} tokens • {message.credits} credits
         </div>
       )}
@@ -320,17 +320,17 @@ export default function WorkspacePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-          <p className="text-gray-600 dark:text-gray-400">Loading workspace...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
+          <p className="text-gray-600 dark:text-zinc-400">Loading workspace...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-gray-50 dark:bg-zinc-950">
       {/* Conversation Sidebar */}
       <ConversationSidebar
         currentConversationId={conversation?.id}
@@ -342,20 +342,20 @@ export default function WorkspacePage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Header */}
-        <header className="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <header className="sticky top-0 z-40 border-b border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 backdrop-blur-xl">
           <div className="px-4 md:px-8 py-4 flex justify-between items-center">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => router.push('/')}
-                className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                className="flex items-center gap-2 text-sm text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-zinc-100 transition-colors"
               >
                 <Home className="w-4 h-4" />
                 <span>Home</span>
               </button>
-              <div className="border-l border-gray-300 dark:border-gray-600 h-4" />
+              <div className="border-l border-gray-300 dark:border-zinc-700 h-4" />
               <div className="flex items-center gap-2">
                 <span className="text-xl">{workspace?.icon || '🤖'}</span>
-                <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+                <h1 className="text-lg font-bold text-gray-900 dark:text-zinc-50">
                   {workspace?.name || 'Agent Workspace'}
                 </h1>
               </div>
@@ -365,25 +365,25 @@ export default function WorkspacePage() {
             <div className="flex items-center gap-3">
               {/* Status */}
               {executionStatus === 'thinking' && (
-                <div className="flex items-center gap-2 text-blue-600">
+                <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-sm hidden sm:inline">Thinking...</span>
                 </div>
               )}
               {executionStatus === 'streaming' && (
-                <div className="flex items-center gap-2 text-green-600">
+                <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-sm hidden sm:inline">Streaming...</span>
                 </div>
               )}
               {executionStatus === 'complete' && (
-                <div className="flex items-center gap-2 text-green-600">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                   <CheckCircle className="w-4 h-4" />
                   <span className="text-sm hidden sm:inline">Complete</span>
                 </div>
               )}
               {executionStatus === 'error' && (
-                <div className="flex items-center gap-2 text-red-600">
+                <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                   <AlertCircle className="w-4 h-4" />
                   <span className="text-sm hidden sm:inline">Error</span>
                 </div>
@@ -436,8 +436,8 @@ export default function WorkspacePage() {
 
               {/* Streaming message */}
               {isStreaming && streamingContent && (
-                <div className="p-4 rounded-lg bg-white dark:bg-gray-800 mr-8 shadow-sm">
-                  <div className="text-xs font-semibold mb-2 text-gray-500 dark:text-gray-400">
+                <div className="p-4 rounded-lg bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 mr-8 shadow-sm">
+                  <div className="text-xs font-semibold mb-2 text-gray-500 dark:text-zinc-400">
                     AI Agent (streaming...)
                   </div>
                   <div className="prose dark:prose-invert max-w-none">
@@ -448,16 +448,16 @@ export default function WorkspacePage() {
 
               {/* Thinking indicator */}
               {executionStatus === 'thinking' && !streamingContent && (
-                <div className="p-4 rounded-lg bg-white dark:bg-gray-800 mr-8 shadow-sm">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                <div className="p-4 rounded-lg bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 mr-8 shadow-sm">
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400">
+                    <Loader2 className="w-4 h-4 animate-spin text-violet-600" />
                     <span>AI is thinking...</span>
                   </div>
                 </div>
               )}
 
               {error && (
-                <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50">
                   <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                     <AlertCircle className="w-4 h-4" />
                     <span className="font-semibold">Error:</span>
@@ -473,7 +473,7 @@ export default function WorkspacePage() {
 
         {/* Chat Input Section - Multi-turn conversations */}
         {conversation && !isStreaming && executionStatus !== 'thinking' && (
-          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <div className="border-t border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
             <div className="max-w-4xl mx-auto">
               <ClaudeChatInput
                 onSendMessage={(data) => sendMessage(data.message, data.files)}

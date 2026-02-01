@@ -128,54 +128,54 @@ export function ConversationSidebar({
 
   if (isCollapsed) {
     return (
-      <div className="w-12 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col items-center py-4 gap-2">
+      <div className="w-12 border-r border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex flex-col items-center py-4 gap-2">
         <button
           onClick={() => setIsCollapsed(false)}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-900 transition-colors"
           title="Expand sidebar"
         >
-          <ChevronRight className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          <ChevronRight className="h-5 w-5 text-gray-600 dark:text-zinc-400" />
         </button>
         <button
           onClick={onNewConversation}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-900 transition-colors"
           title="New conversation"
         >
-          <Plus className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          <Plus className="h-5 w-5 text-gray-600 dark:text-zinc-400" />
         </button>
         <div className="flex-1" />
         <button
           onClick={loadConversations}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-900 transition-colors"
           title="Refresh"
         >
-          <MessageSquare className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          <MessageSquare className="h-5 w-5 text-gray-600 dark:text-zinc-400" />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col h-full">
+    <div className="w-64 border-r border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-3">
+      <div className="p-4 border-b border-gray-200 dark:border-zinc-800 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-50">
             Conversations
           </h2>
           <button
             onClick={() => setIsCollapsed(true)}
-            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-zinc-900 transition-colors"
             title="Collapse sidebar"
           >
-            <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-zinc-400" />
           </button>
         </div>
 
         {/* New Conversation Button */}
         <button
           onClick={onNewConversation}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 text-white rounded-lg transition-colors shadow-lg shadow-violet-500/20"
         >
           <Plus className="h-4 w-4" />
           <span className="font-medium">New Chat</span>
@@ -183,13 +183,13 @@ export function ConversationSidebar({
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-zinc-500" />
           <input
             type="text"
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-3 py-2 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg text-sm text-gray-900 dark:text-zinc-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:focus:ring-violet-500 transition-all"
           />
         </div>
 
@@ -199,8 +199,8 @@ export function ConversationSidebar({
             onClick={() => setShowArchived(!showArchived)}
             className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded text-xs transition-colors ${
               showArchived
-                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800'
+                : 'bg-gray-100 dark:bg-zinc-900 text-gray-600 dark:text-zinc-400 border border-transparent'
             }`}
           >
             <Archive className="h-3 w-3" />
@@ -212,11 +212,11 @@ export function ConversationSidebar({
       {/* Conversation List */}
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+          <div className="p-4 text-center text-zinc-500 dark:text-zinc-400">
             Loading...
           </div>
         ) : filteredConversations.length === 0 ? (
-          <div className="p-4 text-center text-gray-500 dark:text-gray-400 space-y-2">
+          <div className="p-4 text-center text-zinc-500 dark:text-zinc-400 space-y-2">
             <MessageSquare className="h-8 w-8 mx-auto opacity-50" />
             <p className="text-sm">
               {searchQuery ? 'No conversations found' : 'No conversations yet'}
@@ -230,25 +230,25 @@ export function ConversationSidebar({
                 onClick={() => onSelectConversation(conv.id)}
                 className={`w-full text-left p-3 rounded-lg transition-all group ${
                   currentConversationId === conv.id
-                    ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent'
+                    ? 'bg-violet-50 dark:bg-violet-950/50 border border-violet-200 dark:border-violet-800 shadow-sm'
+                    : 'hover:bg-gray-50 dark:hover:bg-zinc-900 border border-transparent'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-1 flex-1">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-zinc-100 line-clamp-1 flex-1">
                     {conv.title}
                   </h3>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => toggleFavorite(conv.id, conv.isFavorite || false, e)}
-                      className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                      className="p-1 rounded hover:bg-gray-200 dark:hover:bg-zinc-800"
                       title={conv.isFavorite ? 'Unfavorite' : 'Favorite'}
                     >
                       <Star
                         className={`h-3 w-3 ${
                           conv.isFavorite
                             ? 'fill-yellow-400 text-yellow-400'
-                            : 'text-gray-400'
+                            : 'text-gray-400 dark:text-zinc-500'
                         }`}
                       />
                     </button>
@@ -257,18 +257,18 @@ export function ConversationSidebar({
                       className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30"
                       title="Delete"
                     >
-                      <Trash2 className="h-3 w-3 text-gray-400 hover:text-red-600 dark:hover:text-red-400" />
+                      <Trash2 className="h-3 w-3 text-gray-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400" />
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-500">
                   <Clock className="h-3 w-3" />
                   <span>{formatDate(conv.lastMessageAt)}</span>
-                  <span className="text-gray-400">•</span>
+                  <span className="text-gray-400 dark:text-zinc-600">•</span>
                   <span>{conv.messageCount} messages</span>
                   {conv.model && (
                     <>
-                      <span className="text-gray-400">•</span>
+                      <span className="text-gray-400 dark:text-zinc-600">•</span>
                       <span className="truncate">{conv.model}</span>
                     </>
                   )}
