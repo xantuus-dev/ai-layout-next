@@ -16,6 +16,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
   const [showSuccess, setShowSuccess] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
   const [isVerified, setIsVerified] = useState(false);
+  const [error, setError] = useState<string>('');
 
   if (!isOpen) return null;
 
@@ -36,27 +37,20 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
 
   const handleOAuthLogin = async (provider: 'google' | 'apple' | 'azure-ad') => {
     try {
-      setShowSuccess(true);
+      setError('');
+      console.log('Initiating OAuth login with provider:', provider);
 
-      // Sign in with OAuth provider
+      // Sign in with OAuth provider - this will redirect to provider's OAuth page
       const result = await signIn(provider, {
-        redirect: false,
-        callbackUrl: '/',
+        callbackUrl: window.location.origin,
+        redirect: true,
       });
 
-      if (result?.ok) {
-        setTimeout(() => {
-          onSuccess();
-          onClose();
-          setShowSuccess(false);
-        }, 2000);
-      } else {
-        setShowSuccess(false);
-        console.error('Authentication failed');
-      }
+      console.log('SignIn result:', result);
+      // Note: Code after this typically won't execute as the page redirects
     } catch (error) {
       console.error('OAuth error:', error);
-      setShowSuccess(false);
+      setError('Failed to initiate login. Please try again.');
     }
   };
 
@@ -161,6 +155,13 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                   siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
                   onSuccess={handleTurnstileSuccess}
                 />
+              </div>
+            )}
+
+            {/* Error Message */}
+            {error && (
+              <div className="p-4 bg-red-500/10 border border-red-500/50 rounded-xl">
+                <p className="text-red-400 text-sm">{error}</p>
               </div>
             )}
 
