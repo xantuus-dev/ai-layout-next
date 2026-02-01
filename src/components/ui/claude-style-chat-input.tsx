@@ -252,19 +252,35 @@ interface ClaudeChatInputProps {
     onOpenTemplateSelector?: (categoryId: string | null) => void;
 }
 
-export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void }, ClaudeChatInputProps>(({
+export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; focusAndHighlight?: () => void }, ClaudeChatInputProps>(({
     onSendMessage,
     initialMessage = "",
     onMessageChange,
     onOpenTemplateSelector
 }, ref) => {
     const [message, setMessage] = useState(initialMessage);
+    const [isHighlighted, setIsHighlighted] = useState(false);
 
-    // Expose setMessage method via ref
+    // Expose setMessage and focusAndHighlight methods via ref
     useImperativeHandle(ref, () => ({
         setMessage: (msg: string) => {
             setMessage(msg);
             onMessageChange?.(msg);
+        },
+        focusAndHighlight: () => {
+            // Focus the textarea
+            textareaRef.current?.focus();
+
+            // Trigger highlight animation
+            setIsHighlighted(true);
+            setTimeout(() => setIsHighlighted(false), 1500);
+
+            // Scroll into view (works for inline contexts, ignored for fixed modals)
+            textareaRef.current?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+                inline: 'nearest'
+            });
         }
     }));
     const [files, setFiles] = useState<AttachedFile[]>([]);
@@ -460,10 +476,11 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void },
         >
             {/* Main Container - matching the inspected element structure */}
             <div className={`
-                !box-content flex flex-col mx-2 md:mx-0 items-stretch transition-all duration-200 relative z-10 rounded-2xl cursor-text border border-bg-300 dark:border-transparent 
+                !box-content flex flex-col mx-2 md:mx-0 items-stretch transition-all duration-200 relative z-10 rounded-2xl cursor-text border border-bg-300 dark:border-transparent
                 shadow-[0_0_15px_rgba(0,0,0,0.08)] hover:shadow-[0_0_20px_rgba(0,0,0,0.12)]
                 focus-within:shadow-[0_0_25px_rgba(0,0,0,0.15)]
                 bg-white dark:bg-[#30302E] font-sans antialiased
+                ${isHighlighted ? 'ring-2 ring-blue-500 ring-offset-2 animate-pulse-once' : ''}
             `}>
 
                 <div className="flex flex-col px-3 pt-3 pb-2 gap-2">

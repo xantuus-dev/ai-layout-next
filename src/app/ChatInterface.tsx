@@ -60,7 +60,7 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
   const [upgradeInfo, setUpgradeInfo] = useState<any>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(initialCategoryFilter || null);
 
-  const chatInputRef = useRef<any>(null);
+  const chatInputRef = useRef<{ setMessage: (msg: string) => void; focusAndHighlight?: () => void }>(null);
 
   // Load conversation when selected
   useEffect(() => {
@@ -327,6 +327,11 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
     // Set the message in the chat input
     if (chatInputRef.current?.setMessage) {
       chatInputRef.current.setMessage(populatedPrompt);
+
+      // Add smooth scroll and focus
+      setTimeout(() => {
+        chatInputRef.current?.focusAndHighlight?.();
+      }, 100);
     }
   };
 
@@ -387,7 +392,7 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
                       {msg.role === 'user' ? 'You' : 'Assistant'}
                       {msg.model && ` (${msg.model})`}
                     </div>
-                    <div className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                    <div className="text-gray-900 dark:text-white whitespace-pre-wrap">
                       {msg.content}
                     </div>
                     {msg.tokens && (

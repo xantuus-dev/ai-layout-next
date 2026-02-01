@@ -38,6 +38,19 @@
   animation: fadeIn 0.2s ease-out forwards;
 }
 
+/* Pulse once animation for scroll-to-chatbox feature */
+@keyframes pulse-once {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+.animate-pulse-once {
+  animation: pulse-once 0.6s ease-in-out;
+}
+
 @layer base {
   :root {
     /* Dark Mode (Default) - Cool slate blue theme */

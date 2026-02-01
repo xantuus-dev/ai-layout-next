@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Sparkles, TrendingUp, Loader2 } from 'lucide-react';
+import { Search, Sparkles, TrendingUp, Loader2, X } from 'lucide-react';
+import ClaudeChatInput from '@/components/ui/claude-style-chat-input';
+import { TemplateVariableHighlighter } from '@/components/ui/TemplateVariableHighlighter';
 
 interface TemplateVariable {
   name: string;
@@ -48,6 +50,9 @@ export default function TemplatesGalleryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [templatePrompt, setTemplatePrompt] = useState<string>('');
+  const chatInputRef = useRef<{ setMessage: (msg: string) => void; focusAndHighlight?: () => void }>(null);
 
   useEffect(() => {
     fetchCategories();
@@ -97,15 +102,40 @@ export default function TemplatesGalleryPage() {
   };
 
   const handleTemplateSelect = async (template: Template) => {
+    // Set the selected template and show the centered chatbox
+    setSelectedTemplate(template);
+    setTemplatePrompt(template.template);
+
+    // Populate the chat input and focus it after a short delay to ensure it's rendered
+    setTimeout(() => {
+      if (chatInputRef.current) {
+        chatInputRef.current.setMessage(template.template);
+        chatInputRef.current.focusAndHighlight?.();
+      }
+    }, 150);
+  };
+
+  const handleCloseChatbox = () => {
+    setSelectedTemplate(null);
+    setTemplatePrompt('');
+  };
+
+  const handleSendMessage = async (data: {
+    message: string;
+    files: any[];
+    pastedContent: any[];
+    model: string;
+    isThinkingEnabled: boolean;
+  }) => {
     try {
       // Create workspace with template
       const res = await fetch('/api/workspace/create-agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: template.title,
-          description: template.description,
-          initialPrompt: template.template,
+          name: selectedTemplate?.title || 'New Conversation',
+          description: selectedTemplate?.description,
+          initialPrompt: data.message,
         }),
       });
 
@@ -113,23 +143,23 @@ export default function TemplatesGalleryPage() {
         throw new Error('Failed to create workspace');
       }
 
-      const data = await res.json();
+      const workspaceData = await res.json();
 
       // Store pending execution with template prompt
       sessionStorage.setItem(
         'pendingExecution',
         JSON.stringify({
-          conversationId: data.conversationId,
-          message: template.template,
-          files: [],
-          pastedContent: null,
-          model: 'claude-sonnet-4-5-20250929',
-          isThinkingEnabled: false,
+          conversationId: workspaceData.conversationId,
+          message: data.message,
+          files: data.files,
+          pastedContent: data.pastedContent,
+          model: data.model,
+          isThinkingEnabled: data.isThinkingEnabled,
         })
       );
 
       // Navigate to workspace
-      router.push(`/workspace/${data.workspaceId}`);
+      router.push(`/workspace/${workspaceData.workspaceId}`);
     } catch (error) {
       console.error('Failed to start from template:', error);
       alert('Failed to create workspace. Please try again.');
@@ -147,7 +177,77 @@ export default function TemplatesGalleryPage() {
   const regularTemplates = filteredTemplates.filter(t => !t.isFeatured);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 relative">
+      {/* Centered Chatbox Overlay */}
+      {selectedTemplate && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={(e) => {
+            // Close when clicking the backdrop
+            if (e.target === e.currentTarget) {
+              handleCloseChatbox();
+            }
+          }}
+        >
+          <div className="w-full max-w-4xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden transform transition-all">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {selectedTemplate.title}
+                  </h2>
+                  {selectedTemplate.isFeatured && (
+                    <Badge className="bg-yellow-500 text-white">
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      Featured
+                    </Badge>
+                  )}
+                </div>
+                {selectedTemplate.description && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {selectedTemplate.description}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={handleCloseChatbox}
+                className="ml-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              </button>
+            </div>
+
+            {/* Chat Input - Centered */}
+            <div className="flex-1 flex flex-col items-center justify-center p-8 md:p-12 overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900 dark:to-gray-900">
+              <div className="w-full max-w-3xl space-y-4">
+                {/* Preview with highlighted variables */}
+                {selectedTemplate.variables && selectedTemplate.variables.length > 0 && (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
+                      Template Preview
+                    </p>
+                    <div className="text-sm text-gray-700 dark:text-gray-300">
+                      <TemplateVariableHighlighter
+                        text={templatePrompt}
+                        variables={selectedTemplate.variables}
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                <ClaudeChatInput
+                  ref={chatInputRef}
+                  onSendMessage={handleSendMessage}
+                  initialMessage={templatePrompt}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-12">

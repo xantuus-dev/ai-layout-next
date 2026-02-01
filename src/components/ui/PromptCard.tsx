@@ -59,7 +59,7 @@ export default function PromptCard() {
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const chatInputRef = useRef<any>(null);
+  const chatInputRef = useRef<{ setMessage: (msg: string) => void; focusAndHighlight?: () => void }>(null);
 
   // Template system state
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
@@ -143,6 +143,25 @@ export default function PromptCard() {
     }
     // Just populate the input field, don't send automatically
     setDraftMessage(chipText);
+
+    // Scroll the chatbox to center of screen and focus the input
+    setTimeout(() => {
+      if (chatInputRef.current) {
+        // Get the chat input element
+        const chatInputElement = chatInputRef.current.getInputElement?.() || chatInputRef.current;
+
+        if (chatInputElement && chatInputElement.scrollIntoView) {
+          chatInputElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          });
+        }
+
+        // Focus the input after scrolling
+        chatInputRef.current.focus?.();
+      }
+    }, 100);
   };
 
   const handleAuthSuccess = () => {
@@ -215,6 +234,13 @@ export default function PromptCard() {
 
     // Set the message in the draft
     setDraftMessage(populatedPrompt);
+
+    // Scroll to chat input, focus, and highlight
+    setTimeout(() => {
+      if (chatInputRef.current) {
+        chatInputRef.current.focusAndHighlight?.();
+      }
+    }, 100);
   };
 
   const handleCloseUpgradeBanner = () => {
@@ -232,10 +258,25 @@ export default function PromptCard() {
     }
     // Populate the chat input with the template text
     setDraftMessage(templateText);
-    // Optionally scroll to the input
-    if (chatInputRef.current) {
-      chatInputRef.current.focus?.();
-    }
+
+    // Scroll the chatbox to center of screen and focus the input
+    setTimeout(() => {
+      if (chatInputRef.current) {
+        // Get the chat input element
+        const chatInputElement = chatInputRef.current.getInputElement?.() || chatInputRef.current;
+
+        if (chatInputElement && chatInputElement.scrollIntoView) {
+          chatInputElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          });
+        }
+
+        // Focus the input after scrolling
+        chatInputRef.current.focus?.();
+      }
+    }, 100);
   };
 
   return (
