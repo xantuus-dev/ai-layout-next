@@ -146,20 +146,8 @@ export default function PromptCard() {
 
     // Scroll the chatbox to center of screen and focus the input
     setTimeout(() => {
-      if (chatInputRef.current) {
-        // Get the chat input element
-        const chatInputElement = chatInputRef.current.getInputElement?.() || chatInputRef.current;
-
-        if (chatInputElement && chatInputElement.scrollIntoView) {
-          chatInputElement.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
-            inline: 'nearest'
-          });
-        }
-
-        // Focus the input after scrolling
-        chatInputRef.current.focus?.();
+      if (chatInputRef.current?.focusAndHighlight) {
+        chatInputRef.current.focusAndHighlight();
       }
     }, 100);
   };
@@ -261,20 +249,8 @@ export default function PromptCard() {
 
     // Scroll the chatbox to center of screen and focus the input
     setTimeout(() => {
-      if (chatInputRef.current) {
-        // Get the chat input element
-        const chatInputElement = chatInputRef.current.getInputElement?.() || chatInputRef.current;
-
-        if (chatInputElement && chatInputElement.scrollIntoView) {
-          chatInputElement.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
-            inline: 'nearest'
-          });
-        }
-
-        // Focus the input after scrolling
-        chatInputRef.current.focus?.();
+      if (chatInputRef.current?.focusAndHighlight) {
+        chatInputRef.current.focusAndHighlight();
       }
     }, 100);
   };
