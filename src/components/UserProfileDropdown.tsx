@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { LogOut, Sparkles, TrendingUp } from 'lucide-react';
+import { LogOut, Sparkles, TrendingUp, User, Settings, Link2, Puzzle } from 'lucide-react';
 import { signOut } from 'next-auth/react';
+import { SettingsModal } from '@/components/SettingsModal';
 
 interface CreditStatus {
   plan: string;
@@ -17,6 +18,8 @@ export default function UserProfileDropdown() {
   const { data: session } = useSession();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<string>('account');
   const [creditStatus, setCreditStatus] = useState<CreditStatus | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -202,28 +205,74 @@ export default function UserProfileDropdown() {
 
             <button
               onClick={() => {
+                setSettingsSection('account');
+                setShowSettings(true);
                 setIsOpen(false);
-                router.push('/settings/account');
               }}
               className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              Account Settings
+              <User className="w-4 h-4" />
+              Account
             </button>
 
             <button
               onClick={() => {
+                setSettingsSection('settings');
+                setShowSettings(true);
                 setIsOpen(false);
-                router.push('/settings/usage');
               }}
               className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              Usage & Billing
+              <Settings className="w-4 h-4" />
+              Settings
+            </button>
+
+            <button
+              onClick={() => {
+                setSettingsSection('usage');
+                setShowSettings(true);
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Usage
+            </button>
+
+            <button
+              onClick={() => {
+                setSettingsSection('personalization');
+                setShowSettings(true);
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3"
+            >
+              <Sparkles className="w-4 h-4" />
+              Personalization
+            </button>
+
+            <button
+              onClick={() => {
+                setSettingsSection('connectors');
+                setShowSettings(true);
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3"
+            >
+              <Link2 className="w-4 h-4" />
+              Connectors
+            </button>
+
+            <button
+              onClick={() => {
+                setSettingsSection('integrations');
+                setShowSettings(true);
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-3"
+            >
+              <Puzzle className="w-4 h-4" />
+              Integrations
             </button>
 
             <button
@@ -239,6 +288,13 @@ export default function UserProfileDropdown() {
           </div>
         </div>
       )}
+
+      {/* Settings Modal */}
+      <SettingsModal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        initialSection={settingsSection}
+      />
     </div>
   );
 }

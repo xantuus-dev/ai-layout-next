@@ -87,11 +87,23 @@ model User {
   projects      Project[]
   tasks         Task[]
 
+  // AI Browser features
+  browserSessions BrowserSession[]
+  workflows       Workflow[]
+  monitors        PageMonitor[]
+  integrations    Integration[]
+
   // Referral system
   referralCode     String?    @unique // User's own referral code
   referredBy       String? // Referral code of user who referred them
   referredUsers    Referral[] @relation("Referrer")
   referralReceived Referral?  @relation("Referred")
+
+  // Personalization fields
+  nickname          String? // User's preferred nickname (50 char limit)
+  occupation        String? // User's occupation/role (100 char limit)
+  bio               String? @db.Text // User's bio/about (2000 char limit)
+  customInstructions String? @db.Text // Custom instructions for AI (3000 char limit)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -503,4 +515,344 @@ model AgentMetrics {
   @@unique([agentType, date])
   @@index([agentType])
   @@index([date])
+}
+
+// ============================================
+// AI BROWSER SERVICE MODELS
+// ============================================
+
+// BrowserSession - Persistent browser sessions with chat/navigation capabilities
+model BrowserSession {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Session configuration
+  url         String  @db.Text // Current URL
+  title       String? // Current page title
+  userAgent   String? // Browser user agent
+  viewport    Json?   // { width, height }
+  cookies     Json?   // Saved cookies for session persistence
+  localStorage Json?  // Saved localStorage state
+
+  // Feature flags
+  chatEnabled       Boolean @default(false)
+  navigationEnabled Boolean @default(false)
+  recordingWorkflow Boolean @default(false)
+
+  // Status
+  status    String   @default("active") // active, paused, closed
+  startedAt DateTime @default(now())
+  closedAt  DateTime?
+
+  // Resource tracking
+  totalCreditsUsed Int @default(0)
+  totalTokensUsed  Int @default(0)
+
+  // Relations
+  webpageContexts WebpageContext[]
+  chatMessages    ChatMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+// WebpageContext - Cached page content for chat functionality
+model WebpageContext {
+  id               String         @id @default(cuid())
+  browserSessionId String
+  browserSession   BrowserSession @relation(fields: [browserSessionId], references: [id], onDelete: Cascade)
+
+  url          String   @db.Text
+  title        String?
+  extractedAt  DateTime @default(now())
+
+  // Content extraction
+  mainContent    String? @db.Text // Main article/content from Readability.js
+  structuredData Json?            // Extracted structured data (headings, lists, tables)
+  metadata       Json?            // Meta tags, Open Graph data
+  links          Json?            // All links on page
+  images         Json?            // All images on page
+
+  // AI optimization
+  contentSummary String? @db.Text // AI-generated summary for context window efficiency
+  embeddings     Json?            // Vector embeddings for semantic search (future)
+
+  // Cache management
+  expiresAt DateTime? // When to refresh this context
+  isStale   Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([browserSessionId])
+  @@index([url])
+}
+
+// ChatMessage - Chat messages between user and AI about webpage
+model ChatMessage {
+  id               String         @id @default(cuid())
+  browserSessionId String
+  browserSession   BrowserSession @relation(fields: [browserSessionId], references: [id], onDelete: Cascade)
+
+  role    String // "user" | "assistant" | "system"
+  content String @db.Text
+
+  // AI metadata
+  model           String? // AI model used for assistant response
+  tokens          Int?    // Token count for this message
+  credits         Int?    // Credits consumed
+  thinkingEnabled Boolean @default(false)
+
+  // Context reference
+  contextUrl String? @db.Text // Which page this message refers to
+
+  createdAt DateTime @default(now())
+
+  @@index([browserSessionId, createdAt])
+}
+
+// Workflow - User-defined automation workflows
+model Workflow {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String? @db.Text
+  icon        String? // Icon identifier
+  color       String? // Hex color
+
+  // Workflow configuration
+  steps          WorkflowStep[]
+  schedule       String? // Cron expression for scheduled runs
+  isAIAssisted   Boolean @default(true) // Use AI for error recovery
+  timeoutSeconds Int     @default(300) // 5 minutes default
+
+  // Status
+  isActive   Boolean @default(true)
+  isTemplate Boolean @default(false) // Public template workflow
+
+  // Analytics
+  totalRuns      Int @default(0)
+  successfulRuns Int @default(0)
+  failedRuns     Int @default(0)
+  lastRunAt      DateTime?
+
+  // Relations
+  executions WorkflowExecution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, isActive])
+  @@index([userId, createdAt])
+  @@index([isTemplate])
+}
+
+// WorkflowStep - Individual actions in a workflow
+model WorkflowStep {
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  order Int // Step order in workflow
+
+  // Step configuration
+  type   String // "navigate", "click", "type", "extract", "wait", "conditional", "loop"
+  action Json   // Action-specific parameters
+
+  // Error handling
+  onError      String @default("stop") // "stop", "continue", "retry", "ai_recovery"
+  maxRetries   Int    @default(3)
+  retryDelay   Int    @default(1000) // Milliseconds
+
+  // Conditional logic
+  condition   Json?   // Condition to evaluate before executing
+  skipIfFalse Boolean @default(false)
+
+  // Output
+  saveOutput   Boolean @default(false)
+  outputName   String? // Variable name to save output
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workflowId, order])
+}
+
+// WorkflowExecution - Execution history for workflows
+model WorkflowExecution {
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  // Execution metadata
+  status      String   @default("running") // running, completed, failed, cancelled
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+
+  // Results
+  currentStep    Int    @default(0)
+  totalSteps     Int
+  result         Json?  // Final output/result
+  error          String? @db.Text
+  executionTrace Json?  // Detailed trace of all steps
+
+  // AI interventions
+  aiRecoveries     Int @default(0) // Number of times AI recovered from errors
+  aiRecoveryDetail Json? // Details of AI interventions
+
+  // Resource usage
+  totalTokens  Int @default(0)
+  totalCredits Int @default(0)
+  duration     Int @default(0) // Milliseconds
+
+  createdAt DateTime @default(now())
+
+  @@index([workflowId, createdAt])
+  @@index([status])
+}
+
+// PageMonitor - Configuration for page monitoring
+model PageMonitor {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String? @db.Text
+  url         String  @db.Text
+
+  // Check configuration
+  checkType     String @default("text") // "text", "element", "screenshot", "ai"
+  checkInterval Int    @default(3600) // Seconds between checks (default: 1 hour)
+  selector      String? // CSS selector to monitor
+  aiPrompt      String? @db.Text // AI prompt for intelligent monitoring
+
+  // Alert rules
+  alertOnChange Boolean @default(true)
+  alertChannels Json    @default("[]") // ["email", "slack", "webhook"]
+  webhookUrl    String? @db.Text
+
+  // Status
+  isActive      Boolean   @default(true)
+  lastCheckedAt DateTime?
+  lastValue     String?   @db.Text // Last observed value
+  lastHash      String? // Hash of content for change detection
+
+  // Analytics
+  totalChecks   Int @default(0)
+  alertsTriggered Int @default(0)
+
+  // Relations
+  alerts MonitorAlert[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, isActive])
+  @@index([userId, lastCheckedAt])
+  @@index([isActive, checkInterval]) // For background job querying
+}
+
+// MonitorAlert - Triggered alerts from monitoring
+model MonitorAlert {
+  id        String      @id @default(cuid())
+  monitorId String
+  monitor   PageMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  // Alert details
+  triggeredAt DateTime @default(now())
+  changeType  String   @default("content_changed") // content_changed, element_appeared, element_disappeared, ai_detected
+
+  oldValue    String? @db.Text
+  newValue    String? @db.Text
+
+  // AI analysis
+  aiAnalysis  String? @db.Text // AI-generated explanation of the change
+
+  // Delivery status
+  delivered Boolean @default(false)
+  deliveredAt DateTime?
+  deliveryChannels Json? // Which channels were notified
+
+  // Screenshot comparison (future feature)
+  oldScreenshot String? @db.Text // Base64 or URL
+  newScreenshot String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([monitorId, triggeredAt])
+  @@index([delivered])
+}
+
+// Integration - Third-party service integrations
+model Integration {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Integration identity
+  provider String // "notion", "slack", "zapier", "custom"
+  name     String // User-friendly name
+
+  // OAuth/API credentials
+  accessToken  String? @db.Text
+  refreshToken String? @db.Text
+  tokenExpiry  DateTime?
+  apiKey       String? @db.Text // For API key-based integrations
+  webhookUrl   String? @db.Text
+
+  // Configuration
+  config Json? // Provider-specific configuration
+  scopes String[] // Granted scopes/permissions
+
+  // Status
+  isActive      Boolean @default(true)
+  lastUsedAt    DateTime?
+  lastSyncAt    DateTime?
+
+  // Relations
+  customTools CustomTool[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@index([userId, isActive])
+}
+
+// CustomTool - User-defined tools for workflow automation
+model CustomTool {
+  id            String      @id @default(cuid())
+  integrationId String
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  // Tool definition
+  name        String
+  description String? @db.Text
+  endpoint    String  @db.Text // API endpoint to call
+  method      String  @default("POST") // HTTP method
+
+  // Parameters
+  parameters     Json // Input parameter schema (JSON Schema)
+  headers        Json? // Custom headers
+  authentication Json? // Auth config (if not using integration tokens)
+
+  // Response handling
+  responseMapping Json? // How to map response to workflow output
+  errorMapping    Json? // How to handle error responses
+
+  // Usage tracking
+  totalCalls Int       @default(0)
+  lastUsedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([integrationId])
 }
