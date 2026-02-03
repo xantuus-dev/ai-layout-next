@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Loader2, AlertCircle, Mail, Calendar, CreditCard, MessageSquare, FileText } from 'lucide-react';
+import Sidebar from '@/components/Sidebar';
 
 interface IntegrationStatus {
   googleDriveEnabled: boolean;
@@ -249,8 +250,11 @@ function IntegrationsPageContent() {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Message Banner */}
+    <div className="relative">
+      <Sidebar />
+      <div className="lg:ml-64 transition-all duration-300">
+        <div className="space-y-6">
+          {/* Message Banner */}
       {message && (
         <div
           className={`p-4 rounded-lg flex items-start gap-3 ${
@@ -352,6 +356,8 @@ function IntegrationsPageContent() {
           <strong>Note:</strong> These integrations enhance your AI capabilities with real-world services.
           Your data is only accessed when you explicitly use these features.
         </p>
+      </div>
+        </div>
       </div>
     </div>
   );

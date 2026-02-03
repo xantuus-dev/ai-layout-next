@@ -10,6 +10,7 @@
  */
 
 import puppeteer, { Browser, Page } from 'puppeteer';
+import { prisma } from '@/lib/prisma';
 
 // Security configuration
 const BROWSER_CONFIG = {
@@ -339,7 +340,15 @@ class BrowserControlService {
 
       switch (action.type) {
         case 'navigate':
-          result.data = { url: page.url() };
+          const pageUrl = page.url();
+          const pageTitle = await page.title();
+          result.data = { url: pageUrl, title: pageTitle };
+
+          // Update session state in database
+          await this.updateSessionState(sessionId, {
+            url: pageUrl,
+            title: pageTitle,
+          });
           break;
 
         case 'click':
@@ -457,6 +466,37 @@ class BrowserControlService {
     }
 
     this.sessions.delete(sessionId);
+  }
+
+  /**
+   * Update session state in database
+   */
+  async updateSessionState(sessionId: string, updates: {
+    url?: string;
+    title?: string;
+    creditsUsed?: number;
+    tokensUsed?: number;
+  }): Promise<void> {
+    try {
+      const updateData: any = {};
+
+      if (updates.url) updateData.url = updates.url;
+      if (updates.title) updateData.title = updates.title;
+      if (updates.creditsUsed) {
+        updateData.totalCreditsUsed = { increment: updates.creditsUsed };
+      }
+      if (updates.tokensUsed) {
+        updateData.totalTokensUsed = { increment: updates.tokensUsed };
+      }
+
+      await prisma.browserSession.update({
+        where: { id: sessionId },
+        data: updateData,
+      });
+    } catch (error) {
+      console.error('Error updating session state:', error);
+      // Don't throw - allow session to continue even if DB update fails
+    }
   }
 
   /**

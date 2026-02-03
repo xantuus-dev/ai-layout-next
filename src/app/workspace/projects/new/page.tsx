@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Loader2, FolderPlus } from 'lucide-react';
+import Sidebar from '@/components/Sidebar';
 
 const PROJECT_COLORS = [
   '#6366f1', // Indigo
@@ -75,7 +76,10 @@ export default function NewProjectPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-2xl">
+    <div className="relative">
+      <Sidebar />
+      <div className="lg:ml-64 transition-all duration-300">
+        <div className="container mx-auto p-6 max-w-2xl">
       <Button
         variant="ghost"
         onClick={() => router.push('/workspace')}
@@ -166,6 +170,8 @@ export default function NewProjectPage() {
           </form>
         </CardContent>
       </Card>
+        </div>
+      </div>
     </div>
   );
 }

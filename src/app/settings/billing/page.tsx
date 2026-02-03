@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { CreditCard, ExternalLink, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { PLAN_DEFINITIONS } from '@/lib/plans';
+import Sidebar from '@/components/Sidebar';
 
 function BillingPageContent() {
   const { data: session } = useSession();
@@ -54,8 +55,11 @@ function BillingPageContent() {
   const isPaidPlan = plan !== 'free';
 
   return (
-    <div className="space-y-6">
-      {/* Success/Cancel Messages */}
+    <div className="relative">
+      <Sidebar />
+      <div className="lg:ml-64 transition-all duration-300">
+        <div className="space-y-6">
+          {/* Success/Cancel Messages */}
       {success && (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-start gap-3">
           <Check className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
@@ -175,6 +179,8 @@ function BillingPageContent() {
           </CardContent>
         </Card>
       )}
+        </div>
+      </div>
     </div>
   );
 }

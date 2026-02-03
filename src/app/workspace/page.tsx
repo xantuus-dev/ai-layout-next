@@ -22,6 +22,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import Image from 'next/image';
+import Sidebar from '@/components/Sidebar';
 
 interface Project {
   id: string;
@@ -130,9 +131,12 @@ export default function WorkspacePage() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Main Panel */}
-      <div className="flex-1 flex flex-col p-6 overflow-auto">
+    <div className="relative">
+      <Sidebar />
+      <div className="lg:ml-64 transition-all duration-300">
+        <div className="flex h-screen bg-background">
+          {/* Main Panel */}
+          <div className="flex-1 flex flex-col p-6 overflow-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2">Workspace</h1>
           <p className="text-muted-foreground">
@@ -322,6 +326,8 @@ export default function WorkspacePage() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
         </div>
       </div>
     </div>

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Copy, Eye, EyeOff, Key, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import Sidebar from '@/components/Sidebar';
 
 interface ApiKey {
   id: string;
@@ -118,8 +119,11 @@ export default function ApiKeysPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="relative">
+      <Sidebar />
+      <div className="lg:ml-64 transition-all duration-300">
+        <div className="space-y-6">
+          {/* Header */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -277,6 +281,8 @@ export default function ApiKeysPage() {
           )}
         </DialogContent>
       </Dialog>
+        </div>
+      </div>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import AuthModal from '@/components/ui/AuthModal';
 import ThemeToggle from '@/components/ThemeToggle';
 import UserProfileDropdown from '@/components/UserProfileDropdown';
 import { CreditsCard } from '@/components/CreditsCard';
+import Sidebar from '@/components/Sidebar';
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 
@@ -33,7 +34,12 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-background">
+    <div className="relative">
+      {/* Sidebar Navigation */}
+      <Sidebar />
+
+      {/* Main Content with sidebar spacing */}
+      <main className="min-h-screen bg-background lg:ml-64 transition-all duration-300">
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
@@ -80,56 +86,32 @@ export default function Home() {
         </div>
       )}
 
-      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex justify-between items-center">
-          <nav className="flex items-center gap-6">
-            <a
-              href="/"
-              className="flex items-center"
-            >
+      <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur-sm">
+        <div className="px-4 md:px-8 py-4 flex justify-between items-center ml-16 lg:ml-0">
+          {/* Logo - visible on mobile, hidden on desktop with sidebar */}
+          <div className="lg:hidden">
+            <a href="/" className="flex items-center">
               <img
                 src="/xantuus-logo-light.png"
                 alt="Xantuus AI"
-                className="h-[7em] w-auto object-contain"
+                className="h-12 w-auto object-contain"
               />
             </a>
-            <a
-              href="/pricing"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Pricing
-            </a>
-            <a
-              href="/templates"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Templates
-            </a>
-            {isAuthenticated && (
-              <>
-                <a
-                  href="/workspace"
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Workspace
-                </a>
-                <a
-                  href="/settings/account"
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Settings
-                </a>
-              </>
-            )}
-          </nav>
+          </div>
 
-          <div className="flex items-center gap-3">
+          {/* Page title or breadcrumb */}
+          <div className="hidden lg:block">
+            <h1 className="text-xl font-semibold text-foreground">Dashboard</h1>
+          </div>
+
+          {/* Right side actions */}
+          <div className="flex items-center gap-3 ml-auto">
             <ThemeToggle />
             {!isAuthenticated ? (
               <>
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  className="hidden sm:block px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Sign In
                 </button>
@@ -181,6 +163,7 @@ export default function Home() {
           </div>
         </div>
       </div>
-    </main>
+      </main>
+    </div>
   );
 }

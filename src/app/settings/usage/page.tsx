@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, TrendingUp, Calendar, Zap, ArrowUpRight, CheckCircle2, Activity } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
+import Sidebar from '@/components/Sidebar';
 
 interface UsageHistoryItem {
   date: string;
@@ -81,7 +82,10 @@ export default function UsagePage() {
   const creditsRemaining = Math.max(usageData.creditsTotal - usageData.creditsUsed, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="relative">
+      <Sidebar />
+      <div className="lg:ml-64 transition-all duration-300">
+        <div className="space-y-6">
       {/* Plan Header with Upgrade Button */}
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -320,6 +324,8 @@ export default function UsagePage() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Search, Sparkles, TrendingUp, Loader2, X } from 'lucide-react';
 import ClaudeChatInput from '@/components/ui/claude-style-chat-input';
 import { TemplateVariableHighlighter } from '@/components/ui/TemplateVariableHighlighter';
+import Sidebar from '@/components/Sidebar';
 
 interface TemplateVariable {
   name: string;
@@ -177,7 +178,10 @@ export default function TemplatesGalleryPage() {
   const regularTemplates = filteredTemplates.filter(t => !t.isFeatured);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 relative">
+    <div className="relative">
+      <Sidebar />
+      <div className="lg:ml-64 transition-all duration-300">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 relative">
       {/* Centered Chatbox Overlay */}
       {selectedTemplate && (
         <div 
@@ -416,6 +420,8 @@ export default function TemplatesGalleryPage() {
             )}
           </>
         )}
+      </div>
+        </div>
       </div>
     </div>
   );

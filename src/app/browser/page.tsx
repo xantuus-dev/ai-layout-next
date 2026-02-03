@@ -9,7 +9,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import BrowserControl from '@/components/ui/BrowserControl';
+import BrowserTabbedInterface from '@/components/browser/BrowserTabbedInterface';
+import Sidebar from '@/components/Sidebar';
 
 export const metadata: Metadata = {
   title: 'Browser Control | AI Layout',
@@ -36,7 +37,10 @@ export default async function BrowserPage() {
   const hasAccess = user.plan === 'pro' || user.plan === 'enterprise';
 
   return (
-    <div className="container max-w-6xl mx-auto py-8 px-4">
+    <div className="relative">
+      <Sidebar />
+      <div className="lg:ml-64 transition-all duration-300">
+        <div className="container max-w-6xl mx-auto py-8 px-4">
       {!hasAccess ? (
         <div className="text-center py-12">
           <h1 className="text-3xl font-bold mb-4">Browser Control</h1>
@@ -66,7 +70,9 @@ export default async function BrowserPage() {
             </div>
           </div>
 
-          <BrowserControl />
+          <BrowserTabbedInterface
+            initialCredits={user.monthlyCredits - user.creditsUsed}
+          />
 
           {/* Security Information */}
           <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -95,6 +101,8 @@ export default async function BrowserPage() {
           </div>
         </>
       )}
+        </div>
+      </div>
     </div>
   );
 }

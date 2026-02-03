@@ -68,14 +68,37 @@ export async function POST(req: NextRequest) {
       description: 'Browser automation session created',
     });
 
-    // Create browser session
+    // Get request body for session configuration
+    const body = await req.json().catch(() => ({}));
+    const { url, chatEnabled, navigationEnabled } = body;
+
+    // Create browser session in memory
     const sessionId = await browserControl.createSession(user.id);
 
-    // Note: Usage is logged by deductCredits function
+    // Create database record for persistence
+    const dbSession = await prisma.browserSession.create({
+      data: {
+        id: sessionId,
+        userId: user.id,
+        url: url || 'about:blank',
+        chatEnabled: chatEnabled ?? false,
+        navigationEnabled: navigationEnabled ?? false,
+        status: 'active',
+        totalCreditsUsed: BROWSER_SESSION_COST,
+      },
+    });
 
     return NextResponse.json({
       success: true,
       sessionId,
+      session: {
+        id: dbSession.id,
+        url: dbSession.url,
+        chatEnabled: dbSession.chatEnabled,
+        navigationEnabled: dbSession.navigationEnabled,
+        status: dbSession.status,
+        startedAt: dbSession.startedAt,
+      },
       creditsUsed: BROWSER_SESSION_COST,
       creditsRemaining: availableCredits - BROWSER_SESSION_COST,
       rateLimitRemaining: rateLimit.remaining,
@@ -84,6 +107,54 @@ export async function POST(req: NextRequest) {
     console.error('Browser session creation error:', error);
     return NextResponse.json(
       { error: 'Failed to create browser session', message: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Get user's browser sessions
+    const sessions = await prisma.browserSession.findMany({
+      where: {
+        userId: user.id,
+        status: { in: ['active', 'paused'] },
+      },
+      orderBy: { startedAt: 'desc' },
+      take: 20,
+    });
+
+    return NextResponse.json({
+      success: true,
+      sessions: sessions.map(s => ({
+        id: s.id,
+        url: s.url,
+        title: s.title,
+        chatEnabled: s.chatEnabled,
+        navigationEnabled: s.navigationEnabled,
+        status: s.status,
+        startedAt: s.startedAt,
+        totalCreditsUsed: s.totalCreditsUsed,
+      })),
+    });
+  } catch (error: any) {
+    console.error('Browser session list error:', error);
+    return NextResponse.json(
+      { error: 'Failed to list sessions', message: error.message },
       { status: 500 }
     );
   }
@@ -111,8 +182,29 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Session ID required' }, { status: 400 });
     }
 
-    // Close session
+    // Verify session belongs to user
+    const dbSession = await prisma.browserSession.findFirst({
+      where: {
+        id: sessionId,
+        userId: user.id,
+      },
+    });
+
+    if (!dbSession) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    // Close session in memory
     await browserControl.closeSession(sessionId);
+
+    // Update database record
+    await prisma.browserSession.update({
+      where: { id: sessionId },
+      data: {
+        status: 'closed',
+        closedAt: new Date(),
+      },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

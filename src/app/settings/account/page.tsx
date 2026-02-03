@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import Sidebar from '@/components/Sidebar';
 
 export default function AccountPage() {
   const { data: session } = useSession();
@@ -38,7 +39,10 @@ export default function AccountPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="relative">
+      <Sidebar />
+      <div className="lg:ml-64 transition-all duration-300">
+        <div className="space-y-6">
       {/* Profile Card */}
       <Card>
         <CardHeader>
@@ -150,6 +154,8 @@ export default function AccountPage() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      </div>
     </div>
   );
 }

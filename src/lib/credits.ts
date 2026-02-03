@@ -24,6 +24,38 @@ export const MODEL_CREDITS_PER_1K: Record<string, number> = {
   'gemini-1.5-pro': 1.25,
 };
 
+// AI Browser Feature Credit Costs
+export const BROWSER_FEATURE_CREDITS = {
+  // Browser Sessions
+  SESSION_CREATE: 50, // Creating a browser session
+
+  // Chat with Webpage
+  EXTRACT_CONTEXT: 10, // One-time extraction of page content
+  CHAT_MESSAGE_MIN: 5, // Minimum per chat message
+  CHAT_MESSAGE_MAX: 50, // Maximum per chat message (token-based)
+
+  // AI Navigation
+  PARSE_COMMAND: 5, // Parsing natural language command
+  NAVIGATION_BASE: 10, // Base cost for AI-powered navigation
+  NAVIGATION_ACTION: 5, // Per action executed (click, type, etc.)
+
+  // Workflow Automation
+  WORKFLOW_BASE: 50, // Base cost to execute workflow
+  WORKFLOW_STEP: 5, // Per workflow step executed
+  WORKFLOW_AI_RECOVERY: 20, // AI-powered error recovery per attempt
+
+  // Page Monitoring
+  MONITOR_CHECK_BASIC: 5, // Basic text/element monitoring check
+  MONITOR_CHECK_AI: 15, // AI-powered monitoring check (minimum)
+  MONITOR_CHECK_AI_MAX: 25, // AI-powered monitoring check (maximum)
+  MONITOR_ALERT: 2, // Processing and sending alert
+
+  // Integrations
+  INTEGRATION_CONNECT: 0, // Free to connect integrations
+  INTEGRATION_API_CALL: 3, // Per API call to integrated service
+  CUSTOM_TOOL_CALL: 5, // Per custom tool execution
+};
+
 /**
  * Check if user's credits need to be reset and reset them if necessary
  */
@@ -175,4 +207,69 @@ export async function getCreditStatus(userId: string) {
     creditsResetAt: user.creditsResetAt,
     percentageUsed: (user.creditsUsed / user.monthlyCredits) * 100,
   };
+}
+
+/**
+ * Calculate credits for chat with webpage feature
+ */
+export function calculateChatCredits(tokens: number, isFirstMessage: boolean): number {
+  let credits = 0;
+
+  // Add extraction cost for first message
+  if (isFirstMessage) {
+    credits += BROWSER_FEATURE_CREDITS.EXTRACT_CONTEXT;
+  }
+
+  // Add token-based cost for the message
+  const messageCost = Math.ceil((tokens / 1000) * 3); // Using Sonnet pricing as base
+  credits += Math.min(
+    Math.max(BROWSER_FEATURE_CREDITS.CHAT_MESSAGE_MIN, messageCost),
+    BROWSER_FEATURE_CREDITS.CHAT_MESSAGE_MAX
+  );
+
+  return credits;
+}
+
+/**
+ * Calculate credits for AI navigation
+ */
+export function calculateNavigationCredits(actionCount: number): number {
+  return (
+    BROWSER_FEATURE_CREDITS.PARSE_COMMAND +
+    BROWSER_FEATURE_CREDITS.NAVIGATION_BASE +
+    BROWSER_FEATURE_CREDITS.NAVIGATION_ACTION * actionCount
+  );
+}
+
+/**
+ * Calculate credits for workflow execution
+ */
+export function calculateWorkflowCredits(
+  stepCount: number,
+  aiRecoveryCount: number = 0
+): number {
+  return (
+    BROWSER_FEATURE_CREDITS.WORKFLOW_BASE +
+    BROWSER_FEATURE_CREDITS.WORKFLOW_STEP * stepCount +
+    BROWSER_FEATURE_CREDITS.WORKFLOW_AI_RECOVERY * aiRecoveryCount
+  );
+}
+
+/**
+ * Calculate credits for monitor check
+ */
+export function calculateMonitorCredits(
+  checkType: 'basic' | 'ai',
+  tokens: number = 0
+): number {
+  if (checkType === 'basic') {
+    return BROWSER_FEATURE_CREDITS.MONITOR_CHECK_BASIC;
+  }
+
+  // AI-powered monitoring with token-based pricing
+  const aiCost = Math.ceil((tokens / 1000) * 3);
+  return Math.min(
+    Math.max(BROWSER_FEATURE_CREDITS.MONITOR_CHECK_AI, aiCost),
+    BROWSER_FEATURE_CREDITS.MONITOR_CHECK_AI_MAX
+  );
 }
