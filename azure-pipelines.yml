@@ -4,13 +4,20 @@ trigger:
       - main
 
 pool:
-  vmImage: ubuntu-latest
+  name: default
 
-steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
 
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+stages:
+  - stage:  Initialization
+    job: TerraformInit
+    steps:
+      - task: TerraformInstaller@1
+          inputs:
+            terraformVersion: $(terraformVersion)
+
+        # Initialize Terraform
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            backendServiceArm: 'Azure subscription 1(4e0a7571-b8f5-4720-bda0-4220088a96a3)'
