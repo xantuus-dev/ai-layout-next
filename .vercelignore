@@ -1,11 +1,25 @@
-node_modules
-.next
-.git
-.env
-.env.local
-.env.production
-*.log
+# Mobile apps and browser extensions (not part of Next.js build)
+ios-mobile
+browser-extension
+
+# Development and documentation files
+demo
+
+# Test files
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# IDE and OS files
+.vscode
+.idea
 .DS_Store
-coverage
-.cache
-prisma/migrations
+Thumbs.db
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+/tmp/
