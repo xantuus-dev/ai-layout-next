@@ -105,6 +105,16 @@ model User {
   bio               String? @db.Text // User's bio/about (2000 char limit)
   customInstructions String? @db.Text // Custom instructions for AI (3000 char limit)
 
+  // Memory system relations
+  memoryMeta           UserMemoryMeta?
+  memoryFiles          MemoryFile[]
+  memorySearchLogs     MemorySearchLog[]
+  indexingConfig       UserIndexingConfig?
+  indexedSessions      IndexedSession[]
+  memoryFacts          MemoryFact[]
+  consolidationJobs    ConsolidationJob[]
+  messageImportance    MessageImportance[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -290,6 +300,12 @@ model Task {
   totalCredits   Int       @default(0)
   executionTime  Int       @default(0) // Milliseconds
 
+  // Scheduling configuration
+  schedule        String?   // Cron expression: "0 9 * * *" for daily 9 AM
+  scheduleEnabled Boolean   @default(false) // Is scheduling active?
+  nextRunAt       DateTime? // Next scheduled execution time
+  timezone        String?   @default("America/New_York") // User's timezone for cron
+
   // Task metadata
   dueDate     DateTime?
   tags        String[]
@@ -305,6 +321,7 @@ model Task {
   @@index([userId, status])
   @@index([userId, createdAt])
   @@index([status, priority]) // For queue polling
+  @@index([scheduleEnabled, nextRunAt]) // For orchestrator scheduling
 }
 
 // Referral System
@@ -541,9 +558,10 @@ model BrowserSession {
   recordingWorkflow Boolean @default(false)
 
   // Status
-  status    String   @default("active") // active, paused, closed
-  startedAt DateTime @default(now())
-  closedAt  DateTime?
+  status     String   @default("active") // active, paused, closed, synced
+  startedAt  DateTime @default(now())
+  closedAt   DateTime?
+  lastSyncAt DateTime? // Last cookie sync from browser extension
 
   // Resource tracking
   totalCreditsUsed Int @default(0)
@@ -855,4 +873,250 @@ model CustomTool {
   updatedAt DateTime @updatedAt
 
   @@index([integrationId])
+}
+
+// ============================================
+// MEMORY SYSTEM MODELS (OpenClaw-inspired)
+// ============================================
+
+// UserMemoryMeta - Per-user memory configuration
+model UserMemoryMeta {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  totalFiles       Int      @default(0)
+  totalChunks      Int      @default(0)
+  lastIndexed      DateTime?
+  embeddingModel   String   @default("text-embedding-3-small")
+  embeddingDimensions Int   @default(1536)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// MemoryFile - Files stored in memory system
+model MemoryFile {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  filePath      String
+  source        String @default("memory") // memory, conversation, agent_log, daily_log
+  chunkCount    Int    @default(0)
+  lastIndexed   DateTime @default(now())
+  fileHash      String? // For detecting changes
+  contentPreview String? @db.Text // First 500 chars
+
+  // Relations
+  chunks MemoryChunk[]
+
+  // Metadata
+  metadata Json? // Additional file metadata
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, filePath])
+  @@index([userId, source])
+  @@index([userId, lastIndexed])
+}
+
+// MemoryChunk - Text chunks with embeddings
+model MemoryChunk {
+  id     String @id @default(cuid())
+  fileId String
+  file   MemoryFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  chunkId    String // {filePath}:{startLine}-{endLine}
+  text       String @db.Text
+  startLine  Int
+  endLine    Int
+  tokenCount Int    @default(0)
+
+  // Vector embedding (stored as JSON array for Prisma compatibility)
+  // Will be converted to pgvector type via raw SQL
+  embedding Json? // [0.1, 0.2, ...] array of 1536 floats
+
+  // Search optimization
+  searchVector String? @db.Text // Full-text search (tsvector equivalent)
+
+  // Access tracking
+  accessCount  Int      @default(0)
+  lastAccessed DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([chunkId])
+  @@index([fileId])
+}
+
+// EmbeddingCache - Cache embeddings to save API costs
+model EmbeddingCache {
+  id String @id @default(cuid())
+
+  contentHash String  @unique // SHA-256 hash of content
+  content     String  @db.Text
+  model       String // Embedding model used
+  embedding   Json // Embedding vector as JSON array
+
+  // Cache management
+  hitCount     Int      @default(0)
+  lastAccessed DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  @@index([model, contentHash])
+  @@index([lastAccessed]) // For LRU eviction
+}
+
+// MemorySearchLog - Track search queries for analytics
+model MemorySearchLog {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  query        String @db.Text
+  resultCount  Int    @default(0)
+  vectorScore  Float?
+  textScore    Float?
+  finalScore   Float?
+  latency      Int    @default(0) // Milliseconds
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ============================================
+// PHASE 2: AUTO-INDEXING & CONSOLIDATION
+// ============================================
+
+// UserIndexingConfig - Per-user auto-indexing configuration
+model UserIndexingConfig {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  autoIndexEnabled             Boolean  @default(true)
+  minMessagesToIndex           Int      @default(5)
+  indexOnSessionEnd            Boolean  @default(true)
+  consolidateOnIndex           Boolean  @default(true)
+  consolidationIntervalHours   Int      @default(6)
+  lastConsolidationAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// IndexedSession - Track indexed conversation sessions
+model IndexedSession {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sessionId           String
+  fileId              String? // Reference to MemoryFile
+  messageCount        Int     @default(0)
+  consolidationStatus String  @default("pending") // pending, processing, completed, failed
+  factsExtracted      Int     @default(0)
+  indexedAt           DateTime @default(now())
+  consolidatedAt      DateTime?
+  error               String?  @db.Text
+
+  metadata Json? // Session metadata
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, sessionId])
+  @@index([userId, consolidationStatus])
+  @@index([consolidationStatus, indexedAt])
+}
+
+// MemoryFact - Extracted facts from conversations
+model MemoryFact {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  factType       String // preference, fact, decision, context, goal, skill
+  content        String @db.Text
+  sourceFileId   String? // Reference to MemoryFile
+  sourceChunkIds String[] // Array of chunk IDs
+
+  // Vector embedding as JSON
+  embedding Json?
+
+  // Scoring
+  confidenceScore Float @default(0.8)
+  importanceScore Float @default(0.5)
+
+  // Lifecycle
+  lastAccessed DateTime @default(now())
+  accessCount  Int      @default(0)
+  expiresAt    DateTime? // Optional expiration
+
+  metadata Json? // Additional fact metadata
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, factType])
+  @@index([userId, importanceScore])
+  @@index([expiresAt])
+}
+
+// ConsolidationJob - Track consolidation job execution
+model ConsolidationJob {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  jobType String @default("scheduled") // scheduled, manual, triggered
+  status  String @default("pending") // pending, running, completed, failed
+
+  // Progress
+  factsExtracted   Int @default(0)
+  factsStored      Int @default(0)
+  factsMerged      Int @default(0)
+  chunksProcessed  Int @default(0)
+  totalChunks      Int @default(0)
+
+  // Timing
+  startedAt   DateTime?
+  completedAt DateTime?
+  duration    Int?      @default(0) // Milliseconds
+
+  // Error handling
+  error String? @db.Text
+
+  metadata Json? // Job metadata
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+// MessageImportance - Cache message importance scores
+model MessageImportance {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  chunkId          String
+  importanceScore  Float
+  recencyFactor    Float
+  accessFactor     Float
+  calculatedAt     DateTime @default(now())
+
+  @@unique([userId, chunkId])
+  @@index([userId, importanceScore])
 }
