@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
-    const type = searchParams.get('type');
+    const type = searchParams.get('type') || undefined;
     const limit = parseInt(searchParams.get('limit') || '20');
     const minImportance = parseFloat(searchParams.get('minImportance') || '0');
 
