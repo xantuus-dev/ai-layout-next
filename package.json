@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "orchestrator": "tsx scripts/start-orchestrator.ts",
-    "memory-scheduler": "tsx scripts/start-memory-scheduler.ts"
+    "memory-scheduler": "tsx scripts/start-memory-scheduler.ts",
+    "setup-memory-db": "tsx scripts/setup-memory-db.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
@@ -35,6 +36,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@revenuecat/purchases-js": "^1.23.0",
     "@stripe/stripe-js": "^8.6.1",
+    "@types/pg": "^8.16.0",
     "@types/puppeteer": "^5.4.7",
     "bullmq": "^5.67.3",
     "class-variance-authority": "^0.7.1",
@@ -53,6 +55,7 @@
     "next": "^14.0.4",
     "next-auth": "^4.24.13",
     "openai": "^6.16.0",
+    "pg": "^8.18.0",
     "prisma": "^6.19.1",
     "puppeteer": "^24.35.0",
     "puppeteer-extra": "^3.3.6",
