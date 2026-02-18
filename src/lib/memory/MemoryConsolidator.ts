@@ -351,11 +351,11 @@ export class MemoryConsolidator {
   /**
    * Deduplicate extracted facts against existing stored facts
    */
-  private async deduplicateAgainstExisting(
+  private async deduplicateAgainstExisting<T extends ExtractedFact>(
     userId: number,
-    extractedFacts: ExtractedFact[]
-  ): Promise<{ newFacts: ExtractedFact[]; mergedCount: number }> {
-    const newFacts: ExtractedFact[] = [];
+    extractedFacts: T[]
+  ): Promise<{ newFacts: T[]; mergedCount: number }> {
+    const newFacts: T[] = [];
     let mergedCount = 0;
 
     for (const fact of extractedFacts) {
