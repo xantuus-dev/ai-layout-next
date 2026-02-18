@@ -569,7 +569,7 @@ Provide a brief (1-2 sentences) explanation of why this action makes sense.`;
     const agentTask: AgentTask = {
       id: task.id,
       userId: task.userId,
-      type: task.agentType || 'custom',
+      type: (task.agentType || 'custom') as AgentType,
       goal: task.title,
       context: task.agentConfig || {},
       priority: task.priority as any,
