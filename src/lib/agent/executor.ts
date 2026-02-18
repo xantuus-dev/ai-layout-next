@@ -28,6 +28,7 @@ import {
 } from './types';
 import { ToolRegistry } from './tools/registry';
 import { captureAgentError, captureToolError, addBreadcrumb, setUser } from '@/lib/sentry';
+import { applyExecutionGuards, withTimeout, getToolTimeout } from './guards';
 
 /**
  * Core agent executor that implements the ReAct loop
@@ -356,8 +357,31 @@ Return ONLY the JSON array, no other text.`;
         console.log(`[Agent] Approval required for step ${step.stepNumber}`);
       }
 
-      // Execute tool
-      const result = await tool.execute(step.params, context);
+      // Apply execution guards (timeout, cost limits, rate limiting)
+      const guards = await applyExecutionGuards(
+        task.userId,
+        step.tool,
+        step.estimatedCredits || 100,
+        this.currentState?.creditsUsed || 0
+      );
+
+      if (!guards.allowed) {
+        throw new Error(`Execution guard failed: ${guards.reason}`);
+      }
+
+      // Log warnings if approaching limits
+      if (guards.costCheck?.warningLevel === 'warning') {
+        console.warn(`[Agent] Warning: Approaching cost limit (${guards.costCheck.warningLevel})`);
+      } else if (guards.costCheck?.warningLevel === 'critical') {
+        console.warn(`[Agent] CRITICAL: Near cost limit! Current: ${guards.costCheck.currentUsage}, Limit: ${guards.costCheck.limit}`);
+      }
+
+      // Execute tool with timeout
+      const result = await withTimeout(
+        () => tool.execute(step.params, context),
+        guards.timeout,
+        `${step.tool} (${step.description})`
+      );
 
       // 3. OBSERVE: Process the result
       if (!result.success) {
@@ -492,19 +516,155 @@ Provide a brief (1-2 sentences) explanation of why this action makes sense.`;
     this.shouldStop = true;
     if (this.currentState) {
       this.currentState.status = 'paused';
+
+      // Save current state to database for resume
+      await prisma.task.update({
+        where: { id: this.currentState.taskId },
+        data: {
+          status: 'paused',
+          currentStep: this.currentState.currentStep,
+          executionTrace: this.currentState.trace as any,
+          totalTokens: this.currentState.tokensUsed,
+          totalCredits: this.currentState.creditsUsed,
+          executionTime: this.currentState.executionTime,
+          lastRunAt: new Date(),
+        },
+      });
+
       await this.emitEvent({
         type: 'task.paused',
         taskId: this.currentState.taskId,
         state: this.currentState,
       });
+
+      console.log(`[Agent] Task ${this.currentState.taskId} paused at step ${this.currentState.currentStep}`);
     }
   }
 
   async resume(state: AgentState): Promise<AgentResult> {
+    console.log(`[Agent] Resuming task ${state.taskId} from step ${state.currentStep}`);
+
+    // Restore state
     this.currentState = state;
+    this.currentState.status = 'executing';
     this.shouldStop = false;
-    // Resume execution from current step
-    throw new Error('Resume not yet implemented');
+
+    // Load task from database to get plan
+    const task = await prisma.task.findUnique({
+      where: { id: state.taskId },
+    });
+
+    if (!task) {
+      throw new Error(`Task ${state.taskId} not found`);
+    }
+
+    if (!task.plan) {
+      throw new Error(`Task ${state.taskId} has no execution plan`);
+    }
+
+    // Reconstruct execution plan
+    const plan: ExecutionPlan = task.plan as ExecutionPlan;
+
+    // Rebuild task object
+    const agentTask: AgentTask = {
+      id: task.id,
+      userId: task.userId,
+      type: task.agentType || 'custom',
+      goal: task.title,
+      context: task.agentConfig || {},
+      priority: task.priority as any,
+    };
+
+    // Emit resume event
+    await this.emitEvent({
+      type: 'task.resumed',
+      taskId: state.taskId,
+      fromStep: state.currentStep,
+    } as any);
+
+    addBreadcrumb(
+      `Resuming task from step ${state.currentStep}`,
+      'agent',
+      'info',
+      { taskId: state.taskId, totalSteps: plan.totalSteps }
+    );
+
+    const startTime = Date.now() - (state.executionTime || 0);
+
+    try {
+      // Continue execution from current step
+      for (let i = state.currentStep; i < plan.steps.length; i++) {
+        if (this.shouldStop) {
+          throw new Error('Execution cancelled');
+        }
+
+        const step = plan.steps[i];
+        this.currentState.currentStep = i + 1;
+        this.currentState.progress = Math.round(((i + 1) / plan.totalSteps) * 100);
+
+        await this.executeStep(agentTask, step);
+      }
+
+      // Mark as completed
+      this.currentState.status = 'completed';
+      this.currentState.completedAt = new Date();
+      this.currentState.executionTime = Date.now() - startTime;
+
+      const result: AgentResult = {
+        taskId: agentTask.id,
+        status: 'completed',
+        result: this.currentState.result,
+        steps: plan.totalSteps,
+        duration: this.currentState.executionTime,
+        creditsUsed: this.currentState.creditsUsed,
+        tokensUsed: this.currentState.tokensUsed,
+        trace: this.currentState.trace,
+        completedAt: new Date(),
+      };
+
+      await this.emitEvent({ type: 'task.completed', taskId: agentTask.id, result });
+
+      // Save to database
+      await this.saveResult(agentTask.id, agentTask.userId, result);
+
+      console.log(`[Agent] Task ${agentTask.id} completed after resume`);
+
+      return result;
+
+    } catch (error: any) {
+      console.error(`[Agent] Resume execution failed:`, error);
+
+      // Track error in Sentry
+      captureAgentError(
+        error,
+        agentTask.id,
+        agentTask.userId,
+        this.currentState?.currentStep,
+        undefined
+      );
+
+      this.currentState.status = 'failed';
+      this.currentState.error = error.message;
+
+      const result: AgentResult = {
+        taskId: agentTask.id,
+        status: 'failed',
+        error: error.message,
+        steps: this.currentState.currentStep,
+        duration: Date.now() - startTime,
+        creditsUsed: this.currentState.creditsUsed,
+        tokensUsed: this.currentState.tokensUsed,
+        trace: this.currentState.trace,
+        completedAt: new Date(),
+      };
+
+      await this.emitEvent({ type: 'task.failed', taskId: agentTask.id, error: error.message });
+
+      // Save to database
+      await this.saveResult(agentTask.id, agentTask.userId, result);
+
+      return result;
+    }
   }
 
   async cancel(): Promise<void> {
