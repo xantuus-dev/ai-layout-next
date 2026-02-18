@@ -13,6 +13,7 @@ import { prisma } from '@/lib/prisma';
 import {
   Agent,
   AgentTask,
+  AgentType,
   AgentResult,
   AgentState,
   AgentStatus,
