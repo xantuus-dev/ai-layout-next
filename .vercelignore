@@ -5,6 +5,14 @@ browser-extension
 # Development and documentation files
 demo
 
+# Work-in-progress features (incomplete, has TypeScript errors)
+src/app/workflows/builder
+src/app/ai-builder
+src/app/builder-demo
+src/app/integration-demo
+src/components/workflow-builder
+src/lib/workflow-builder
+
 # Test files
 **/__tests__
 **/*.test.ts
