@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Send, X, HardDrive, Mail, Calendar as CalendarIcon } from 'lucide-react';
+import { Copy, Send, X, HardDrive, Mail, Calendar as CalendarIcon, Edit3, RotateCcw, Wand2 } from 'lucide-react';
 import { GoogleIntegrationBadge } from './GoogleIntegrationBadge';
 import { GoogleConnectPrompt } from './GoogleConnectPrompt';
 import { TemplateVariableHighlighter } from './TemplateVariableHighlighter';
@@ -49,6 +49,8 @@ export function TemplateVariableForm({
 }: TemplateVariableFormProps) {
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [populatedPrompt, setPopulatedPrompt] = useState('');
+  const [editedPrompt, setEditedPrompt] = useState('');
+  const [editMode, setEditMode] = useState(false);
   const [copied, setCopied] = useState(false);
   const [userIntegrations, setUserIntegrations] = useState<{
     googleDriveEnabled: boolean;
@@ -105,7 +107,10 @@ export function TemplateVariableForm({
     });
 
     setPopulatedPrompt(prompt);
-  }, [variableValues, template]);
+    if (!editMode) {
+      setEditedPrompt(prompt);
+    }
+  }, [variableValues, template, editMode]);
 
   const handleVariableChange = (name: string, value: string) => {
     setVariableValues((prev) => ({
@@ -115,20 +120,37 @@ export function TemplateVariableForm({
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(populatedPrompt);
+    const textToCopy = editMode ? editedPrompt : populatedPrompt;
+    navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleUseTemplate = () => {
-    // Check if all required variables are filled
-    const missingRequired = template.variables
-      .filter((v) => v.required && !variableValues[v.name])
-      .map((v) => v.label || v.name);
+  const handleToggleEditMode = () => {
+    if (!editMode) {
+      // Entering edit mode - sync edited prompt with populated
+      setEditedPrompt(populatedPrompt);
+    }
+    setEditMode(!editMode);
+  };
 
-    if (missingRequired.length > 0) {
-      alert(`Please fill in required fields: ${missingRequired.join(', ')}`);
-      return;
+  const handleResetToTemplate = () => {
+    setEditedPrompt(populatedPrompt);
+  };
+
+  const handleUseTemplate = () => {
+    const finalPrompt = editMode ? editedPrompt : populatedPrompt;
+
+    // Check if all required variables are filled (only in variable mode)
+    if (!editMode) {
+      const missingRequired = template.variables
+        .filter((v) => v.required && !variableValues[v.name])
+        .map((v) => v.label || v.name);
+
+      if (missingRequired.length > 0) {
+        alert(`Please fill in required fields: ${missingRequired.join(', ')}`);
+        return;
+      }
     }
 
     // Increment usage count
@@ -136,7 +158,7 @@ export function TemplateVariableForm({
       method: 'POST',
     }).catch(console.error);
 
-    onUseTemplate(populatedPrompt);
+    onUseTemplate(finalPrompt);
     onClose();
   };
 
@@ -146,6 +168,8 @@ export function TemplateVariableForm({
       return;
     }
 
+    const finalPrompt = editMode ? editedPrompt : populatedPrompt;
+
     setActionLoading('drive');
     try {
       const response = await fetch('/api/integrations/drive/upload', {
@@ -153,7 +177,7 @@ export function TemplateVariableForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: `${template.title}.txt`,
-          content: populatedPrompt,
+          content: finalPrompt,
           mimeType: 'text/plain',
         }),
       });
@@ -182,6 +206,8 @@ export function TemplateVariableForm({
     const subject = prompt('Enter email subject:', template.title);
     if (!subject) return;
 
+    const finalPrompt = editMode ? editedPrompt : populatedPrompt;
+
     setActionLoading('gmail');
     try {
       const response = await fetch('/api/integrations/gmail/send', {
@@ -190,7 +216,7 @@ export function TemplateVariableForm({
         body: JSON.stringify({
           to,
           subject,
-          body: populatedPrompt,
+          body: finalPrompt,
           isHtml: false,
         }),
       });
@@ -219,6 +245,8 @@ export function TemplateVariableForm({
       new Date(Date.now() + 3600000).toISOString().slice(0, 16).replace('T', ' '));
     if (!startTime) return;
 
+    const finalPrompt = editMode ? editedPrompt : populatedPrompt;
+
     setActionLoading('calendar');
     try {
       const startDate = new Date(startTime);
@@ -230,7 +258,7 @@ export function TemplateVariableForm({
         body: JSON.stringify({
           event: {
             summary: title,
-            description: populatedPrompt,
+            description: finalPrompt,
             start: {
               dateTime: startDate.toISOString(),
               timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -315,27 +343,27 @@ export function TemplateVariableForm({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-6xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-7xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200 dark:border-gray-800">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-850">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-3 mb-2">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {template.title}
                 </h2>
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-xs font-semibold px-2 py-1">
                   {template.tier.toUpperCase()}
                 </Badge>
                 {template.category && (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs px-2 py-1">
                     {template.category.icon} {template.category.name}
                   </Badge>
                 )}
               </div>
               {template.description && (
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                   {template.description}
                 </p>
               )}
@@ -344,58 +372,164 @@ export function TemplateVariableForm({
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="ml-4"
+              className="ml-4 hover:bg-white/50 dark:hover:bg-gray-800/50"
             >
               <X className="w-5 h-5" />
             </Button>
           </div>
         </div>
 
+        {/* Mode Toggle */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wand2 className="w-5 h-5 text-blue-500" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {editMode ? 'Edit Mode - Customize your prompt freely' : 'Variable Mode - Fill in the template fields'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {editMode && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetToTemplate}
+                  className="text-xs"
+                >
+                  <RotateCcw className="w-3 h-3 mr-1" />
+                  Reset
+                </Button>
+              )}
+              <Button
+                variant={editMode ? "default" : "outline"}
+                size="sm"
+                onClick={handleToggleEditMode}
+                className={editMode ? "bg-blue-500 hover:bg-blue-600" : ""}
+              >
+                <Edit3 className="w-4 h-4 mr-2" />
+                {editMode ? 'Back to Variables' : 'Edit Prompt'}
+              </Button>
+            </div>
+          </div>
+        </div>
+
         {/* Content - Two Columns */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 overflow-y-auto">
-          {/* Left Column - Variable Inputs */}
+          {/* Left Column - Variable Inputs or Edit Mode Info */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Fill in the details
-            </h3>
-
-            {template.variables.length === 0 ? (
-              <p className="text-gray-500 text-sm">
-                This template has no variables. You can use it as-is.
-              </p>
-            ) : (
-              template.variables.map((variable) => (
-                <div key={variable.name} className="space-y-2">
-                  <Label htmlFor={variable.name} className="flex items-center gap-2">
-                    {variable.label || variable.name}
-                    {variable.required && (
-                      <span className="text-red-500 text-sm">*</span>
-                    )}
-                  </Label>
-                  {renderVariableInput(variable)}
+            {!editMode ? (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-6 bg-blue-500 rounded-full"></div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Fill in the details
+                  </h3>
                 </div>
-              ))
+
+                {template.variables.length === 0 ? (
+                  <Card className="border-2 border-dashed">
+                    <CardContent className="p-6">
+                      <p className="text-gray-500 text-sm text-center">
+                        This template has no variables. You can use it as-is or switch to Edit Mode to customize.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  template.variables.map((variable) => (
+                    <div key={variable.name} className="space-y-2 p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
+                      <Label htmlFor={variable.name} className="flex items-center gap-2 font-medium">
+                        {variable.label || variable.name}
+                        {variable.required && (
+                          <span className="text-red-500 text-sm font-bold">*</span>
+                        )}
+                      </Label>
+                      {renderVariableInput(variable)}
+                      {variable.placeholder && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {variable.placeholder}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-6 bg-purple-500 rounded-full"></div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Edit your prompt
+                  </h3>
+                </div>
+                <Card className="border-2 border-purple-200 dark:border-purple-800">
+                  <CardContent className="p-6 space-y-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      You're now in edit mode. Make any changes you want to the prompt below. Your edits will be used when you click "Use Template".
+                    </p>
+                    <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="text-blue-500">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-blue-900 dark:text-blue-100">
+                          Tip: Switch back to Variable Mode to update the template fields automatically.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
             )}
           </div>
 
-          {/* Right Column - Preview */}
+          {/* Right Column - Preview/Editor */}
           <div className="lg:sticky lg:top-0 lg:self-start">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Preview</CardTitle>
-                <CardDescription>
-                  See how your prompt will look
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 min-h-[200px] max-h-[400px] overflow-y-auto">
-                  <div className="text-sm text-gray-700 dark:text-gray-300 font-sans">
-                    <TemplateVariableHighlighter
-                      text={populatedPrompt}
-                      variables={template.variables}
-                    />
+            <Card className="shadow-lg border-2">
+              <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-850">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      {editMode ? (
+                        <>
+                          <Edit3 className="w-5 h-5 text-purple-500" />
+                          Edit Prompt
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="w-5 h-5 text-blue-500" />
+                          Preview
+                        </>
+                      )}
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      {editMode ? 'Customize your prompt directly' : 'See how your prompt will look'}
+                    </CardDescription>
                   </div>
+                  <Badge variant={editMode ? "default" : "secondary"} className={editMode ? "bg-purple-500" : ""}>
+                    {editMode ? 'Editable' : 'Live Preview'}
+                  </Badge>
                 </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                {editMode ? (
+                  <Textarea
+                    value={editedPrompt}
+                    onChange={(e) => setEditedPrompt(e.target.value)}
+                    className="min-h-[300px] max-h-[500px] font-mono text-sm border-2 border-purple-200 dark:border-purple-800 focus:border-purple-400 dark:focus:border-purple-600 resize-none"
+                    placeholder="Edit your prompt here..."
+                  />
+                ) : (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 min-h-[300px] max-h-[500px] overflow-y-auto">
+                    <div className="text-sm text-gray-700 dark:text-gray-300 font-sans leading-relaxed">
+                      <TemplateVariableHighlighter
+                        text={populatedPrompt}
+                        variables={template.variables}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex gap-2 mt-4">
                   <Button
@@ -412,8 +546,8 @@ export function TemplateVariableForm({
                 {/* Integration Actions */}
                 {(template.requiresGoogleDrive || template.requiresGmail || template.requiresCalendar) && (
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-3">
-                      Quick Actions:
+                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide">
+                      Quick Actions
                     </p>
                     <div className="flex flex-col gap-2">
                       {template.requiresGoogleDrive && (
@@ -422,7 +556,7 @@ export function TemplateVariableForm({
                           size="sm"
                           onClick={handleSaveToDrive}
                           disabled={actionLoading !== null}
-                          className="justify-start"
+                          className="justify-start hover:bg-blue-50 dark:hover:bg-blue-900/20"
                         >
                           <HardDrive className="w-4 h-4 mr-2" />
                           {actionLoading === 'drive' ? 'Saving...' : 'Save to Drive'}
@@ -434,7 +568,7 @@ export function TemplateVariableForm({
                           size="sm"
                           onClick={handleSendViaGmail}
                           disabled={actionLoading !== null}
-                          className="justify-start"
+                          className="justify-start hover:bg-red-50 dark:hover:bg-red-900/20"
                         >
                           <Mail className="w-4 h-4 mr-2" />
                           {actionLoading === 'gmail' ? 'Sending...' : 'Send via Gmail'}
@@ -446,7 +580,7 @@ export function TemplateVariableForm({
                           size="sm"
                           onClick={handleCreateCalendarEvent}
                           disabled={actionLoading !== null}
-                          className="justify-start"
+                          className="justify-start hover:bg-green-50 dark:hover:bg-green-900/20"
                         >
                           <CalendarIcon className="w-4 h-4 mr-2" />
                           {actionLoading === 'calendar' ? 'Creating...' : 'Create Calendar Event'}
@@ -477,18 +611,25 @@ export function TemplateVariableForm({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+        <div className="p-6 border-t border-gray-200 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-850">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">
-              {template.variables.filter((v) => v.required).length > 0 && (
-                <span>* Required fields</span>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              {!editMode && template.variables.filter((v) => v.required).length > 0 && (
+                <span className="flex items-center gap-1">
+                  <span className="text-red-500 font-bold">*</span>
+                  Required fields
+                </span>
               )}
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose}>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={onClose} size="lg">
                 Cancel
               </Button>
-              <Button onClick={handleUseTemplate} className="bg-blue-500 hover:bg-blue-600">
+              <Button
+                onClick={handleUseTemplate}
+                size="lg"
+                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold px-6 shadow-lg hover:shadow-xl transition-all"
+              >
                 <Send className="w-4 h-4 mr-2" />
                 Use Template
               </Button>
