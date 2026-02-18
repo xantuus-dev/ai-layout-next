@@ -17,9 +17,10 @@ import { captureAPIError } from '@/lib/sentry';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  // Authenticate user
+  const session = await getServerSession(authOptions);
+
   try {
-    // Authenticate user
-    const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
