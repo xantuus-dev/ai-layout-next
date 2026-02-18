@@ -563,7 +563,7 @@ Provide a brief (1-2 sentences) explanation of why this action makes sense.`;
     }
 
     // Reconstruct execution plan
-    const plan: ExecutionPlan = task.plan as ExecutionPlan;
+    const plan: ExecutionPlan = task.plan as unknown as ExecutionPlan;
 
     // Rebuild task object
     const agentTask: AgentTask = {
