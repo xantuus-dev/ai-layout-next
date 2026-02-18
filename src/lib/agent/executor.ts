@@ -538,7 +538,7 @@ Provide a brief (1-2 sentences) explanation of why this action makes sense.`;
 
       // Deduct credits from user
       await prisma.user.update({
-        where: { id: result.taskId }, // Note: This should be userId, fix in production
+        where: { id: task.userId },
         data: {
           creditsUsed: {
             increment: result.creditsUsed,
