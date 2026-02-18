@@ -23,8 +23,9 @@ export type {
 
 export type {
   ExtractedFact,
-  FactExtractionOptions,
-  FactExtractionResult,
+  ExtractionOptions,
+  ExtractionResult,
+  FactType,
 } from './FactExtractor';
 
 export type {
