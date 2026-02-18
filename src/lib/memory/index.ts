@@ -19,7 +19,6 @@ export type {
   ConversationSession,
   IndexingConfig,
   IndexingResult,
-  IndexingStats,
 } from './ConversationIndexer';
 
 export type {
