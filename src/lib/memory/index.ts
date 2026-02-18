@@ -11,11 +11,8 @@ export { MemoryConsolidator } from './MemoryConsolidator';
 export { MemoryScheduler } from './MemoryScheduler';
 export { loadMemoryConfig, validateMemoryConfig } from './config';
 
-export type {
-  MemoryConfig,
-  MemorySearchOptions,
-  MemorySearchResult,
-} from './config';
+export type { MemoryConfig } from './config';
+export type { MemorySearchOptions, MemorySearchResult } from './MemoryService';
 
 export type {
   Message,
