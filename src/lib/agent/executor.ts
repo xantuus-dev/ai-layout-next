@@ -261,7 +261,7 @@ Return ONLY the JSON array, no other text.`;
       await this.emitEvent({ type: 'task.completed', taskId: task.id, result });
 
       // Save to database
-      await this.saveResult(task.id, result);
+      await this.saveResult(task.id, task.userId, result);
 
       return result;
 
@@ -286,7 +286,7 @@ Return ONLY the JSON array, no other text.`;
       await this.emitEvent({ type: 'task.failed', taskId: task.id, error: error.message });
 
       // Save to database
-      await this.saveResult(task.id, result);
+      await this.saveResult(task.id, task.userId, result);
 
       return result;
     }
@@ -497,7 +497,7 @@ Provide a brief (1-2 sentences) explanation of why this action makes sense.`;
   /**
    * Save execution result to database
    */
-  private async saveResult(taskId: string, result: AgentResult): Promise<void> {
+  private async saveResult(taskId: string, userId: string, result: AgentResult): Promise<void> {
     try {
       await prisma.task.update({
         where: { id: taskId },
@@ -538,7 +538,7 @@ Provide a brief (1-2 sentences) explanation of why this action makes sense.`;
 
       // Deduct credits from user
       await prisma.user.update({
-        where: { id: task.userId },
+        where: { id: userId },
         data: {
           creditsUsed: {
             increment: result.creditsUsed,
