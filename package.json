@@ -9,7 +9,8 @@
     "lint": "eslint",
     "orchestrator": "tsx scripts/start-orchestrator.ts",
     "memory-scheduler": "tsx scripts/start-memory-scheduler.ts",
-    "setup-memory-db": "tsx scripts/setup-memory-db.ts"
+    "setup-memory-db": "tsx scripts/setup-memory-db.ts",
+    "verify-memory-setup": "tsx scripts/verify-memory-setup.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
