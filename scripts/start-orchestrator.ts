@@ -22,7 +22,7 @@
 
 import { getAgentWorker, closeAgentWorker } from '../src/lib/queue/agent-worker';
 import { getOrchestrator, stopOrchestrator } from '../src/lib/agent/orchestrator';
-import { redisConnection } from '../src/lib/queue/redis';
+import { closeRedisConnection } from '../src/lib/queue/redis';
 
 // Handle graceful shutdown
 let isShuttingDown = false;
@@ -43,7 +43,7 @@ async function shutdown() {
     await closeAgentWorker();
 
     // Close Redis connection
-    await redisConnection.quit();
+    await closeRedisConnection();
 
     console.log('✅ Shutdown complete');
     process.exit(0);
