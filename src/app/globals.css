@@ -88,6 +88,25 @@
 
     --radius: 0.75rem;                           /* 12px */
     --ease-silk: cubic-bezier(0.2, 0.0, 0, 1.0);
+
+    /* Integration Panel Variables */
+    --border-btn-main: 240 6% 25%;               /* Button borders */
+    --border-main: 240 6% 20%;                   /* Main borders */
+    --border-dark: 240 6% 30%;                   /* Dark borders for focus */
+    --background-menu-white: 240 6% 15%;         /* Card backgrounds */
+    --background-nav: 240 5% 18%;                /* Navigation hover */
+    --text-primary: 0 0% 98%;                    /* Primary text */
+    --text-secondary: 0 0% 85%;                  /* Secondary text */
+    --text-tertiary: 240 5% 65%;                 /* Tertiary text */
+    --text-disable: 240 5% 45%;                  /* Disabled text */
+    --icon-primary: 0 0% 98%;                    /* Primary icons */
+    --icon-secondary: 240 5% 65%;                /* Secondary icons */
+    --icon-tertiary: 240 5% 55%;                 /* Tertiary icons */
+    --Button-primary-white: 240 6% 18%;          /* Primary button bg */
+    --Button-primary-black: 258 90% 66%;         /* Primary button accent */
+    --fill-gray: 240 5% 22%;                     /* Fill gray */
+    --fill-tsp-white-main: 240 6% 17%;           /* Transparent white main */
+    --fill-tsp-white-light: 240 6% 19%;          /* Transparent white light */
   }
   .light {
     /* Light Mode - Clean neutral with purple accents */
@@ -113,6 +132,25 @@
     --border: 240 6% 90%;                        /* hsl(240, 6%, 90%) = #E4E4E7 */
     --input: 240 6% 90%;
     --ring: 258 90% 66%;                         /* Purple focus ring */
+
+    /* Integration Panel Variables - Light Mode */
+    --border-btn-main: 240 6% 85%;               /* Button borders */
+    --border-main: 240 6% 90%;                   /* Main borders */
+    --border-dark: 240 6% 75%;                   /* Dark borders for focus */
+    --background-menu-white: 0 0% 100%;          /* Card backgrounds */
+    --background-nav: 240 5% 96%;                /* Navigation hover */
+    --text-primary: 240 10% 10%;                 /* Primary text */
+    --text-secondary: 240 10% 20%;               /* Secondary text */
+    --text-tertiary: 240 5% 50%;                 /* Tertiary text */
+    --text-disable: 240 5% 65%;                  /* Disabled text */
+    --icon-primary: 240 10% 10%;                 /* Primary icons */
+    --icon-secondary: 240 5% 50%;                /* Secondary icons */
+    --icon-tertiary: 240 5% 60%;                 /* Tertiary icons */
+    --Button-primary-white: 0 0% 100%;           /* Primary button bg */
+    --Button-primary-black: 258 90% 66%;         /* Primary button accent */
+    --fill-gray: 240 5% 94%;                     /* Fill gray */
+    --fill-tsp-white-main: 240 6% 97%;           /* Transparent white main */
+    --fill-tsp-white-light: 240 6% 98%;          /* Transparent white light */
   }
 }
 

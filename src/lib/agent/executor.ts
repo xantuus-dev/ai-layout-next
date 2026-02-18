@@ -27,6 +27,7 @@ import {
   AgentEvent,
 } from './types';
 import { ToolRegistry } from './tools/registry';
+import { captureAgentError, captureToolError, addBreadcrumb, setUser } from '@/lib/sentry';
 
 /**
  * Core agent executor that implements the ReAct loop
@@ -207,6 +208,15 @@ Return ONLY the JSON array, no other text.`;
   async execute(task: AgentTask, plan: ExecutionPlan): Promise<AgentResult> {
     console.log(`[Agent] Starting execution of task ${task.id}`);
 
+    // Set user context for error tracking
+    setUser(task.userId);
+    addBreadcrumb(
+      `Starting task execution: ${task.goal}`,
+      'agent',
+      'info',
+      { taskId: task.id, type: task.type, steps: plan.totalSteps }
+    );
+
     // Initialize state
     this.currentState = {
       taskId: task.id,
@@ -267,6 +277,15 @@ Return ONLY the JSON array, no other text.`;
 
     } catch (error: any) {
       console.error(`[Agent] Execution failed:`, error);
+
+      // Track error in Sentry
+      captureAgentError(
+        error,
+        task.id,
+        task.userId,
+        this.currentState?.currentStep,
+        undefined
+      );
 
       this.currentState.status = 'failed';
       this.currentState.error = error.message;
@@ -380,6 +399,15 @@ Return ONLY the JSON array, no other text.`;
 
     } catch (error: any) {
       console.error(`[Agent] Step ${step.stepNumber} failed:`, error);
+
+      // Track step error in Sentry
+      captureAgentError(
+        error,
+        task.id,
+        task.userId,
+        step.stepNumber,
+        step.tool
+      );
 
       const trace: ExecutionTrace = {
         stepNumber: step.stepNumber,

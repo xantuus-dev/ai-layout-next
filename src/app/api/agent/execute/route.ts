@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma';
 import { AgentExecutor } from '@/lib/agent/executor';
 import { toolRegistry } from '@/lib/agent/tools';
 import { AgentTask, AgentConfig } from '@/lib/agent/types';
+import { queueAgentTask } from '@/lib/queue/agent-queue';
 
 export async function POST(request: NextRequest) {
   try {
@@ -91,14 +92,19 @@ export async function POST(request: NextRequest) {
 
     // Execute asynchronously if requested
     if (body.async) {
-      // In production, this would use a job queue
-      executeTaskAsync(agentTask, agentConfig);
+      // Queue task for background execution using BullMQ
+      const priority = getPriorityValue(task.priority);
+      const jobId = await queueAgentTask(user.id, task.id, {
+        priority,
+        retryCount: agentConfig.retryCount || 3,
+      });
 
       return NextResponse.json({
         success: true,
         taskId: task.id,
-        status: 'planning',
-        message: 'Task execution started in background',
+        jobId,
+        status: 'pending',
+        message: 'Task queued for background execution',
       });
     }
 
@@ -224,28 +230,19 @@ async function executeExistingTask(task: any, userId: string) {
 }
 
 /**
- * Execute task asynchronously (placeholder for job queue)
+ * Convert priority string to numeric value for queue
  */
-async function executeTaskAsync(task: AgentTask, config: AgentConfig) {
-  // In production, this would push to a job queue (BullMQ)
-  // For now, we just execute in background
-  setTimeout(async () => {
-    try {
-      const executor = new AgentExecutor(task.type, config, toolRegistry);
-      const plan = await executor.plan(task);
-
-      await prisma.task.update({
-        where: { id: task.id },
-        data: {
-          plan: plan as any,
-          totalSteps: plan.totalSteps,
-          status: 'executing',
-        },
-      });
-
-      await executor.execute(task, plan);
-    } catch (error) {
-      console.error('Async execution failed:', error);
-    }
-  }, 0);
+function getPriorityValue(priority: string | null): number {
+  switch (priority) {
+    case 'urgent':
+      return 1;
+    case 'high':
+      return 2;
+    case 'medium':
+      return 3;
+    case 'low':
+      return 4;
+    default:
+      return 3;
+  }
 }

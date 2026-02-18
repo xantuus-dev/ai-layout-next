@@ -36,6 +36,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@revenuecat/purchases-js": "^1.23.0",
+    "@sentry/nextjs": "^10.39.0",
     "@stripe/stripe-js": "^8.6.1",
     "@types/pg": "^8.16.0",
     "@types/puppeteer": "^5.4.7",
