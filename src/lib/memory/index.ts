@@ -31,7 +31,7 @@ export type {
 export type {
   ConsolidationOptions,
   ConsolidationResult,
-  MemoryFact,
+  StoredFact,
 } from './MemoryConsolidator';
 
 export type {
