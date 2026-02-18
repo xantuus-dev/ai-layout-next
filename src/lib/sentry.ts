@@ -110,27 +110,23 @@ export async function trackPerformance<T>(
   operation: () => Promise<T>,
   tags?: Record<string, string>
 ): Promise<T> {
-  const transaction = Sentry.startTransaction({
-    name: operationName,
-    op: 'function',
-  });
-
-  if (tags) {
-    Object.entries(tags).forEach(([key, value]) => {
-      transaction.setTag(key, value);
-    });
-  }
-
-  try {
-    const result = await operation();
-    transaction.setStatus('ok');
-    return result;
-  } catch (error) {
-    transaction.setStatus('internal_error');
-    throw error;
-  } finally {
-    transaction.finish();
-  }
+  return await Sentry.startSpan(
+    {
+      name: operationName,
+      op: 'function',
+      attributes: tags || {},
+    },
+    async (span) => {
+      try {
+        const result = await operation();
+        span?.setStatus({ code: 1 }); // OK status
+        return result;
+      } catch (error) {
+        span?.setStatus({ code: 2 }); // Error status
+        throw error;
+      }
+    }
+  );
 }
 
 /**
