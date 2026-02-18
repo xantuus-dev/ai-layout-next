@@ -12,6 +12,8 @@ src/app/builder-demo
 src/app/integration-demo
 src/components/workflow-builder
 src/lib/workflow-builder
+src/app/api/workflows/execute
+src/app/api/workflows/execution
 
 # Test files
 **/__tests__
