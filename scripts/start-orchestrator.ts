@@ -22,7 +22,7 @@
 
 import { getAgentWorker, closeAgentWorker } from '../src/lib/queue/agent-worker';
 import { getOrchestrator, stopOrchestrator } from '../src/lib/agent/orchestrator';
-import { closeRedisConnection } from '../src/lib/queue/redis';
+import { closeRedisConnection, isRedisAvailable, getRedisHealth } from '../src/lib/queue/redis';
 
 // Handle graceful shutdown
 let isShuttingDown = false;
@@ -61,12 +61,17 @@ async function main() {
   console.log('🚀 Starting Agent Orchestrator...\n');
 
   // Check Redis connection
-  console.log('🔌 Connecting to Redis...');
-  try {
-    await redisConnection.ping();
-    console.log('✅ Redis connected\n');
-  } catch (error) {
-    console.error('❌ Redis connection failed:', error);
+  console.log('🔌 Checking Redis connection...');
+
+  // Give Redis a moment to initialize
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  const health = await getRedisHealth();
+
+  if (!health.connected) {
+    console.error('❌ Redis connection failed');
+    console.error('   State:', health.state);
+    console.error('   Circuit:', health.circuitState);
     console.error('\nPlease ensure Redis is running:');
     console.error('  - macOS: brew services start redis');
     console.error('  - Linux: sudo systemctl start redis');
@@ -74,6 +79,8 @@ async function main() {
     console.error('  - Or configure REDIS_HOST and REDIS_PORT environment variables\n');
     process.exit(1);
   }
+
+  console.log('✅ Redis connected\n');
 
   // Start worker
   console.log('👷 Starting agent worker...');
