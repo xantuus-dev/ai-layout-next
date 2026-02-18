@@ -168,7 +168,7 @@ export async function checkUserCredits(
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
-      credits: true,
+      monthlyCredits: true,
       creditsUsed: true,
     },
   });
@@ -182,7 +182,7 @@ export async function checkUserCredits(
     };
   }
 
-  const availableCredits = user.credits - user.creditsUsed;
+  const availableCredits = user.monthlyCredits - user.creditsUsed;
 
   if (availableCredits < requiredCredits) {
     return {
