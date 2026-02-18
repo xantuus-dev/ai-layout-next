@@ -572,7 +572,7 @@ Provide a brief (1-2 sentences) explanation of why this action makes sense.`;
       userId: task.userId,
       type: (task.agentType || 'custom') as AgentType,
       goal: task.title,
-      context: task.agentConfig || {},
+      context: (task.agentConfig as Record<string, any>) || {},
       priority: task.priority as any,
     };
 
