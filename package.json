@@ -48,7 +48,7 @@
     "date-fns": "^4.1.0",
     "docx": "^9.5.1",
     "framer-motion": "^12.29.2",
-    "googleapis": "^170.0.0",
+    "googleapis": "^171.4.0",
     "gpt-tokenizer": "^2.6.1",
     "ioredis": "^5.9.2",
     "jsdom": "^27.0.1",
