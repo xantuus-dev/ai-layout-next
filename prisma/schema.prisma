@@ -1120,3 +1120,325 @@ model MessageImportance {
   @@unique([userId, chunkId])
   @@index([userId, importanceScore])
 }
+
+// ============================================
+// SKILL MARKETPLACE MODELS
+// ============================================
+
+// CustomSkill - User-created or marketplace skills
+model CustomSkill {
+  id        String @id @default(cuid())
+  creatorId String
+
+  // Skill identity
+  name        String
+  description String @db.Text
+  category    String // productivity, data, communication, integration, entertainment
+  icon        String? // Icon identifier or emoji
+
+  // Pricing
+  pricingModel String @default("free") // free, one-time, subscription
+  price        Int    @default(0) // USD cents
+
+  // Technical specs
+  requiredTools        String[] // Tools this skill needs
+  requiredIntegrations String[] // Integrations required (slack, github, etc)
+  estimatedCreditCost  Int      @default(0) // Credits per execution
+
+  // Code/configuration
+  skillType       String @default("config") // config, javascript, python
+  skillDefinition Json // Either config JSON or code string
+  parameters      Json   @default("[]") // Parameter schema for skill execution
+
+  // Quality metrics
+  downloads   Int   @default(0)
+  rating      Float @default(0) // 1-5 stars
+  reviewCount Int   @default(0)
+
+  // Versioning
+  version   String   @default("1.0.0")
+  changelog Json     @default("[]") // Array of version changes
+
+  // Marketplace status
+  status   String  @default("draft") // draft, pending_review, approved, rejected, archived
+  featured Boolean @default(false)
+
+  // Review feedback (if rejected)
+  reviewFeedback String? @db.Text
+  reviewedAt     DateTime?
+  reviewedBy     String? // Admin user ID
+
+  // Relations
+  installations SkillInstallation[]
+  reviews       SkillReview[]
+
+  // Analytics
+  totalRevenue    Int @default(0) // USD cents
+  monthlyRevenue  Int @default(0) // USD cents
+  totalExecutions Int @default(0)
+  lastUsedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([creatorId, status])
+  @@index([status, featured])
+  @@index([category, status])
+  @@index([pricingModel, status])
+}
+
+// SkillInstallation - Track user installations of skills
+model SkillInstallation {
+  id      String      @id @default(cuid())
+  userId  String
+  skillId String
+  skill   CustomSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  // Purchase info
+  purchaseType String  @default("free") // free, one-time, subscription
+  amountPaid   Int     @default(0) // USD cents
+  transactionId String? // Stripe payment intent ID
+
+  // Subscription info (if applicable)
+  subscriptionId       String? // Stripe subscription ID
+  subscriptionStatus   String? // active, cancelled, expired
+  subscriptionPeriodEnd DateTime?
+
+  // Usage tracking
+  executionCount Int       @default(0)
+  lastUsedAt     DateTime?
+
+  // Installation status
+  isActive   Boolean @default(true)
+  installedAt DateTime @default(now())
+  removedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, skillId])
+  @@index([userId, isActive])
+  @@index([skillId, installedAt])
+}
+
+// SkillReview - User reviews for skills
+model SkillReview {
+  id      String      @id @default(cuid())
+  userId  String
+  skillId String
+  skill   CustomSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  rating  Float  // 1-5 stars
+  title   String?
+  comment String? @db.Text
+
+  // Creator response
+  response    String? @db.Text
+  respondedAt DateTime?
+
+  // Helpful votes
+  helpfulCount   Int @default(0)
+  unhelpfulCount Int @default(0)
+
+  // Verification
+  isVerified Boolean @default(false) // User actually installed/used the skill
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, skillId])
+  @@index([skillId, rating])
+  @@index([skillId, createdAt])
+}
+
+// ============================================
+// VERTICAL TEMPLATES MODELS
+// ============================================
+
+// IndustryTemplate - Pre-configured agent templates for industries
+model IndustryTemplate {
+  id String @id @default(cuid())
+
+  // Template identity
+  name        String
+  description String @db.Text
+  industry    String // ecommerce, content-creation, real-estate, recruiting, finance, etc
+  icon        String? // Icon identifier or emoji
+  color       String? // Hex color
+
+  // Agent configuration
+  agentType      String  @default("custom") // Which agent type to use
+  systemPrompt   String  @db.Text // Pre-configured system prompt
+  suggestedModel String  @default("claude-sonnet-4-5-20250929") // Recommended model
+
+  // Required capabilities
+  requiredTools        String[] // Tools needed (browser, email, etc)
+  optionalTools        String[] // Optional tools for enhanced features
+  requiredIntegrations String[] // Integrations needed (slack, gmail, etc)
+
+  // Sample workflows
+  sampleWorkflows Json @default("[]") // Array of workflow definitions
+
+  // Custom instructions template
+  customInstructionsTemplate String? @db.Text // Template for user customization
+
+  // Success metrics
+  suggestedKPIs String[] // KPIs to track for this template
+
+  // Template configuration
+  defaultConfig Json @default("{}") // Default agent config
+
+  // Marketplace
+  tier       String  @default("free") // free, core, ultra - which tier can access
+  featured   Boolean @default(false)
+  order      Int     @default(0) // Display order
+
+  // Analytics
+  installCount Int       @default(0)
+  lastUsedAt   DateTime?
+
+  // Relations
+  userSettings TemplateSetting[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([industry, tier])
+  @@index([featured, order])
+  @@index([tier])
+}
+
+// TemplateSetting - User customizations of templates
+model TemplateSetting {
+  id         String           @id @default(cuid())
+  userId     String
+  templateId String
+  template   IndustryTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  // User customization
+  customName         String?
+  customSystemPrompt String? @db.Text
+  customConfig       Json? // Overrides for default config
+
+  // Usage tracking
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, templateId])
+  @@index([userId, isActive])
+}
+
+// ============================================
+// MULTI-AGENT TEAMS MODELS
+// ============================================
+
+// AgentTeam - Groups of agents working together
+model AgentTeam {
+  id     String @id @default(cuid())
+  userId String
+
+  // Team identity
+  name        String
+  description String? @db.Text
+  icon        String? // Icon identifier or emoji
+  color       String? // Hex color
+
+  // Team configuration
+  teamType     String @default("sequential") // sequential, parallel, hierarchical
+  maxAgents    Int    @default(5) // Max agents in team
+  sharedMemory Boolean @default(true) // Share context between agents
+
+  // Orchestration settings
+  coordinationStrategy String @default("leader") // leader, democratic, autonomous
+  errorHandling        String @default("rollback") // rollback, continue, ask
+
+  // Relations
+  agents         TeamAgent[]
+  collaborations AgentCollaboration[]
+
+  // Analytics
+  totalTasks     Int       @default(0)
+  successfulTasks Int      @default(0)
+  failedTasks    Int       @default(0)
+  lastUsedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, teamType])
+}
+
+// TeamAgent - Individual agent within a team
+model TeamAgent {
+  id     String    @id @default(cuid())
+  teamId String
+  team   AgentTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  // Agent identity
+  name        String
+  role        String // researcher, writer, analyst, communicator, coder
+  description String? @db.Text
+
+  // Agent configuration
+  agentType      String // research, writer, data, communication, browser
+  systemPrompt   String @db.Text
+  model          String @default("claude-sonnet-4-5-20250929")
+  tools          String[] // Available tools for this agent
+
+  // Team position
+  isLeader Boolean @default(false)
+  order    Int     @default(0) // Execution order in sequential teams
+
+  // Capabilities
+  canDelegate    Boolean @default(false) // Can assign tasks to other agents
+  canRequestHelp Boolean @default(true) // Can request help from other agents
+
+  // Resource limits
+  maxCreditsPerTask Int @default(1000)
+  maxStepsPerTask   Int @default(20)
+  timeoutSeconds    Int @default(300)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([teamId, order])
+  @@index([teamId, isLeader])
+}
+
+// AgentCollaboration - Track inter-agent communications and task handoffs
+model AgentCollaboration {
+  id     String    @id @default(cuid())
+  teamId String
+  team   AgentTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  // Task context
+  taskId      String // Reference to parent Task
+  parentTaskId String? // If this is a subtask
+
+  // Agent communication
+  fromAgentId String // Sending agent
+  toAgentId   String // Receiving agent
+
+  // Communication details
+  type        String // delegation, request_help, share_context, report_result
+  message     String @db.Text
+  context     Json? // Shared context data
+
+  // Status
+  status      String   @default("pending") // pending, in_progress, completed, failed
+  response    String?  @db.Text
+  result      Json?
+
+  // Timing
+  sentAt      DateTime @default(now())
+  respondedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([teamId, taskId])
+  @@index([taskId, status])
+  @@index([fromAgentId, toAgentId])
+}
