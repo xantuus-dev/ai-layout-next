@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle, Loader2, AlertCircle, Mail, Calendar, CreditCard, MessageSquare, FileText } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertCircle, Mail, Calendar, CreditCard, MessageSquare, FileText, Send } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 
 interface IntegrationStatus {
@@ -16,6 +16,7 @@ interface IntegrationStatus {
   notionEnabled?: boolean;
   stripeEnabled?: boolean;
   slackEnabled?: boolean;
+  telegramEnabled?: boolean;
 }
 
 interface Integration {
@@ -72,6 +73,26 @@ function IntegrationsPageContent() {
       const response = await fetch('/api/auth/session');
       const session = await response.json();
 
+      // Load Slack status
+      let slackEnabled = false;
+      try {
+        const slackResponse = await fetch('/api/integrations/slack/connect');
+        const slackData = await slackResponse.json();
+        slackEnabled = slackData.connected || false;
+      } catch (error) {
+        console.error('Error loading Slack status:', error);
+      }
+
+      // Load Telegram status
+      let telegramEnabled = false;
+      try {
+        const telegramResponse = await fetch('/api/integrations/telegram/connect');
+        const telegramData = await telegramResponse.json();
+        telegramEnabled = telegramData.connected || false;
+      } catch (error) {
+        console.error('Error loading Telegram status:', error);
+      }
+
       if (session?.user) {
         setIntegrations({
           googleDriveEnabled: session.user.googleDriveEnabled || false,
@@ -80,7 +101,8 @@ function IntegrationsPageContent() {
           googleAccessToken: !!session.user.googleAccessToken,
           notionEnabled: false, // TODO: Add actual status
           stripeEnabled: false, // TODO: Add actual status
-          slackEnabled: false, // TODO: Add actual status
+          slackEnabled,
+          telegramEnabled,
         });
       }
     } catch (error) {
@@ -169,6 +191,133 @@ function IntegrationsPageContent() {
     }
   };
 
+  const handleConnectSlack = async () => {
+    setConnecting('slack');
+    setMessage(null);
+
+    try {
+      const response = await fetch(
+        `/api/integrations/slack/connect?returnUrl=/settings/integrations`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to initiate connection');
+      }
+
+      const data = await response.json();
+      window.location.href = data.url;
+    } catch (error) {
+      console.error('Error connecting:', error);
+      setMessage({
+        type: 'error',
+        text: 'Failed to connect to Slack. Please try again.',
+      });
+      setConnecting(null);
+    }
+  };
+
+  const handleDisconnectSlack = async () => {
+    if (!confirm('Are you sure you want to disconnect Slack?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/integrations/slack/connect', {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to disconnect');
+      }
+
+      setMessage({
+        type: 'success',
+        text: 'Successfully disconnected from Slack',
+      });
+
+      await loadIntegrationStatus();
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+      setMessage({
+        type: 'error',
+        text: 'Failed to disconnect. Please try again.',
+      });
+    }
+  };
+
+  const handleConnectTelegram = () => {
+    // Show modal or input for bot token
+    const botToken = prompt(
+      'Enter your Telegram Bot Token:\n\n1. Create a bot with @BotFather on Telegram\n2. Copy the bot token provided\n3. Paste it below'
+    );
+
+    if (!botToken || !botToken.trim()) {
+      return;
+    }
+
+    setConnecting('telegram');
+    setMessage(null);
+
+    fetch('/api/integrations/telegram/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ botToken: botToken.trim() }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to connect');
+        }
+        return response.json();
+      })
+      .then((data) => {
+        setMessage({
+          type: 'success',
+          text: `Successfully connected Telegram bot: @${data.botInfo.username}`,
+        });
+        loadIntegrationStatus();
+      })
+      .catch((error) => {
+        console.error('Error connecting:', error);
+        setMessage({
+          type: 'error',
+          text: `Failed to connect: ${error.message}`,
+        });
+      })
+      .finally(() => {
+        setConnecting(null);
+      });
+  };
+
+  const handleDisconnectTelegram = async () => {
+    if (!confirm('Are you sure you want to disconnect your Telegram bot?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/integrations/telegram/connect', {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to disconnect');
+      }
+
+      setMessage({
+        type: 'success',
+        text: 'Successfully disconnected from Telegram',
+      });
+
+      await loadIntegrationStatus();
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+      setMessage({
+        type: 'error',
+        text: 'Failed to disconnect. Please try again.',
+      });
+    }
+  };
+
   const handleComingSoon = (name: string) => {
     setMessage({
       type: 'error',
@@ -211,6 +360,36 @@ function IntegrationsPageContent() {
       onDisconnect: handleDisconnect,
     },
     {
+      id: 'google-calendar',
+      name: 'Google Calendar',
+      description: 'Create and manage calendar events',
+      icon: <Calendar className="w-6 h-6 text-white" />,
+      iconBg: 'bg-blue-500',
+      status: integrations?.googleCalendarEnabled ? 'connected' : 'disconnected',
+      onConnect: handleConnectCalendar,
+      onDisconnect: handleDisconnect,
+    },
+    {
+      id: 'slack',
+      name: 'Slack',
+      description: 'Receive AI responses in Slack channels and DMs',
+      icon: <MessageSquare className="w-6 h-6 text-white" />,
+      iconBg: 'bg-purple-500',
+      status: integrations?.slackEnabled ? 'connected' : 'disconnected',
+      onConnect: handleConnectSlack,
+      onDisconnect: handleDisconnectSlack,
+    },
+    {
+      id: 'telegram',
+      name: 'Telegram',
+      description: 'Chat with your AI assistant via Telegram bot',
+      icon: <Send className="w-6 h-6 text-white" />,
+      iconBg: 'bg-blue-400',
+      status: integrations?.telegramEnabled ? 'connected' : 'disconnected',
+      onConnect: handleConnectTelegram,
+      onDisconnect: handleDisconnectTelegram,
+    },
+    {
       id: 'notion',
       name: 'Notion',
       description: 'Sync and create Notion pages',
@@ -227,25 +406,6 @@ function IntegrationsPageContent() {
       iconBg: 'bg-indigo-500',
       status: 'disconnected',
       onConnect: () => handleComingSoon('Stripe'),
-    },
-    {
-      id: 'slack',
-      name: 'Slack',
-      description: 'Send messages and notifications',
-      icon: <MessageSquare className="w-6 h-6 text-white" />,
-      iconBg: 'bg-purple-500',
-      status: 'disconnected',
-      onConnect: () => handleComingSoon('Slack'),
-    },
-    {
-      id: 'google-calendar',
-      name: 'Google Calendar',
-      description: 'Create and manage calendar events',
-      icon: <Calendar className="w-6 h-6 text-white" />,
-      iconBg: 'bg-blue-500',
-      status: integrations?.googleCalendarEnabled ? 'connected' : 'disconnected',
-      onConnect: handleConnectCalendar,
-      onDisconnect: handleDisconnect,
     },
   ];
 

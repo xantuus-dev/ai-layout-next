@@ -233,6 +233,9 @@ function ConditionalConfig({ node }: { node: CanvasNode }) {
       config: {
         ...node.config,
         condition: {
+          variable: node.config.condition?.variable || '',
+          operator: node.config.condition?.operator || 'equals',
+          value: node.config.condition?.value || '',
           ...node.config.condition,
           [key]: value,
         },

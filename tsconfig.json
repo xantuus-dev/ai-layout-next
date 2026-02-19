@@ -39,6 +39,8 @@
     "src/app/page.tsx.bak"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "ios-mobile",
+    "browser-extension"
   ]
 }

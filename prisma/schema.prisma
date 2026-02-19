@@ -115,6 +115,11 @@ model User {
   consolidationJobs    ConsolidationJob[]
   messageImportance    MessageImportance[]
 
+  // Skill marketplace relations
+  createdSkills        CustomSkill[]      @relation("SkillCreator")
+  skillInstallations   SkillInstallation[]
+  skillReviews         SkillReview[]      @relation("SkillReviews")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -1129,12 +1134,14 @@ model MessageImportance {
 model CustomSkill {
   id        String @id @default(cuid())
   creatorId String
+  creator   User   @relation("SkillCreator", fields: [creatorId], references: [id], onDelete: Cascade)
 
   // Skill identity
   name        String
   description String @db.Text
   category    String // productivity, data, communication, integration, entertainment
   icon        String? // Icon identifier or emoji
+  tags        String[] @default([]) // Tags for filtering and search
 
   // Pricing
   pricingModel String @default("free") // free, one-time, subscription
@@ -1191,6 +1198,7 @@ model CustomSkill {
 model SkillInstallation {
   id      String      @id @default(cuid())
   userId  String
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   skillId String
   skill   CustomSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
@@ -1225,6 +1233,7 @@ model SkillInstallation {
 model SkillReview {
   id      String      @id @default(cuid())
   userId  String
+  user    User        @relation("SkillReviews", fields: [userId], references: [id], onDelete: Cascade)
   skillId String
   skill   CustomSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
 

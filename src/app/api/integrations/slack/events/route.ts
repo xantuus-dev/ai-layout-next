@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('Error handling Slack event:', error);
-    captureAPIError(error, '/api/integrations/slack/events', 'POST');
+    captureAPIError(error as Error, '/api/integrations/slack/events', 'POST');
 
     // Still acknowledge to Slack to prevent retries
     return NextResponse.json({ ok: true });

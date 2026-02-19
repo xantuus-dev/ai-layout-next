@@ -120,7 +120,7 @@ export function WorkflowTemplateLibrary({
     }
 
     // Convert template to canvas nodes based on template type
-    let nodes;
+    let nodes: any[];
     if (selectedTemplate.id === 'price-monitor-template') {
       nodes = convertPriceMonitorToVisualNodes({
         competitorUrl: config.competitorUrl,

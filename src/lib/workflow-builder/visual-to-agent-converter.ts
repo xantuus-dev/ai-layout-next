@@ -37,6 +37,7 @@ export function convertVisualWorkflowToAgentPlan(
     totalSteps: steps.length,
     estimatedCredits,
     estimatedDuration,
+    createdAt: new Date(),
     metadata: {
       workflowName,
       workflowDescription,
@@ -76,14 +77,6 @@ function convertNodeToExecutionStep(
     requiresApproval: false, // Could be configurable in advanced mode
     estimatedCredits,
     estimatedDuration,
-    metadata: {
-      nodeId: node.id,
-      nodeType: node.type,
-      errorHandling: node.config.onError,
-      maxRetries: node.config.maxRetries,
-      saveOutput: node.config.saveOutput,
-      outputName: node.config.outputName,
-    },
   };
 }
 

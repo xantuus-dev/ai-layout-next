@@ -150,6 +150,21 @@ interface WorkflowBuilderState {
    */
   setWorkflowMetadata: (name: string, description: string) => void;
 
+  /**
+   * Set workflow nodes
+   */
+  setNodes: (nodes: CanvasNode[]) => void;
+
+  /**
+   * Set workflow name
+   */
+  setWorkflowName: (name: string) => void;
+
+  /**
+   * Set workflow description
+   */
+  setWorkflowDescription: (description: string) => void;
+
   // ========== Execution Monitoring ==========
   /**
    * Start execution monitoring
@@ -367,6 +382,18 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderState>((set, get) =
 
   setWorkflowMetadata: (name, description) => {
     set({ workflowName: name, workflowDescription: description });
+  },
+
+  setNodes: (nodes: CanvasNode[]) => {
+    set({ nodes });
+  },
+
+  setWorkflowName: (name: string) => {
+    set({ workflowName: name });
+  },
+
+  setWorkflowDescription: (description: string) => {
+    set({ workflowDescription: description });
   },
 
   // ========== Execution Monitoring ==========
