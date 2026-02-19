@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import Link from 'next/link';
+import CreateSkillModal from '@/components/marketplace/CreateSkillModal';
 
 interface Skill {
   id: string;
@@ -67,6 +68,7 @@ export default function MarketplacePage() {
   const [pricingFilter, setPricingFilter] = useState<string | null>(null);
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [installing, setInstalling] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   useEffect(() => {
     loadSkills();
@@ -148,11 +150,12 @@ export default function MarketplacePage() {
                 Discover and install AI skills created by the community
               </p>
             </div>
-            <Link href="/marketplace/create">
-              <Button className="gradient-primary hover:gradient-primary-hover">
-                Create Skill
-              </Button>
-            </Link>
+            <Button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="gradient-primary hover:gradient-primary-hover"
+            >
+              Create Skill
+            </Button>
           </div>
 
           {/* Search and Filters */}
@@ -350,6 +353,15 @@ export default function MarketplacePage() {
           )}
         </div>
       </div>
+
+      {/* Create Skill Modal */}
+      <CreateSkillModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => {
+          loadSkills(); // Reload skills after creation
+        }}
+      />
     </div>
   );
 }
