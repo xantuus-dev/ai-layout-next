@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Search, Sparkles, TrendingUp, Loader2, X } from 'lucide-react';
 import ClaudeChatInput from '@/components/ui/claude-style-chat-input';
 import { TemplateVariableHighlighter } from '@/components/ui/TemplateVariableHighlighter';
+import { EditableTemplateVariableHighlighter } from '@/components/ui/EditableTemplateVariableHighlighter';
 import Sidebar from '@/components/Sidebar';
 
 interface TemplateVariable {
@@ -53,6 +54,7 @@ export default function TemplatesGalleryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [templatePrompt, setTemplatePrompt] = useState<string>('');
+  const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const chatInputRef = useRef<{ setMessage: (msg: string) => void; focusAndHighlight?: () => void }>(null);
 
   useEffect(() => {
@@ -107,6 +109,13 @@ export default function TemplatesGalleryPage() {
     setSelectedTemplate(template);
     setTemplatePrompt(template.template);
 
+    // Initialize variable values as empty
+    const initialValues: Record<string, string> = {};
+    template.variables.forEach((v) => {
+      initialValues[v.name] = '';
+    });
+    setVariableValues(initialValues);
+
     // Populate the chat input and focus it after a short delay to ensure it's rendered
     setTimeout(() => {
       if (chatInputRef.current) {
@@ -119,6 +128,23 @@ export default function TemplatesGalleryPage() {
   const handleCloseChatbox = () => {
     setSelectedTemplate(null);
     setTemplatePrompt('');
+    setVariableValues({});
+  };
+
+  const handleVariableChange = (variableName: string, value: string) => {
+    setVariableValues((prev) => ({ ...prev, [variableName]: value }));
+
+    // Update the template prompt with the new value
+    const updatedPrompt = Object.entries({ ...variableValues, [variableName]: value }).reduce(
+      (text, [name, val]) => text.replace(new RegExp(`\\{\\{${name}\\}\\}`, 'g'), val || `{{${name}}}`),
+      selectedTemplate?.template || ''
+    );
+    setTemplatePrompt(updatedPrompt);
+
+    // Update chat input
+    if (chatInputRef.current) {
+      chatInputRef.current.setMessage(updatedPrompt);
+    }
   };
 
   const handleSendMessage = async (data: {
@@ -226,16 +252,18 @@ export default function TemplatesGalleryPage() {
             {/* Chat Input - Centered */}
             <div className="flex-1 flex flex-col items-center justify-center p-8 md:p-12 overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900 dark:to-gray-900">
               <div className="w-full max-w-3xl space-y-4">
-                {/* Preview with highlighted variables */}
+                {/* Preview with editable variables */}
                 {selectedTemplate.variables && selectedTemplate.variables.length > 0 && (
                   <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
                     <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
-                      Template Preview
+                      Template Preview - Click variables to edit
                     </p>
                     <div className="text-sm text-gray-700 dark:text-gray-300">
-                      <TemplateVariableHighlighter
-                        text={templatePrompt}
+                      <EditableTemplateVariableHighlighter
+                        text={selectedTemplate.template}
                         variables={selectedTemplate.variables}
+                        variableValues={variableValues}
+                        onVariableChange={handleVariableChange}
                       />
                     </div>
                   </div>
