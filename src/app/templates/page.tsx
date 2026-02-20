@@ -107,7 +107,6 @@ export default function TemplatesGalleryPage() {
   const handleTemplateSelect = async (template: Template) => {
     // Set the selected template and show the centered chatbox
     setSelectedTemplate(template);
-    setTemplatePrompt(template.template);
 
     // Initialize variable values as empty
     const initialValues: Record<string, string> = {};
@@ -116,10 +115,17 @@ export default function TemplatesGalleryPage() {
     });
     setVariableValues(initialValues);
 
-    // Populate the chat input and focus it after a short delay to ensure it's rendered
+    // Replace all variables with empty strings for initial prompt
+    let initialPrompt = template.template;
+    template.variables.forEach((v) => {
+      initialPrompt = initialPrompt.replace(new RegExp(`\\{\\{${v.name}\\}\\}`, 'g'), '');
+    });
+    setTemplatePrompt(initialPrompt);
+
+    // Populate the chat input with empty variables and focus it after a short delay to ensure it's rendered
     setTimeout(() => {
       if (chatInputRef.current) {
-        chatInputRef.current.setMessage(template.template);
+        chatInputRef.current.setMessage(initialPrompt);
         chatInputRef.current.focusAndHighlight?.();
       }
     }, 150);
@@ -132,16 +138,17 @@ export default function TemplatesGalleryPage() {
   };
 
   const handleVariableChange = (variableName: string, value: string) => {
-    setVariableValues((prev) => ({ ...prev, [variableName]: value }));
+    const updatedValues = { ...variableValues, [variableName]: value };
+    setVariableValues(updatedValues);
 
-    // Update the template prompt with the new value
-    const updatedPrompt = Object.entries({ ...variableValues, [variableName]: value }).reduce(
-      (text, [name, val]) => text.replace(new RegExp(`\\{\\{${name}\\}\\}`, 'g'), val || `{{${name}}}`),
-      selectedTemplate?.template || ''
-    );
+    // Update the template prompt with all variable values (replace {{variable}} with actual values)
+    let updatedPrompt = selectedTemplate?.template || '';
+    Object.entries(updatedValues).forEach(([name, val]) => {
+      updatedPrompt = updatedPrompt.replace(new RegExp(`\\{\\{${name}\\}\\}`, 'g'), val);
+    });
     setTemplatePrompt(updatedPrompt);
 
-    // Update chat input
+    // Update chat input with the final text (variables replaced)
     if (chatInputRef.current) {
       chatInputRef.current.setMessage(updatedPrompt);
     }
