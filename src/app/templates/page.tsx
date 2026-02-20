@@ -107,28 +107,14 @@ export default function TemplatesGalleryPage() {
   const handleTemplateSelect = async (template: Template) => {
     // Set the selected template and show the centered chatbox
     setSelectedTemplate(template);
-
     // Initialize variable values as empty
     const initialValues: Record<string, string> = {};
     template.variables.forEach((v) => {
       initialValues[v.name] = '';
     });
     setVariableValues(initialValues);
-
-    // Replace all variables with empty strings for initial prompt
-    let initialPrompt = template.template;
-    template.variables.forEach((v) => {
-      initialPrompt = initialPrompt.replace(new RegExp(`\\{\\{${v.name}\\}\\}`, 'g'), '');
-    });
-    setTemplatePrompt(initialPrompt);
-
-    // Populate the chat input with empty variables and focus it after a short delay to ensure it's rendered
-    setTimeout(() => {
-      if (chatInputRef.current) {
-        chatInputRef.current.setMessage(initialPrompt);
-        chatInputRef.current.focusAndHighlight?.();
-      }
-    }, 150);
+    // Start with the full template text (including variables) as the base prompt
+    setTemplatePrompt(template.template);
   };
 
   const handleCloseChatbox = () => {
@@ -140,17 +126,14 @@ export default function TemplatesGalleryPage() {
   const handleVariableChange = (variableName: string, value: string) => {
     const updatedValues = { ...variableValues, [variableName]: value };
     setVariableValues(updatedValues);
+  };
 
-    // Update the template prompt with all variable values (replace {{variable}} with actual values)
-    let updatedPrompt = selectedTemplate?.template || '';
-    Object.entries(updatedValues).forEach(([name, val]) => {
-      updatedPrompt = updatedPrompt.replace(new RegExp(`\\{\\{${name}\\}\\}`, 'g'), val);
-    });
-    setTemplatePrompt(updatedPrompt);
-
-    // Update chat input with the final text (variables replaced)
+  // Keep the main text prompt in sync with the Template Preview content
+  const handleTemplateTextChange = (newText: string) => {
+    setTemplatePrompt(newText);
     if (chatInputRef.current) {
-      chatInputRef.current.setMessage(updatedPrompt);
+      chatInputRef.current.setMessage(newText);
+      chatInputRef.current.focusAndHighlight?.();
     }
   };
 
@@ -271,6 +254,7 @@ export default function TemplatesGalleryPage() {
                         variables={selectedTemplate.variables}
                         variableValues={variableValues}
                         onVariableChange={handleVariableChange}
+                        onTextChange={handleTemplateTextChange}
                       />
                     </div>
                   </div>
