@@ -122,7 +122,8 @@ export default function ApiKeysPage() {
     <div className="relative">
       <Sidebar />
       <div className="lg:ml-64 transition-all duration-300">
-        <div className="space-y-6">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 p-4 md:p-8">
+          <div className="max-w-4xl mx-auto space-y-6">
           {/* Header */}
       <Card>
         <CardHeader>
@@ -281,6 +282,7 @@ export default function ApiKeysPage() {
           )}
         </DialogContent>
       </Dialog>
+          </div>
         </div>
       </div>
     </div>

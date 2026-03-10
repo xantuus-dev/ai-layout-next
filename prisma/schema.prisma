@@ -78,8 +78,11 @@ model User {
   googleCalendarEnabled Boolean   @default(false)
 
   // Usage tracking
-  usageRecords UsageRecord[]
-  apiKeys      ApiKey[]
+  usageRecords  UsageRecord[]
+  apiKeys       ApiKey[]
+  generatedImages GeneratedImage[]
+  imageGenerationJobs ImageGenerationJob[]
+  imageShareLinks ImageShareLink[]
 
   // Workspace features
   workspaces    Workspace[]
@@ -163,6 +166,135 @@ model ApiKey {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+// Image Generation
+model GeneratedImage {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Bulk generation job reference (optional)
+  jobId String?
+  job   ImageGenerationJob? @relation("JobImages", fields: [jobId], references: [id], onDelete: SetNull)
+
+  // Generation Details
+  prompt String @db.Text // The prompt used to generate the image
+  model  String @default("gemini-2.0-flash-exp") // AI model used
+  width  Int    @default(1024) // Image width in pixels
+  height Int    @default(1024) // Image height in pixels
+
+  // Image Storage
+  imageUrl String @db.Text // URL to the generated image
+
+  // Credits
+  creditsUsed Int @default(0) // Credits consumed for this generation
+
+  // Metadata
+  metadata Json? // Additional generation metadata
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId])
+  @@index([jobId])
+
+  // Relations
+  shareLinks ImageShareLink[]
+}
+
+// Image Templates for quick generation
+model ImageTemplate {
+  id String @id @default(cuid())
+
+  // Template Info
+  name        String
+  description String?
+  category    String // e.g., "pitch-deck", "social-media", "product", "team"
+  prompt      String @db.Text // Template prompt - can have {{variable}} placeholders
+
+  // Default settings
+  defaultWidth  Int @default(1024)
+  defaultHeight Int @default(1024)
+
+  // UI
+  icon        String? // Icon name or emoji
+  thumbnail   String? // URL to thumbnail preview
+
+  // Visibility
+  isPublic    Boolean @default(true)
+  createdBy   String? // Admin/creator ID
+
+  // Usage tracking
+  usageCount  Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, isPublic])
+}
+
+// Bulk image generation job tracking
+model ImageGenerationJob {
+  id String @id @default(cuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Job info
+  status String @default("pending") // pending, processing, completed, failed
+
+  // Generation details
+  basePrompt String @db.Text
+  quantity   Int    @default(3)
+  width      Int    @default(1024)
+  height     Int    @default(1024)
+
+  // Results
+  images           GeneratedImage[] @relation("JobImages")
+  totalCreditsUsed Int @default(0)
+
+  // Error tracking
+  errorMessage String?
+  failedCount  Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+// Image sharing with public links
+model ImageShareLink {
+  id String @id @default(cuid())
+
+  imageId String
+  image   GeneratedImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Share info
+  shareToken String @unique @default(cuid()) // URL-safe token
+  title      String?
+  message    String?
+
+  // Access control
+  expiresAt DateTime? // If null, never expires
+  maxViews  Int?      // If null, unlimited views
+  viewCount Int @default(0)
+
+  // Permissions
+  allowDownload Boolean @default(true)
+  allowShare    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([shareToken])
 }
 
 // Webhook Event Tracking (for idempotency)

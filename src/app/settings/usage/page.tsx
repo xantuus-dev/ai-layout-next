@@ -85,7 +85,8 @@ export default function UsagePage() {
     <div className="relative">
       <Sidebar />
       <div className="lg:ml-64 transition-all duration-300">
-        <div className="space-y-6">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 p-4 md:p-8">
+          <div className="max-w-4xl mx-auto space-y-6">
       {/* Plan Header with Upgrade Button */}
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -324,6 +325,7 @@ export default function UsagePage() {
           </div>
         </CardContent>
       </Card>
+          </div>
         </div>
       </div>
     </div>

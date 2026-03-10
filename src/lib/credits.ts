@@ -24,6 +24,25 @@ export const MODEL_CREDITS_PER_1K: Record<string, number> = {
   'gemini-1.5-pro': 1.25,
 };
 
+// Image Generation Credit Costs
+// Based on image dimensions - higher resolution = higher cost
+export const IMAGE_GENERATION_COSTS: Record<string, number> = {
+  'small': 5, // 512x512
+  'medium': 15, // 1024x1024
+  'large': 30, // 1536x1536
+};
+
+// Helper function to get image generation cost by dimensions
+export function getImageGenerationCost(width: number, height: number): number {
+  if (width <= 512 && height <= 512) {
+    return IMAGE_GENERATION_COSTS.small;
+  } else if (width <= 1024 && height <= 1024) {
+    return IMAGE_GENERATION_COSTS.medium;
+  } else {
+    return IMAGE_GENERATION_COSTS.large;
+  }
+}
+
 // AI Browser Feature Credit Costs
 export const BROWSER_FEATURE_CREDITS = {
   // Browser Sessions
