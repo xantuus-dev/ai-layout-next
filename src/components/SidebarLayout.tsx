@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import Sidebar from './Sidebar';
+import PaymentFailedBanner from './PaymentFailedBanner';
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
@@ -19,7 +20,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
   return (
     <div className="relative min-h-screen bg-background">
-      <Sidebar />
+      <Sidebar isCollapsed={isCollapsed} onToggleCollapse={() => setIsCollapsed((prev) => !prev)} />
 
       {/* Main Content Area with proper margin */}
       <div
@@ -27,6 +28,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
           isCollapsed ? 'lg:ml-20' : 'lg:ml-64'
         }`}
       >
+        <PaymentFailedBanner />
         <div className="ml-0 lg:ml-0">
           {children}
         </div>

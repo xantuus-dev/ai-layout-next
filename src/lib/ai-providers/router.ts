@@ -148,8 +148,15 @@ class AIRouter {
     const provider = this.getProviderForModel(modelId);
 
     if (!provider) {
-      // Default to 3 credits per 1K tokens (Sonnet pricing)
-      return Math.max(1, Math.ceil((tokens / 1000) * 3));
+      // No provider registered for this model at all. Bill at the highest
+      // known rate across every registered model rather than guessing a
+      // mid-tier default — an unrecognized model should never be cheaper
+      // to undercharge for than a model we actually have pricing for.
+      console.warn(`⚠️  No provider found for model "${modelId}" — billing at highest known rate`);
+      const highestKnownRate = this.allModels.length > 0
+        ? Math.max(...this.allModels.map(m => m.creditsPerThousandTokens))
+        : 15; // last-resort default if no providers are configured at all
+      return Math.max(1, Math.ceil((tokens / 1000) * highestKnownRate));
     }
 
     return provider.estimateCredits(tokens, modelId);

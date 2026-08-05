@@ -18,7 +18,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { priceId, productType } = await req.json();
+    const { priceId, productType, credits } = await req.json();
+
+    if (!priceId) {
+      return NextResponse.json({ error: 'priceId is required' }, { status: 400 });
+    }
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
@@ -54,6 +58,7 @@ export async function POST(req: NextRequest) {
       metadata: {
         userId: user.id,
         productType, // 'credits', 'template', 'lifetime', etc.
+        ...(credits ? { credits: String(credits) } : {}), // required when productType === 'credits'
       },
     });
 

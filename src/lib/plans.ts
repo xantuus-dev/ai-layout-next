@@ -1,6 +1,19 @@
 /**
- * Centralized plan definitions
- * This is the SINGLE SOURCE OF TRUTH for all plan configurations
+ * Coarse plan tiers: free / pro / enterprise.
+ *
+ * There are two pricing systems in this codebase, deliberately:
+ * - This file (plans.ts) defines the FREE tier, and provides a coarse
+ *   'free' | 'pro' | 'enterprise' label used for UI badges, RevenueCat
+ *   (mobile) subscriptions, and plan-tier comparisons. STRIPE_PRO_PRICE_ID /
+ *   STRIPE_ENTERPRISE_PRICE_ID are NOT currently configured — the web
+ *   checkout flow does not sell these fixed tiers directly.
+ * - pricing-config.ts defines the actual granular Stripe price catalog
+ *   (CREDIT_TIER_PRICES) that /pricing sells and the Stripe webhook reads.
+ *   It is the source of truth for a paid user's real `monthlyCredits`.
+ *
+ * Do not render PLAN_DEFINITIONS[...].features credit-amount text as if it
+ * reflects a paid user's actual plan — use `user.monthlyCredits` instead;
+ * a 'pro'-labeled user could be on any of the 12 CREDIT_TIER_PRICES tiers.
  */
 
 export const PLAN_DEFINITIONS = {

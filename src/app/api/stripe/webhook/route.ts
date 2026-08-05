@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { stripe, PLANS, isStripeEnabled, getPlanByPriceId } from '@/lib/stripe';
+import { stripe, PLANS, isStripeEnabled } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
-import { getPriceTierByPriceId, getBillingCycleFromPriceId } from '@/lib/pricing-config';
+import { sendPaymentFailedEmail } from '@/lib/email';
+import { grantPurchasedCredits, updateUserSubscription } from '@/lib/stripe-webhook-handlers';
 
 export async function POST(req: NextRequest) {
   if (!isStripeEnabled() || !stripe) {
@@ -102,6 +103,11 @@ export async function POST(req: NextRequest) {
               subscription
             );
           }
+        } else if (session.mode === 'payment' && session.metadata?.productType === 'credits') {
+          await grantPurchasedCredits(
+            session.metadata.userId,
+            session.metadata.credits
+          );
         }
         break;
       }
@@ -220,7 +226,14 @@ export async function POST(req: NextRequest) {
             });
 
             console.log(`Payment failed for user ${user.id}, subscription ${subscriptionId}`);
-            // TODO: Send email notification to user about failed payment
+
+            if (user.email) {
+              await sendPaymentFailedEmail({
+                to: user.email,
+                name: user.name,
+                billingUrl: `${process.env.NEXTAUTH_URL}/settings/billing`,
+              });
+            }
           }
         }
         break;
@@ -285,83 +298,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-async function updateUserSubscription(
-  userId: string | undefined,
-  subscription: Stripe.Subscription
-) {
-  if (!userId) {
-    // Try to find user by Stripe customer ID or subscription ID
-    const user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { stripeCustomerId: subscription.customer as string },
-          { stripeSubscriptionId: subscription.id },
-        ],
-      },
-    });
-
-    if (!user) {
-      console.error(`Cannot update subscription: User not found for subscription ${subscription.id}`);
-      return;
-    }
-
-    userId = user.id;
-  }
-
-  const priceId = subscription.items.data[0].price.id;
-
-  // First check if this is a custom pricing tier
-  const priceTier = getPriceTierByPriceId(priceId);
-  const billingCycle = getBillingCycleFromPriceId(priceId);
-
-  if (priceTier) {
-    // Custom pricing tier (Pro with variable credits)
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        stripeSubscriptionId: subscription.id,
-        stripePriceId: priceId,
-        stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
-        plan: 'pro', // All custom tiers are Pro plan
-        monthlyCredits: priceTier.credits,
-        billingCycle: billingCycle || 'monthly',
-      },
-    });
-
-    console.log(`Updated user ${userId} to Pro plan (${billingCycle}) with ${priceTier.credits} credits`);
-    return;
-  }
-
-  // Fall back to standard plan lookup
-  const plan = getPlanByPriceId(priceId);
-
-  if (!plan) {
-    console.error(`Unknown price ID: ${priceId}, defaulting to free plan`);
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        stripeSubscriptionId: subscription.id,
-        stripePriceId: priceId,
-        stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
-        plan: 'free',
-        monthlyCredits: PLANS.FREE.credits,
-      },
-    });
-    return;
-  }
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      stripeSubscriptionId: subscription.id,
-      stripePriceId: priceId,
-      stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
-      plan: plan.id,
-      monthlyCredits: plan.credits,
-    },
-  });
-
-  console.log(`Updated user ${userId} to plan ${plan.id} with ${plan.credits} credits`);
 }

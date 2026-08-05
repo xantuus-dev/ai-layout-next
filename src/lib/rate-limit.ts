@@ -111,4 +111,9 @@ export const RATE_LIMITS = {
     maxRequests: 60,
     windowMs: 60 * 1000, // 1 minute
   },
+  // Image generation: 10 requests per hour per user
+  IMAGE_GENERATION: {
+    maxRequests: 10,
+    windowMs: 60 * 60 * 1000, // 1 hour
+  },
 } as const;

@@ -13,6 +13,7 @@ declare module "next-auth" {
       stripeCustomerId?: string | null
       stripeSubscriptionId?: string | null
       stripeCurrentPeriodEnd?: Date | null
+      paymentFailed?: boolean
     }
   }
 }

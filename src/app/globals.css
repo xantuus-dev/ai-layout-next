@@ -53,7 +53,67 @@
 
 @layer base {
   :root {
-    /* Dark Mode (Default) - Modern Purple/Violet Theme */
+    /*
+     * Light Mode (Default). Tailwind is configured with darkMode: ['class'],
+     * and ThemeToggle only ever toggles a `.dark` class on <html> — it never
+     * applies a `.light` class. These two blocks used to be `:root` (dark
+     * values) and `.light` (light values, under a selector nothing ever
+     * applied), which meant every component using the bare semantic tokens
+     * (bg-card, text-foreground, bg-accent, etc. — not a manually paired
+     * `dark:` class) was permanently stuck in dark colors regardless of the
+     * toggle. Fixed by making :root the light defaults and .dark the
+     * override, matching how darkMode: ['class'] actually works.
+     */
+    --background: 0 0% 98%;                      /* hsl(0, 0%, 98%) = #FAFAFA (Neutral 50) */
+    --foreground: 240 10% 10%;                   /* hsl(240, 10%, 10%) = #18181B (Dark text) */
+    --card: 0 0% 100%;                           /* White cards */
+    --card-foreground: 240 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+
+    --primary: 258 90% 66%;                      /* hsl(258, 90%, 66%) = #8B5CF6 (Violet 500) */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 5% 96%;                     /* hsl(240, 5%, 96%) = #F4F4F5 (Light gray) */
+    --secondary-foreground: 240 10% 15%;
+
+    --accent: 283 85% 65%;                       /* hsl(283, 85%, 65%) = #A855F7 (Purple 500) */
+    --accent-foreground: 0 0% 100%;
+
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+
+    --destructive: 0 85% 60%;                    /* hsl(0, 85%, 60%) = #EF4444 (Red 500) */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 6% 90%;                        /* hsl(240, 6%, 90%) = #E4E4E7 */
+    --input: 240 6% 90%;
+    --ring: 258 90% 66%;                         /* Purple focus ring */
+
+    --radius: 0.75rem;                           /* 12px */
+    --ease-silk: cubic-bezier(0.2, 0.0, 0, 1.0);
+
+    /* Integration Panel Variables - Light Mode */
+    --border-btn-main: 240 6% 85%;               /* Button borders */
+    --border-main: 240 6% 90%;                   /* Main borders */
+    --border-dark: 240 6% 75%;                   /* Dark borders for focus */
+    --background-menu-white: 0 0% 100%;          /* Card backgrounds */
+    --background-nav: 240 5% 96%;                /* Navigation hover */
+    --text-primary: 240 10% 10%;                 /* Primary text */
+    --text-secondary: 240 10% 20%;               /* Secondary text */
+    --text-tertiary: 240 5% 50%;                 /* Tertiary text */
+    --text-disable: 240 5% 65%;                  /* Disabled text */
+    --icon-primary: 240 10% 10%;                 /* Primary icons */
+    --icon-secondary: 240 5% 50%;                /* Secondary icons */
+    --icon-tertiary: 240 5% 60%;                 /* Tertiary icons */
+    --Button-primary-white: 0 0% 100%;           /* Primary button bg */
+    --Button-primary-black: 258 90% 66%;         /* Primary button accent */
+    --fill-gray: 240 5% 94%;                     /* Fill gray */
+    --fill-tsp-white-main: 240 6% 97%;           /* Transparent white main */
+    --fill-tsp-white-light: 240 6% 98%;          /* Transparent white light */
+  }
+  .dark {
+    /* Dark Mode override - Modern Purple/Violet Theme */
     --background: 240 10% 10%;                   /* hsl(240, 10%, 10%) = #18181B (Zinc 950) */
     --foreground: 0 0% 98%;                      /* hsl(0, 0%, 98%) = #FAFAFA (Near white) */
     --card: 240 6% 15%;                          /* hsl(240, 6%, 15%) = #27272A (Zinc 800) */
@@ -86,9 +146,6 @@
     --input: 240 6% 20%;
     --ring: 258 90% 66%;                         /* Purple focus ring */
 
-    --radius: 0.75rem;                           /* 12px */
-    --ease-silk: cubic-bezier(0.2, 0.0, 0, 1.0);
-
     /* Integration Panel Variables */
     --border-btn-main: 240 6% 25%;               /* Button borders */
     --border-main: 240 6% 20%;                   /* Main borders */
@@ -107,50 +164,6 @@
     --fill-gray: 240 5% 22%;                     /* Fill gray */
     --fill-tsp-white-main: 240 6% 17%;           /* Transparent white main */
     --fill-tsp-white-light: 240 6% 19%;          /* Transparent white light */
-  }
-  .light {
-    /* Light Mode - Clean neutral with purple accents */
-    --background: 0 0% 98%;                      /* hsl(0, 0%, 98%) = #FAFAFA (Neutral 50) */
-    --foreground: 240 10% 10%;                   /* hsl(240, 10%, 10%) = #18181B (Dark text) */
-    --card: 0 0% 100%;                           /* White cards */
-    --card-foreground: 240 10% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 10%;
-
-    --primary: 258 90% 66%;                      /* hsl(258, 90%, 66%) = #8B5CF6 (Violet 500) */
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 240 5% 96%;                     /* hsl(240, 5%, 96%) = #F4F4F5 (Light gray) */
-    --secondary-foreground: 240 10% 15%;
-
-    --accent: 283 85% 65%;                       /* hsl(283, 85%, 65%) = #A855F7 (Purple 500) */
-    --accent-foreground: 0 0% 100%;
-
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-
-    --border: 240 6% 90%;                        /* hsl(240, 6%, 90%) = #E4E4E7 */
-    --input: 240 6% 90%;
-    --ring: 258 90% 66%;                         /* Purple focus ring */
-
-    /* Integration Panel Variables - Light Mode */
-    --border-btn-main: 240 6% 85%;               /* Button borders */
-    --border-main: 240 6% 90%;                   /* Main borders */
-    --border-dark: 240 6% 75%;                   /* Dark borders for focus */
-    --background-menu-white: 0 0% 100%;          /* Card backgrounds */
-    --background-nav: 240 5% 96%;                /* Navigation hover */
-    --text-primary: 240 10% 10%;                 /* Primary text */
-    --text-secondary: 240 10% 20%;               /* Secondary text */
-    --text-tertiary: 240 5% 50%;                 /* Tertiary text */
-    --text-disable: 240 5% 65%;                  /* Disabled text */
-    --icon-primary: 240 10% 10%;                 /* Primary icons */
-    --icon-secondary: 240 5% 50%;                /* Secondary icons */
-    --icon-tertiary: 240 5% 60%;                 /* Tertiary icons */
-    --Button-primary-white: 0 0% 100%;           /* Primary button bg */
-    --Button-primary-black: 258 90% 66%;         /* Primary button accent */
-    --fill-gray: 240 5% 94%;                     /* Fill gray */
-    --fill-tsp-white-main: 240 6% 97%;           /* Transparent white main */
-    --fill-tsp-white-light: 240 6% 98%;          /* Transparent white light */
   }
 }
 
@@ -178,33 +191,36 @@
   }
 }
 
-/* Gradient utilities for www.xantuus.com style */
+/* Gradient utilities — single brand identity (violet/purple, matching --primary) */
 @layer utilities {
   .gradient-primary {
-    @apply bg-gradient-to-r from-lime-500 to-emerald-600;
+    @apply bg-gradient-to-r from-violet-500 to-purple-600;
   }
 
   .gradient-primary-hover {
-    @apply bg-gradient-to-r from-lime-600 to-emerald-700;
+    @apply bg-gradient-to-r from-violet-600 to-purple-700;
   }
 
   .gradient-accent {
-    @apply bg-gradient-to-r from-teal-500 to-emerald-500;
+    @apply bg-gradient-to-r from-blue-500 to-violet-600;
   }
 
   .gradient-accent-hover {
-    @apply bg-gradient-to-r from-teal-600 to-emerald-600;
+    @apply bg-gradient-to-r from-blue-600 to-violet-700;
   }
 
   .text-gradient {
-    @apply bg-gradient-to-r from-white via-lime-300 to-emerald-300 bg-clip-text text-transparent;
+    /* Starts from the theme's own foreground color (not a literal white)
+       so it stays legible on both a light and a dark page background. */
+    @apply bg-gradient-to-r from-foreground via-violet-500 to-purple-600 bg-clip-text text-transparent;
   }
 
+  /* Names kept for now to avoid touching every call site — colors are brand violet/blue, not literal green/teal */
   .glow-green {
-    box-shadow: 0 8px 15px -3px rgba(34, 197, 94, 0.3);
+    box-shadow: 0 8px 15px -3px rgba(139, 92, 246, 0.35);
   }
 
   .glow-teal {
-    box-shadow: 0 8px 15px -3px rgba(20, 184, 166, 0.3);
+    box-shadow: 0 8px 15px -3px rgba(59, 130, 246, 0.35);
   }
 }

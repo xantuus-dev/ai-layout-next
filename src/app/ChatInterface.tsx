@@ -231,6 +231,10 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
           pastedContent: data.pastedContent,
           model: data.model,
           isThinkingEnabled: data.isThinkingEnabled,
+          history: messages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
         }),
       });
 

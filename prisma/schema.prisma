@@ -65,9 +65,22 @@ model User {
   creditsResetAt DateTime @default(now())
   billingCycle   String? // monthly, yearly
 
+  // Usage alert tracking — prevents re-sending the same threshold email on
+  // every request once a user is over it. Cleared on each monthly reset.
+  creditAlert80SentAt  DateTime?
+  creditAlert100SentAt DateTime?
+
   // Payment Status
   paymentFailed   Boolean   @default(false)
   paymentFailedAt DateTime?
+
+  // Team billing: when set, this user's credit checks/deductions/resets
+  // are resolved against billingOwner's pool instead of their own fields.
+  // Set when a user accepts an invite to a team's default workspace;
+  // cleared when they're removed from it.
+  billingOwnerId String?
+  billingOwner   User?   @relation("TeamBilling", fields: [billingOwnerId], references: [id], onDelete: SetNull)
+  teamMembers    User[]  @relation("TeamBilling")
 
   // Google Integrations
   googleAccessToken     String?   @db.Text
@@ -499,6 +512,7 @@ model Workspace {
   projects      Project[]
   conversations Conversation[]
   members       WorkspaceMember[]
+  invites       WorkspaceInvite[]
 
   // Organization
   order Int @default(0) // For custom ordering in sidebar
@@ -620,6 +634,27 @@ model WorkspaceMember {
   @@unique([workspaceId, userId])
   @@index([workspaceId])
   @@index([userId])
+}
+
+// A pending invite to join a workspace's shared credit pool, by email.
+// Works whether or not the invitee has an account yet — resolved on accept.
+model WorkspaceInvite {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  email     String
+  role      String @default("member") // "admin" | "member" | "viewer"
+  invitedBy String // User ID who sent the invite
+  token     String @unique @default(cuid())
+  status    String @default("pending") // "pending" | "accepted" | "revoked"
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@unique([workspaceId, email])
+  @@index([email, status])
+  @@index([token])
 }
 
 // Agent Execution System

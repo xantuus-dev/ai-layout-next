@@ -38,12 +38,12 @@ export async function POST(request: NextRequest) {
 
     // 3. Check rate limit (max 10 images per hour)
     const rateLimitKey = `image-generation:${user.id}`;
-    const isRateLimited = await checkRateLimit(rateLimitKey, 10, 3600); // 10 per hour
-    if (isRateLimited) {
+    const rateLimitResult = checkRateLimit(rateLimitKey, RATE_LIMITS.IMAGE_GENERATION);
+    if (!rateLimitResult.success) {
       return NextResponse.json(
         {
           error: 'Rate limit exceeded. Maximum 10 images per hour.',
-          retryAfter: 3600,
+          retryAfter: Math.ceil((rateLimitResult.reset - Date.now()) / 1000),
         },
         { status: 429 }
       );

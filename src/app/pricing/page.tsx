@@ -152,7 +152,7 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
         {/* Pricing Configuration Error */}
         {pricingError && (
@@ -278,7 +278,7 @@ export default function PricingPage() {
                 </Select>
               </div>
               <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-text-400">
+                <span className="text-muted-foreground">
                   {selectedCredits.split(' ')[0]} credits per month
                 </span>
                 <span className="text-accent font-medium">
@@ -354,7 +354,7 @@ export default function PricingPage() {
 
         {/* FAQ Section */}
         <div className="mt-24 max-w-3xl mx-auto">
-          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-12">
+          <h2 className="text-3xl font-bold text-center text-foreground mb-12">
             Frequently Asked Questions
           </h2>
           <div className="space-y-4">
@@ -374,24 +374,24 @@ export default function PricingPage() {
             ].map((faq, index) => (
               <div
                 key={index}
-                className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800"
+                className="border border-border rounded-lg overflow-hidden bg-card"
               >
                 <button
                   onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-accent transition-colors"
                 >
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <h3 className="text-lg font-semibold text-foreground">
                     {faq.question}
                   </h3>
                   <ChevronDown
-                    className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${
+                    className={`w-5 h-5 text-muted-foreground transition-transform ${
                       openFaqIndex === index ? 'rotate-180' : ''
                     }`}
                   />
                 </button>
                 {openFaqIndex === index && (
                   <div className="px-6 pb-4 pt-2">
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-muted-foreground">
                       {faq.answer}
                     </p>
                   </div>

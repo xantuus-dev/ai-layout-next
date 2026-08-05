@@ -130,7 +130,11 @@ export class OpenAIProvider implements AIProvider {
 
   estimateCredits(tokens: number, modelId: string): number {
     const model = this.models.find(m => m.id === modelId);
-    const creditsPerK = model?.creditsPerThousandTokens || 5;
+    if (!model) {
+      console.warn(`⚠️  No credit pricing for OpenAI model "${modelId}" — billing at highest known rate`);
+    }
+    const creditsPerK = model?.creditsPerThousandTokens
+      ?? Math.max(...this.models.map(m => m.creditsPerThousandTokens));
     return Math.max(1, Math.ceil((tokens / 1000) * creditsPerK));
   }
 }

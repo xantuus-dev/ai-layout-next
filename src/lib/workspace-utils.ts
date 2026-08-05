@@ -53,17 +53,58 @@ export async function getUserWorkspaces(userId: string) {
 }
 
 /**
- * Verify that a user has access to a workspace
+ * Verify that a user has access to a workspace — either as the owner,
+ * or as an invited WorkspaceMember (team collaboration).
  */
 export async function verifyWorkspaceAccess(workspaceId: string, userId: string) {
   const workspace = await prisma.workspace.findFirst({
     where: {
       id: workspaceId,
-      userId,
+      OR: [
+        { userId },
+        { members: { some: { userId } } },
+      ],
     },
   });
 
   return workspace !== null;
+}
+
+/**
+ * Resolve a user's team context for team-management purposes:
+ * - Owners (not billed to anyone else) manage their own default workspace.
+ * - Members bill to (and act within) their team owner's default workspace,
+ *   with permissions gated by their WorkspaceMember role.
+ */
+export async function resolveTeamContext(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { billingOwnerId: true },
+  });
+
+  if (user?.billingOwnerId) {
+    const workspace = await getOrCreateDefaultWorkspace(user.billingOwnerId);
+    const member = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: workspace.id, userId } },
+    });
+
+    return {
+      workspace,
+      ownerId: user.billingOwnerId,
+      isOwner: false,
+      role: member?.role || 'member',
+      canManageMembers: member?.role === 'admin',
+    };
+  }
+
+  const workspace = await getOrCreateDefaultWorkspace(userId);
+  return {
+    workspace,
+    ownerId: userId,
+    isOwner: true,
+    role: 'owner',
+    canManageMembers: true,
+  };
 }
 
 /**

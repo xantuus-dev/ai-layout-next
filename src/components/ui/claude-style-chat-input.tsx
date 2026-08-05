@@ -61,7 +61,7 @@ const FilePreviewCard: React.FC<FilePreviewCardProps> = ({ file, onRemove }) => 
     const isImage = file.type.startsWith("image/") && file.preview;
 
     return (
-        <div className={`relative group flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-bg-300 bg-bg-200 animate-fade-in transition-all hover:border-text-400`}>
+        <div className={`relative group flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-border bg-accent animate-fade-in transition-all hover:border-muted-foreground`}>
             {isImage ? (
                 <div className="w-full h-full relative">
                     <img src={file.preview!} alt={file.file.name} className="w-full h-full object-cover" />
@@ -70,18 +70,18 @@ const FilePreviewCard: React.FC<FilePreviewCardProps> = ({ file, onRemove }) => 
             ) : (
                 <div className="w-full h-full p-3 flex flex-col justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-bg-300 rounded">
-                            <Icons.FileText className="w-4 h-4 text-text-300" />
+                        <div className="p-1.5 bg-muted rounded">
+                            <Icons.FileText className="w-4 h-4 text-muted-foreground" />
                         </div>
-                        <span className="text-[10px] font-medium text-text-400 uppercase tracking-wider truncate">
+                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider truncate">
                             {file.file.name.split('.').pop()}
                         </span>
                     </div>
                     <div className="space-y-0.5">
-                        <p className="text-xs font-medium text-text-200 truncate" title={file.file.name}>
+                        <p className="text-xs font-medium text-foreground truncate" title={file.file.name}>
                             {file.file.name}
                         </p>
-                        <p className="text-[10px] text-text-500">
+                        <p className="text-[10px] text-muted-foreground">
                             {formatFileSize(file.file.size)}
                         </p>
                     </div>
@@ -176,8 +176,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ models, selectedModel, on
                 onClick={() => setIsOpen(!isOpen)}
                 className={`inline-flex items-center justify-center relative shrink-0 transition font-base duration-300 ease-[cubic-bezier(0.165,0.85,0.45,1)] h-8 rounded-xl px-3 min-w-[4rem] active:scale-[0.98] whitespace-nowrap !text-xs pl-2.5 pr-2 gap-1 
                 ${isOpen
-                        ? 'bg-bg-200 text-text-100 dark:bg-[#454540] dark:text-[#ECECEC]'
-                        : 'text-text-300 hover:text-text-200 hover:bg-bg-200 dark:text-[#B4B4B4] dark:hover:text-[#ECECEC] dark:hover:bg-[#454540]'}`}
+                        ? 'bg-accent text-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
             >
                 <div className="font-ui inline-flex gap-[3px] text-[14px] h-[14px] leading-none items-baseline">
                     <div className="flex items-center gap-[4px]">
@@ -190,7 +190,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ models, selectedModel, on
             </button>
 
             {isOpen && (
-                <div className="absolute top-full right-0 mt-2 w-[260px] bg-white dark:bg-[#212121] border border-[#DDDDDD] dark:border-[#30302E] rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col p-1.5 animate-fade-in origin-top-right max-h-[400px] overflow-y-auto">
+                <div className="absolute top-full right-0 mt-2 w-[260px] bg-popover border border-border rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col p-1.5 animate-fade-in origin-top-right max-h-[400px] overflow-y-auto">
                     {models.map(model => (
                         <button
                             key={model.id}
@@ -198,40 +198,40 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ models, selectedModel, on
                                 onSelect(model.id);
                                 setIsOpen(false);
                             }}
-                            className={`w-full text-left px-3 py-2.5 rounded-xl flex items-start justify-between group transition-colors hover:bg-bg-200 dark:hover:bg-[#30302E]`}
+                            className={`w-full text-left px-3 py-2.5 rounded-xl flex items-start justify-between group transition-colors hover:bg-accent`}
                         >
                             <div className="flex flex-col gap-0.5">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[13px] font-semibold text-text-100 dark:text-[#ECECEC]">
+                                    <span className="text-[13px] font-semibold text-foreground">
                                         {model.name}
                                     </span>
-                                    <span className="px-1.5 py-[1px] rounded text-[9px] font-medium bg-bg-200 dark:bg-[#30302E] text-text-400 dark:text-[#999999] uppercase tracking-wide">
+                                    <span className="px-1.5 py-[1px] rounded text-[9px] font-medium bg-accent text-muted-foreground uppercase tracking-wide">
                                         {model.provider}
                                     </span>
                                     {model.badge && (
                                         <span className={`px-1.5 py-[1px] rounded-full text-[10px] font-medium border ${model.badge === 'Upgrade'
-                                            ? 'border-blue-200 text-blue-600 bg-white dark:border-blue-500/30 dark:text-blue-400 dark:bg-blue-500/10'
-                                            : 'border-bg-300 text-text-300'
+                                            ? 'border-primary/30 text-primary bg-primary/10'
+                                            : 'border-border text-muted-foreground'
                                             }`}>
                                             {model.badge}
                                         </span>
                                     )}
                                 </div>
-                                <span className="text-[11px] text-text-300 dark:text-[#999999]">
+                                <span className="text-[11px] text-muted-foreground">
                                     {model.description}
                                 </span>
                             </div>
                             {selectedModel === model.id && (
-                                <Icons.Check className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-1" />
+                                <Icons.Check className="w-4 h-4 text-primary mt-1" />
                             )}
                         </button>
                     ))}
 
-                    <div className="h-px bg-bg-300 dark:bg-[#30302E] my-1 mx-2" />
+                    <div className="h-px bg-border my-1 mx-2" />
 
-                    <button className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between group transition-colors hover:bg-bg-200 dark:hover:bg-[#30302E] text-text-100 dark:text-[#ECECEC]">
+                    <button className="w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between group transition-colors hover:bg-accent text-foreground">
                         <span className="text-[13px] font-semibold">More models</span>
-                        <Icons.SelectArrow className="w-4 h-4 -rotate-90 text-text-300 dark:text-[#999999]" />
+                        <Icons.SelectArrow className="w-4 h-4 -rotate-90 text-muted-foreground" />
                     </button>
                 </div>
             )}
@@ -477,7 +477,7 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
         >
             {/* Main Container - matching the inspected element structure */}
             <div className={`
-                !box-content flex flex-col mx-2 md:mx-0 items-stretch transition-all duration-200 relative z-10 rounded-2xl cursor-text border border-bg-300 dark:border-transparent
+                !box-content flex flex-col mx-2 md:mx-0 items-stretch transition-all duration-200 relative z-10 rounded-2xl cursor-text border border-border dark:border-transparent
                 shadow-[0_0_15px_rgba(0,0,0,0.08)] hover:shadow-[0_0_20px_rgba(0,0,0,0.12)]
                 focus-within:shadow-[0_0_25px_rgba(0,0,0,0.15)]
                 bg-white dark:bg-[#30302E] font-sans antialiased
@@ -520,7 +520,7 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
                                 onPaste={handlePaste}
                                 onKeyDown={handleKeyDown}
                                 placeholder="How can I help you today?"
-                                className="w-full bg-transparent border-0 outline-none text-text-100 text-[16px] placeholder:text-text-400 resize-none overflow-hidden py-0 leading-relaxed block font-normal antialiased"
+                                className="w-full bg-transparent border-0 outline-none text-foreground text-[16px] placeholder:text-muted-foreground resize-none overflow-hidden py-0 leading-relaxed block font-normal antialiased"
                                 rows={1}
                                 autoFocus
                                 style={{ minHeight: '1.5em' }}
@@ -537,7 +537,7 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
                             <div className="relative" ref={fileMenuRef}>
                                 <button
                                     onClick={() => setShowFileMenu(!showFileMenu)}
-                                    className="group inline-flex items-center justify-center relative shrink-0 transition-colors duration-200 h-8 w-8 rounded-lg active:scale-95 text-text-400 hover:text-text-200 hover:bg-bg-200"
+                                    className="group inline-flex items-center justify-center relative shrink-0 transition-colors duration-200 h-8 w-8 rounded-lg active:scale-95 text-muted-foreground hover:text-foreground hover:bg-accent"
                                     type="button"
                                     aria-label="Add files or image"
                                 >
@@ -600,7 +600,7 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
                                     className={`transition-all duration-200 h-8 w-8 flex items-center justify-center rounded-lg active:scale-95
                                         ${isThinkingEnabled
                                             ? 'text-accent bg-accent/10'
-                                            : 'text-text-400 hover:text-text-200 hover:bg-bg-200'}
+                                            : 'text-muted-foreground hover:text-foreground hover:bg-accent'}
                                     `}
                                     aria-pressed={isThinkingEnabled}
                                     aria-label="Extended thinking"
@@ -621,7 +621,7 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
                                     href="/apps/image-generator"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="group transition-all duration-200 h-8 w-8 flex items-center justify-center rounded-lg active:scale-95 text-text-400 hover:text-text-200 hover:bg-bg-200"
+                                    className="group transition-all duration-200 h-8 w-8 flex items-center justify-center rounded-lg active:scale-95 text-muted-foreground hover:text-foreground hover:bg-accent"
                                     aria-label="Generate image"
                                 >
                                     <Icons.Wand2 className="w-5 h-5" />
@@ -670,7 +670,7 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
             {/* Drag Overlay */}
             {
                 isDragging && (
-                    <div className="absolute inset-0 bg-bg-200/90 border-2 border-dashed border-accent rounded-2xl z-50 flex flex-col items-center justify-center backdrop-blur-sm pointer-events-none">
+                    <div className="absolute inset-0 bg-accent/90 border-2 border-dashed border-primary rounded-2xl z-50 flex flex-col items-center justify-center backdrop-blur-sm pointer-events-none">
                         <Icons.Archive className="w-10 h-10 text-accent mb-2 animate-bounce" />
                         <p className="text-accent font-medium">Drop files to upload</p>
                     </div>
@@ -690,7 +690,7 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
             />
 
             <div className="text-center mt-4">
-                <p className="text-xs text-text-500">
+                <p className="text-xs text-muted-foreground">
                     AI can make mistakes. Please check important information.
                 </p>
             </div>

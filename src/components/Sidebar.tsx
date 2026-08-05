@@ -25,7 +25,7 @@ import {
   Link2,
   Wand2
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 
 interface MenuItem {
@@ -35,12 +35,16 @@ interface MenuItem {
   requireAuth?: boolean;
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export default function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { data: session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [activeItem, setActiveItem] = useState('Home');
 
   const menuItems: MenuItem[] = [
     { name: 'Home', icon: Home, href: '/' },
@@ -54,10 +58,8 @@ export default function Sidebar() {
   ];
 
   const toggleSidebar = () => setIsOpen(!isOpen);
-  const toggleCollapse = () => setIsCollapsed(!isCollapsed);
 
   const handleNavigation = (item: MenuItem) => {
-    setActiveItem(item.name);
     router.push(item.href);
     if (isOpen) {
       setIsOpen(false);
@@ -103,7 +105,7 @@ export default function Sidebar() {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-800">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">X</span>
             </div>
             {!isCollapsed && (
@@ -115,7 +117,7 @@ export default function Sidebar() {
 
           {/* Desktop Collapse Button */}
           <button
-            onClick={toggleCollapse}
+            onClick={onToggleCollapse}
             className="hidden lg:block p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors duration-200"
             aria-label="Toggle collapse"
           >
@@ -132,7 +134,9 @@ export default function Sidebar() {
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {visibleMenuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeItem === item.name;
+            const isActive = item.href === '/'
+              ? pathname === '/'
+              : pathname === item.href || pathname?.startsWith(`${item.href}/`);
 
             return (
               <button
@@ -140,7 +144,7 @@ export default function Sidebar() {
                 onClick={() => handleNavigation(item)}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                   isActive
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                    ? 'gradient-primary text-white shadow-lg'
                     : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                 }`}
               >
@@ -187,7 +191,7 @@ export default function Sidebar() {
         {!isCollapsed && session && (
           <div className="p-4 border-t border-gray-800">
             <div className="flex items-center space-x-3 px-4 py-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-r from-violet-400 to-purple-500 rounded-full flex items-center justify-center">
                 {session.user?.image ? (
                   <img
                     src={session.user.image}

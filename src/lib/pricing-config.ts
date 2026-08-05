@@ -1,6 +1,9 @@
 /**
- * Centralized Pricing Configuration
- * This is the SINGLE SOURCE OF TRUTH for all pricing tiers and Stripe price IDs
+ * Granular Stripe price catalog — the actual paid tiers /pricing sells and
+ * the Stripe webhook reads to set a user's real `monthlyCredits`.
+ * See plans.ts for how this relates to the coarse free/pro/enterprise
+ * label also stored on User.plan (a display badge, not the source of truth
+ * for credit limits).
  *
  * SETUP INSTRUCTIONS:
  * 1. Create products in Stripe Dashboard (https://dashboard.stripe.com/products)
@@ -158,6 +161,50 @@ export const CREDIT_TIER_PRICES: Record<string, PriceTier> = {
     },
   },
 };
+
+export interface CreditPack {
+  credits: number;
+  displayName: string;
+  price: number;
+  priceId: string | null;
+}
+
+/**
+ * One-time "top up" credit packs, billed as a single Stripe payment
+ * (mode: 'payment', not a subscription). These stack on top of whatever
+ * plan the user is on and are consumed before the next monthly reset —
+ * they are not a substitute for a recurring plan.
+ *
+ * Create these as one-time (non-recurring) Prices in the Stripe Dashboard
+ * and add the resulting price IDs to .env.local.
+ */
+export const CREDIT_PACK_PRICES: CreditPack[] = [
+  {
+    credits: 1000,
+    displayName: '1,000 credits',
+    price: 8,
+    priceId: process.env.NEXT_PUBLIC_STRIPE_CREDITPACK_1000_PRICE_ID || null,
+  },
+  {
+    credits: 5000,
+    displayName: '5,000 credits',
+    price: 35,
+    priceId: process.env.NEXT_PUBLIC_STRIPE_CREDITPACK_5000_PRICE_ID || null,
+  },
+  {
+    credits: 20000,
+    displayName: '20,000 credits',
+    price: 120,
+    priceId: process.env.NEXT_PUBLIC_STRIPE_CREDITPACK_20000_PRICE_ID || null,
+  },
+];
+
+/**
+ * Get a credit pack's Stripe price ID by credit amount (for webhook processing)
+ */
+export function getCreditPackByPriceId(priceId: string): CreditPack | null {
+  return CREDIT_PACK_PRICES.find(pack => pack.priceId === priceId) || null;
+}
 
 /**
  * Get price tier by credit amount

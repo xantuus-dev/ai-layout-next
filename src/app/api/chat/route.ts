@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAuthenticatedUserId } from '@/lib/api-auth';
 import { aiRouter } from '@/lib/ai-providers';
+import { checkAndResetCredits, hasEnoughCredits, deductCredits, getCreditStatus } from '@/lib/credits';
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { message, files, pastedContent, model, isThinkingEnabled } = body;
+    const { message, files, pastedContent, model, isThinkingEnabled, history = [] } = body;
 
     // Validate input
     if (!message && (!files || files.length === 0) && (!pastedContent || pastedContent.length === 0)) {
@@ -69,14 +70,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has enough credits
-    if (user.creditsUsed >= user.monthlyCredits) {
+    // Reset credits if the monthly window has rolled over, then check
+    // (transparently resolves to the team billing pool if this user is a team member)
+    await checkAndResetCredits(user.id);
+    if (!(await hasEnoughCredits(user.id, 0))) {
       return NextResponse.json(
         {
           error: 'Credit limit reached',
           message: 'You have used all your monthly credits. Please upgrade your plan or wait for your credits to reset.',
-          creditsUsed: user.creditsUsed,
-          monthlyCredits: user.monthlyCredits,
         },
         { status: 429 }
       );
@@ -155,9 +156,16 @@ export async function POST(request: NextRequest) {
       ? { type: 'enabled' as const, budget_tokens: 2048 }
       : undefined;
 
+    // Format history if present
+    const historyMessages = Array.isArray(history) ? history.map((msg: any) => ({
+      role: msg.role === 'assistant' || msg.role === 'system' ? msg.role : 'user',
+      content: msg.content
+    })) : [];
+
     // Call AI router with content blocks
     const response = await aiRouter.chat(modelId, {
       messages: [
+        ...historyMessages,
         {
           role: 'user',
           content: contentBlocks.length === 1 && contentBlocks[0].type === 'text'
@@ -178,32 +186,20 @@ export async function POST(request: NextRequest) {
     const { inputTokens, outputTokens, totalTokens } = response.usage;
     const creditsUsed = aiRouter.estimateCredits(modelId, totalTokens);
 
-    // Record usage in database
-    await prisma.usageRecord.create({
-      data: {
-        userId: user.id,
-        type: 'chat',
-        model: modelId,
-        tokens: totalTokens,
-        credits: creditsUsed,
-        metadata: {
-          inputTokens,
-          outputTokens,
-          modelRequested: model,
-          provider: response.provider,
-        },
+    // Record usage and deduct from the (possibly team-pooled) credit balance
+    await deductCredits(user.id, creditsUsed, {
+      type: 'chat',
+      model: modelId,
+      tokens: totalTokens,
+      extra: {
+        inputTokens,
+        outputTokens,
+        modelRequested: model,
+        provider: response.provider,
       },
     });
 
-    // Update user's credit usage
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        creditsUsed: {
-          increment: creditsUsed,
-        },
-      },
-    });
+    const creditStatus = await getCreditStatus(user.id);
 
     return NextResponse.json(
       {
@@ -217,7 +213,7 @@ export async function POST(request: NextRequest) {
           outputTokens,
           totalTokens,
           creditsUsed,
-          creditsRemaining: user.monthlyCredits - (user.creditsUsed + creditsUsed),
+          creditsRemaining: creditStatus?.creditsRemaining ?? null,
         },
       },
       {

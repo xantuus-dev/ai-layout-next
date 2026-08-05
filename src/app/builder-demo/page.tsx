@@ -1,3 +1,5 @@
+'use client';
+
 import BuilderSelector from '@/components/ui/BuilderSelector';
 
 export default function BuilderDemoPage() {

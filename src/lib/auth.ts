@@ -3,6 +3,7 @@ import GoogleProvider from "next-auth/providers/google"
 import AppleProvider from "next-auth/providers/apple"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
+import { getCreditStatus, resolveBillingUserId } from "@/lib/credits"
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
@@ -86,17 +87,32 @@ export const authOptions: NextAuthOptions = {
             stripeCustomerId: true,
             stripeSubscriptionId: true,
             stripeCurrentPeriodEnd: true,
+            paymentFailed: true,
           },
         });
 
         if (dbUser) {
+          // Resolves to the team billing owner's pool if this user is a
+          // team member — without this, a member would see their own
+          // (irrelevant) plan/credit fields everywhere the session is used.
+          const creditStatus = await getCreditStatus(dbUser.id);
+          const billingUserId = await resolveBillingUserId(dbUser.id);
+
+          // A failed payment belongs to whoever's subscription actually
+          // failed — the pool owner, for a team member — since it affects
+          // everyone drawing from that pool, not just the acting user.
+          const paymentFailed = billingUserId === dbUser.id
+            ? dbUser.paymentFailed
+            : (await prisma.user.findUnique({ where: { id: billingUserId }, select: { paymentFailed: true } }))?.paymentFailed ?? false;
+
           session.user.id = dbUser.id;
-          session.user.plan = dbUser.plan;
-          session.user.monthlyCredits = dbUser.monthlyCredits;
-          session.user.creditsUsed = dbUser.creditsUsed;
+          session.user.plan = creditStatus?.plan ?? dbUser.plan;
+          session.user.monthlyCredits = creditStatus?.monthlyCredits ?? dbUser.monthlyCredits;
+          session.user.creditsUsed = creditStatus?.creditsUsed ?? dbUser.creditsUsed;
           session.user.stripeCustomerId = dbUser.stripeCustomerId;
           session.user.stripeSubscriptionId = dbUser.stripeSubscriptionId;
           session.user.stripeCurrentPeriodEnd = dbUser.stripeCurrentPeriodEnd;
+          session.user.paymentFailed = paymentFailed;
         } else {
           console.warn('[AUTH] User not found in database:', user.id);
         }

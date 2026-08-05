@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCreditStatus } from '@/lib/credits';
 import { startOfMonth, endOfMonth, subDays } from 'date-fns';
 
 export async function GET(request: NextRequest) {
@@ -18,15 +19,19 @@ export async function GET(request: NextRequest) {
     // Get user data
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      select: {
-        plan: true,
-        monthlyCredits: true,
-        creditsUsed: true,
-        creditsResetAt: true,
-      },
+      select: { id: true },
     });
 
     if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    // Resolves to the team billing owner's pool if this user is a team member
+    const creditStatus = await getCreditStatus(user.id);
+    if (!creditStatus) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -91,27 +96,27 @@ export async function GET(request: NextRequest) {
       model: record.model || undefined,
     }));
 
-    const creditsRemaining = user.monthlyCredits - user.creditsUsed;
+    const creditsRemaining = creditStatus.creditsRemaining;
     const dailyRefreshCredits = 500; // Daily refresh amount
     const freeCredits = Math.max(0, creditsRemaining);
 
     return NextResponse.json({
       // Legacy format
-      currentPlan: user.plan.toUpperCase(),
-      creditsUsed: user.creditsUsed,
-      creditsTotal: user.monthlyCredits,
-      resetDate: user.creditsResetAt.toISOString(),
+      currentPlan: creditStatus.plan.toUpperCase(),
+      creditsUsed: creditStatus.creditsUsed,
+      creditsTotal: creditStatus.monthlyCredits,
+      resetDate: creditStatus.creditsResetAt.toISOString(),
       usageHistory: formattedUsageHistory,
       dailyUsage: formattedDailyUsage,
 
       // New format for CreditsCard
       totalCredits: creditsRemaining,
-      monthlyCredits: user.monthlyCredits,
+      monthlyCredits: creditStatus.monthlyCredits,
       creditsRemaining: creditsRemaining,
-      plan: user.plan,
+      plan: creditStatus.plan,
       dailyRefreshCredits: dailyRefreshCredits,
       freeCredits: freeCredits,
-      nextResetTime: user.creditsResetAt.toISOString(),
+      nextResetTime: creditStatus.creditsResetAt.toISOString(),
     });
   } catch (error) {
     console.error('Error fetching usage data:', error);

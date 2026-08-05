@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { aiRouter } from '@/lib/ai-providers';
 import { verifyWorkspaceAccess } from '@/lib/workspace-utils';
-import { checkAndResetCredits } from '@/lib/credits';
+import { checkAndResetCredits, hasEnoughCredits, resolveBillingUserId } from '@/lib/credits';
 
 export async function POST(
   request: NextRequest,
@@ -19,6 +19,7 @@ export async function POST(
       let userMessageId: string | null = null;
       let creditsDeducted = 0;
       let userId: string | null = null;
+      let billingUserId: string | null = null;
 
       try {
         // 1. Authenticate user
@@ -44,6 +45,7 @@ export async function POST(
         }
 
         userId = user.id;
+        billingUserId = await resolveBillingUserId(user.id);
 
         // 2. Verify workspace access
         const hasAccess = await verifyWorkspaceAccess(workspaceId, user.id);
@@ -67,19 +69,19 @@ export async function POST(
           return;
         }
 
-        // 4. Check credits
+        // 4. Check credits (resolves to the team billing pool if applicable)
         await checkAndResetCredits(user.id);
-        const updatedUser = await prisma.user.findUnique({
-          where: { id: user.id },
-        });
-
-        if (!updatedUser || updatedUser.creditsUsed >= updatedUser.monthlyCredits) {
+        if (!(await hasEnoughCredits(user.id, 0))) {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Insufficient credits' })}\n\n`)
           );
           controller.close();
           return;
         }
+
+        const updatedUser = await prisma.user.findUnique({
+          where: { id: billingUserId },
+        });
 
         // 5. Create user message with transaction
         const userMessage = await prisma.$transaction(async (tx) => {
@@ -287,9 +289,9 @@ export async function POST(
             },
           });
 
-          // Update user credits
+          // Update credits on the resolved billing owner (team pool if applicable)
           await tx.user.update({
-            where: { id: user.id },
+            where: { id: billingUserId! },
             data: {
               creditsUsed: { increment: creditsUsed },
             },
@@ -297,7 +299,9 @@ export async function POST(
         });
 
         // 9. Send completion
-        const creditsRemaining = updatedUser.monthlyCredits - (updatedUser.creditsUsed + creditsDeducted);
+        const creditsRemaining = updatedUser
+          ? updatedUser.monthlyCredits - (updatedUser.creditsUsed + creditsDeducted)
+          : null;
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({
             type: 'complete',
@@ -320,9 +324,9 @@ export async function POST(
                 where: { id: userMessageId },
               });
             } else if (creditsDeducted > 0) {
-              // Credits already deducted - refund
+              // Credits already deducted - refund the billing owner (team pool if applicable)
               await prisma.user.update({
-                where: { id: userId },
+                where: { id: billingUserId || userId },
                 data: {
                   creditsUsed: { decrement: creditsDeducted },
                 },

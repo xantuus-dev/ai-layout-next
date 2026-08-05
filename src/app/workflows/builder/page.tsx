@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { WorkflowBuilderCanvas } from '@/components/workflow-builder/WorkflowBuilderCanvas';
@@ -18,7 +18,7 @@ import { createWorkflowData, validateWorkflow } from '@/lib/workflow-builder/wor
 import { Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-export default function WorkflowBuilderPage() {
+function WorkflowBuilderPageContent() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -296,5 +296,13 @@ export default function WorkflowBuilderPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function WorkflowBuilderPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin" /></div>}>
+      <WorkflowBuilderPageContent />
+    </Suspense>
   );
 }
