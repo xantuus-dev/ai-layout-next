@@ -6,10 +6,11 @@
  * Responsive sidebar navigation with:
  * - Mobile hamburger menu
  * - Desktop collapse functionality
+ * - A collapsible "Sessions" list (recent conversations across all workspaces)
  * - Gradient styling matching app theme
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Menu,
   X,
@@ -17,13 +18,16 @@ import {
   User,
   Settings,
   LogOut,
-  ChevronLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   Home,
   BarChart3,
   Sparkles,
   FolderOpen,
   Link2,
-  Wand2
+  Wand2,
+  ChevronDown,
+  MessageSquare,
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -33,6 +37,12 @@ interface MenuItem {
   icon: React.ElementType;
   href: string;
   requireAuth?: boolean;
+}
+
+interface SessionSummary {
+  id: string;
+  title: string;
+  workspace: { id: string; name: string } | null;
 }
 
 interface SidebarProps {
@@ -45,6 +55,9 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
   const pathname = usePathname();
   const { data: session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
+  const [sessionsExpanded, setSessionsExpanded] = useState(true);
+  const [conversations, setConversations] = useState<SessionSummary[]>([]);
+  const [loadingConversations, setLoadingConversations] = useState(false);
 
   const menuItems: MenuItem[] = [
     { name: 'Home', icon: Home, href: '/' },
@@ -70,10 +83,42 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
     signOut({ callbackUrl: '/' });
   };
 
+  const handleSessionClick = (conv: SessionSummary) => {
+    if (!conv.workspace) return;
+    router.push(`/workspace/${conv.workspace.id}?conversation=${conv.id}`);
+    if (isOpen) setIsOpen(false);
+  };
+
   // Filter menu items based on auth status
   const visibleMenuItems = menuItems.filter(
     (item) => !item.requireAuth || session
   );
+
+  // Load recent sessions (across all workspaces) — refetches when navigating
+  // into/out of a workspace so a freshly created session shows up.
+  useEffect(() => {
+    if (!session?.user) {
+      setConversations([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingConversations(true);
+
+    fetch('/api/workspace/conversations?limit=20&sortBy=lastMessageAt&sortOrder=desc')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setConversations(data.conversations || []);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingConversations(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user, pathname]);
 
   return (
     <>
@@ -96,14 +141,14 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
 
       {/* Sidebar */}
       <div
-        className={`fixed top-0 left-0 h-full bg-gradient-to-b from-[#1a1a1a] via-[#252525] to-[#1a1a1a] border-r border-gray-800 transition-all duration-300 ease-in-out z-40 ${
+        className={`fixed top-0 left-0 h-full flex flex-col bg-gradient-to-b from-[#1a1a1a] via-[#252525] to-[#1a1a1a] border-r border-gray-800 transition-all duration-300 ease-in-out z-40 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0 ${
           isCollapsed ? 'lg:w-20' : 'lg:w-64'
         } w-64 shadow-2xl`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-800">
+        <div className="flex items-center justify-between p-6 border-b border-gray-800 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">X</span>
@@ -119,19 +164,14 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
           <button
             onClick={onToggleCollapse}
             className="hidden lg:block p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors duration-200"
-            aria-label="Toggle collapse"
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <ChevronLeft
-              size={20}
-              className={`transition-transform duration-300 ${
-                isCollapsed ? 'rotate-180' : ''
-              }`}
-            />
+            {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        {/* Primary Navigation (fixed, does not scroll) */}
+        <nav className="p-4 space-y-1 flex-shrink-0">
           {visibleMenuItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.href === '/'
@@ -142,27 +182,25 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
               <button
                 key={item.name}
                 onClick={() => handleNavigation(item)}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
+                className={`relative w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all duration-200 group ${
                   isActive
-                    ? 'gradient-primary text-white shadow-lg'
-                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                    ? 'bg-white/10 text-white'
+                    : 'text-gray-300 hover:bg-white/5 hover:text-white'
                 }`}
               >
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-full bg-primary" />
+                )}
                 <Icon
-                  size={20}
+                  size={18}
                   className={`transition-colors duration-200 ${
-                    isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'
+                    isActive ? 'text-primary' : 'text-gray-400 group-hover:text-white'
                   }`}
                 />
                 {!isCollapsed && (
-                  <span className="font-medium transition-colors duration-200">
+                  <span className="text-sm font-medium transition-colors duration-200">
                     {item.name}
                   </span>
-                )}
-
-                {/* Active indicator */}
-                {isActive && !isCollapsed && (
-                  <div className="ml-auto w-2 h-2 bg-white rounded-full opacity-80" />
                 )}
               </button>
             );
@@ -172,14 +210,14 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
           {session && (
             <button
               onClick={handleLogout}
-              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 group text-gray-300 hover:bg-red-600/20 hover:text-red-400 border-t border-gray-800 mt-4 pt-4"
+              className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all duration-200 group text-gray-300 hover:bg-red-600/20 hover:text-red-400 border-t border-gray-800 mt-2 pt-3"
             >
               <LogOut
-                size={20}
+                size={18}
                 className="text-gray-400 group-hover:text-red-400 transition-colors duration-200"
               />
               {!isCollapsed && (
-                <span className="font-medium transition-colors duration-200">
+                <span className="text-sm font-medium transition-colors duration-200">
                   Logout
                 </span>
               )}
@@ -187,9 +225,54 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
           )}
         </nav>
 
+        {/* Sessions (collapsible, fills remaining space, own scroll region) */}
+        {session && !isCollapsed && (
+          <div className="flex flex-col flex-1 min-h-0 border-t border-gray-800 mt-2">
+            <button
+              onClick={() => setSessionsExpanded((prev) => !prev)}
+              className="w-full flex items-center justify-between px-5 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
+            >
+              <span>Sessions</span>
+              <ChevronDown
+                size={14}
+                className={`transition-transform duration-200 ${sessionsExpanded ? '' : '-rotate-90'}`}
+              />
+            </button>
+
+            {sessionsExpanded && (
+              <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-0.5">
+                {loadingConversations ? (
+                  <p className="px-3 py-2 text-xs text-gray-500">Loading...</p>
+                ) : conversations.length === 0 ? (
+                  <p className="px-3 py-2 text-xs text-gray-500">No sessions yet</p>
+                ) : (
+                  conversations.map((conv) => {
+                    const isActiveSession = pathname === `/workspace/${conv.workspace?.id}`;
+                    return (
+                      <button
+                        key={conv.id}
+                        onClick={() => handleSessionClick(conv)}
+                        title={conv.title}
+                        className={`w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg text-sm truncate transition-colors ${
+                          isActiveSession
+                            ? 'bg-white/10 text-white'
+                            : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                        }`}
+                      >
+                        <MessageSquare size={14} className="flex-shrink-0 text-gray-500" />
+                        <span className="truncate">{conv.title || 'Untitled session'}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Footer */}
         {!isCollapsed && session && (
-          <div className="p-4 border-t border-gray-800">
+          <div className="p-4 border-t border-gray-800 flex-shrink-0">
             <div className="flex items-center space-x-3 px-4 py-3">
               <div className="w-8 h-8 bg-gradient-to-r from-teal-400 to-emerald-500 rounded-full flex items-center justify-center">
                 {session.user?.image ? (

@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import Sidebar from './Sidebar';
 import PaymentFailedBanner from './PaymentFailedBanner';
+import AnnouncementBanner from './AnnouncementBanner';
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
@@ -29,6 +30,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
         }`}
       >
         <PaymentFailedBanner />
+        <AnnouncementBanner />
         <div className="ml-0 lg:ml-0">
           {children}
         </div>

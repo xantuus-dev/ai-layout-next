@@ -8,7 +8,6 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ClaudeChatInput from '@/components/ui/claude-style-chat-input';
 import { InlineQuickActionButtons } from '@/components/workspace/InlineQuickActionButtons';
-import { ConversationSidebar } from '@/components/ConversationSidebar';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -227,26 +226,6 @@ export default function WorkspacePage() {
     });
   };
 
-  // Handle conversation selection
-  const handleSelectConversation = (conversationId: string) => {
-    router.push(`/workspace/${workspaceId}?conversation=${conversationId}`);
-    router.refresh();
-  };
-
-  // Handle new conversation
-  const handleNewConversation = () => {
-    router.push('/');
-  };
-
-  // Handle delete conversation
-  const handleDeleteConversation = async (conversationId: string) => {
-    if (conversationId === conversation?.id) {
-      router.push('/workspace');
-    } else {
-      await fetchWorkspaceData();
-    }
-  };
-
   // Export conversation to different formats
   const exportConversation = async (format: string) => {
     if (!conversation) return;
@@ -291,11 +270,11 @@ export default function WorkspacePage() {
     <div
       className={`p-4 rounded-lg ${
         message.role === 'user'
-          ? 'bg-gradient-to-r from-lime-500/10 to-emerald-600/10 border border-primary/30 ml-8 shadow-md'
-          : 'bg-slate-900/70 border border-slate-800 mr-8 shadow-lg'
+          ? 'bg-primary/10 border border-primary/30 ml-8 shadow-md'
+          : 'bg-card border border-border mr-8 shadow-lg'
       }`}
     >
-      <div className="text-xs font-semibold mb-2 text-gray-400">
+      <div className="text-xs font-semibold mb-2 text-muted-foreground">
         {message.role === 'user' ? 'You' : 'AI Agent'}
         {message.model && ` (${message.model})`}
       </div>
@@ -320,46 +299,39 @@ export default function WorkspacePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-gray-400">Loading workspace...</p>
+          <p className="text-muted-foreground">Loading workspace...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900">
-      {/* Conversation Sidebar */}
-      <ConversationSidebar
-        currentConversationId={conversation?.id}
-        onSelectConversation={handleSelectConversation}
-        onNewConversation={handleNewConversation}
-        onDeleteConversation={handleDeleteConversation}
-      />
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen">
-        {/* Header */}
-        <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/80 backdrop-blur-xl">
-          <div className="px-4 md:px-8 py-4 flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push('/')}
-                className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
-              >
-                <Home className="w-4 h-4" />
-                <span>Home</span>
-              </button>
-              <div className="border-l border-slate-700 h-4" />
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{workspace?.icon || '🤖'}</span>
-                <h1 className="text-lg font-bold text-white">
-                  {workspace?.name || 'Agent Workspace'}
-                </h1>
-              </div>
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Header — sticky to the top of the page's own scroll, so it works
+          correctly regardless of whether a banner is rendered above this
+          page (a hardcoded h-screen here would overflow the viewport once
+          a banner adds height above it). */}
+      <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-xl flex-shrink-0">
+        <div className="px-4 md:px-8 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push('/')}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Home className="w-4 h-4" />
+              <span>Home</span>
+            </button>
+            <div className="border-l border-border h-4" />
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{workspace?.icon || '🤖'}</span>
+              <h1 className="text-lg font-bold text-foreground">
+                {workspace?.name || 'Agent Workspace'}
+              </h1>
             </div>
+          </div>
 
             {/* Status Indicator and Export */}
             <div className="flex items-center gap-3">
@@ -426,8 +398,8 @@ export default function WorkspacePage() {
           </div>
         </header>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Messages — flows with the page's own scroll (see note above) */}
+        <div className="flex-1">
           <div className="max-w-4xl mx-auto p-4 md:p-8">
             <div className="space-y-4">
               {messages.map((msg) => (
@@ -436,8 +408,8 @@ export default function WorkspacePage() {
 
               {/* Streaming message */}
               {isStreaming && streamingContent && (
-                <div className="p-4 rounded-lg bg-slate-900/70 border border-slate-800 mr-8 shadow-lg">
-                  <div className="text-xs font-semibold mb-2 text-gray-400">
+                <div className="p-4 rounded-lg bg-card border border-border mr-8 shadow-lg">
+                  <div className="text-xs font-semibold mb-2 text-muted-foreground">
                     AI Agent (streaming...)
                   </div>
                   <div className="prose dark:prose-invert max-w-none">
@@ -448,8 +420,8 @@ export default function WorkspacePage() {
 
               {/* Thinking indicator */}
               {executionStatus === 'thinking' && !streamingContent && (
-                <div className="p-4 rounded-lg bg-slate-900/70 border border-slate-800 mr-8 shadow-lg">
-                  <div className="flex items-center gap-2 text-gray-400">
+                <div className="p-4 rounded-lg bg-card border border-border mr-8 shadow-lg">
+                  <div className="flex items-center gap-2 text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin text-primary" />
                     <span>AI is thinking...</span>
                   </div>
@@ -473,7 +445,7 @@ export default function WorkspacePage() {
 
         {/* Chat Input Section - Multi-turn conversations */}
         {conversation && !isStreaming && executionStatus !== 'thinking' && (
-          <div className="border-t border-slate-800 bg-slate-900/80 backdrop-blur-xl p-4">
+          <div className="sticky bottom-0 border-t border-border bg-card/80 backdrop-blur-xl p-4 flex-shrink-0">
             <div className="max-w-4xl mx-auto">
               <ClaudeChatInput
                 onSendMessage={(data) => sendMessage(data.message, data.files)}
@@ -483,7 +455,6 @@ export default function WorkspacePage() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }
