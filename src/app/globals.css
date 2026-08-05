@@ -71,13 +71,13 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 10%;
 
-    --primary: 258 90% 66%;                      /* hsl(258, 90%, 66%) = #8B5CF6 (Violet 500) */
+    --primary: 173 80% 40%;                      /* hsl(173, 80%, 40%) = #14B8A6 (Teal 500 — matches www.xantuus.com) */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 5% 96%;                     /* hsl(240, 5%, 96%) = #F4F4F5 (Light gray) */
     --secondary-foreground: 240 10% 15%;
 
-    --accent: 283 85% 65%;                       /* hsl(283, 85%, 65%) = #A855F7 (Purple 500) */
+    --accent: 160 84% 39%;                       /* hsl(160, 84%, 39%) = #10B981 (Emerald 500) */
     --accent-foreground: 0 0% 100%;
 
     --muted: 240 5% 96%;
@@ -88,7 +88,7 @@
 
     --border: 240 6% 90%;                        /* hsl(240, 6%, 90%) = #E4E4E7 */
     --input: 240 6% 90%;
-    --ring: 258 90% 66%;                         /* Purple focus ring */
+    --ring: 173 80% 40%;                         /* Teal focus ring */
 
     --radius: 0.75rem;                           /* 12px */
     --ease-silk: cubic-bezier(0.2, 0.0, 0, 1.0);
@@ -107,44 +107,44 @@
     --icon-secondary: 240 5% 50%;                /* Secondary icons */
     --icon-tertiary: 240 5% 60%;                 /* Tertiary icons */
     --Button-primary-white: 0 0% 100%;           /* Primary button bg */
-    --Button-primary-black: 258 90% 66%;         /* Primary button accent */
+    --Button-primary-black: 173 80% 40%;         /* Primary button accent */
     --fill-gray: 240 5% 94%;                     /* Fill gray */
     --fill-tsp-white-main: 240 6% 97%;           /* Transparent white main */
     --fill-tsp-white-light: 240 6% 98%;          /* Transparent white light */
   }
   .dark {
-    /* Dark Mode override - Modern Purple/Violet Theme */
-    --background: 240 10% 10%;                   /* hsl(240, 10%, 10%) = #18181B (Zinc 950) */
+    /* Dark Mode override - Teal/Emerald Theme, matching www.xantuus.com */
+    --background: 220 20% 6%;                    /* hsl(220, 20%, 6%) ≈ #0C0F14 (near-black, matches xantuus.com hero bg) */
     --foreground: 0 0% 98%;                      /* hsl(0, 0%, 98%) = #FAFAFA (Near white) */
-    --card: 240 6% 15%;                          /* hsl(240, 6%, 15%) = #27272A (Zinc 800) */
+    --card: 220 16% 12%;                         /* hsl(220, 16%, 12%) ≈ #171B23 */
     --card-foreground: 0 0% 98%;
-    --popover: 240 6% 15%;
+    --popover: 220 16% 12%;
     --popover-foreground: 0 0% 98%;
 
-    /* PRIMARY: Vibrant Purple */
-    --primary: 258 90% 66%;                      /* hsl(258, 90%, 66%) = #8B5CF6 (Violet 500) */
+    /* PRIMARY: Teal (matches www.xantuus.com's brand gradient) */
+    --primary: 173 80% 40%;                      /* hsl(173, 80%, 40%) = #14B8A6 (Teal 500) */
     --primary-foreground: 0 0% 100%;
 
     /* SECONDARY */
-    --secondary: 240 5% 25%;                     /* hsl(240, 5%, 25%) = #3F3F46 (Zinc 700) */
+    --secondary: 220 14% 20%;                    /* hsl(220, 14%, 20%) ≈ #292F3A */
     --secondary-foreground: 0 0% 90%;
 
-    /* ACCENT: Purple/Magenta */
-    --accent: 283 85% 65%;                       /* hsl(283, 85%, 65%) = #A855F7 (Purple 500) */
+    /* ACCENT: Emerald (paired with teal in the brand gradient) */
+    --accent: 160 84% 39%;                       /* hsl(160, 84%, 39%) = #10B981 (Emerald 500) */
     --accent-foreground: 0 0% 100%;
 
     /* MUTED */
-    --muted: 240 5% 20%;                         /* hsl(240, 5%, 20%) = #333338 */
-    --muted-foreground: 240 5% 65%;              /* hsl(240, 5%, 65%) = #A1A1AA */
+    --muted: 220 14% 18%;                         /* hsl(220, 14%, 18%) ≈ #232831 */
+    --muted-foreground: 220 8% 65%;              /* hsl(220, 8%, 65%) ≈ #A2A7B0 */
 
     /* DESTRUCTIVE */
     --destructive: 0 85% 60%;                    /* hsl(0, 85%, 60%) = #EF4444 (Red 500) */
     --destructive-foreground: 0 0% 100%;
 
     /* BORDERS & INPUTS */
-    --border: 240 6% 20%;                        /* hsl(240, 6%, 20%) = #323238 (Dark border) */
-    --input: 240 6% 20%;
-    --ring: 258 90% 66%;                         /* Purple focus ring */
+    --border: 220 14% 20%;                       /* hsl(220, 14%, 20%) ≈ #292F3A */
+    --input: 220 14% 20%;
+    --ring: 173 80% 40%;                         /* Teal focus ring */
 
     /* Integration Panel Variables */
     --border-btn-main: 240 6% 25%;               /* Button borders */
@@ -160,7 +160,7 @@
     --icon-secondary: 240 5% 65%;                /* Secondary icons */
     --icon-tertiary: 240 5% 55%;                 /* Tertiary icons */
     --Button-primary-white: 240 6% 18%;          /* Primary button bg */
-    --Button-primary-black: 258 90% 66%;         /* Primary button accent */
+    --Button-primary-black: 173 80% 40%;         /* Primary button accent */
     --fill-gray: 240 5% 22%;                     /* Fill gray */
     --fill-tsp-white-main: 240 6% 17%;           /* Transparent white main */
     --fill-tsp-white-light: 240 6% 19%;          /* Transparent white light */
@@ -191,36 +191,35 @@
   }
 }
 
-/* Gradient utilities — single brand identity (violet/purple, matching --primary) */
+/* Gradient utilities — single brand identity (teal/emerald, matching www.xantuus.com) */
 @layer utilities {
   .gradient-primary {
-    @apply bg-gradient-to-r from-violet-500 to-purple-600;
+    @apply bg-gradient-to-r from-teal-600 to-emerald-600;
   }
 
   .gradient-primary-hover {
-    @apply bg-gradient-to-r from-violet-600 to-purple-700;
+    @apply bg-gradient-to-r from-teal-700 to-emerald-700;
   }
 
   .gradient-accent {
-    @apply bg-gradient-to-r from-blue-500 to-violet-600;
+    @apply bg-gradient-to-r from-emerald-500 to-teal-600;
   }
 
   .gradient-accent-hover {
-    @apply bg-gradient-to-r from-blue-600 to-violet-700;
+    @apply bg-gradient-to-r from-emerald-600 to-teal-700;
   }
 
   .text-gradient {
     /* Starts from the theme's own foreground color (not a literal white)
        so it stays legible on both a light and a dark page background. */
-    @apply bg-gradient-to-r from-foreground via-violet-500 to-purple-600 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-foreground via-teal-300 to-emerald-300 bg-clip-text text-transparent;
   }
 
-  /* Names kept for now to avoid touching every call site — colors are brand violet/blue, not literal green/teal */
   .glow-green {
-    box-shadow: 0 8px 15px -3px rgba(139, 92, 246, 0.35);
+    box-shadow: 0 8px 15px -3px rgba(20, 184, 166, 0.35);
   }
 
   .glow-teal {
-    box-shadow: 0 8px 15px -3px rgba(59, 130, 246, 0.35);
+    box-shadow: 0 8px 15px -3px rgba(16, 185, 129, 0.35);
   }
 }
