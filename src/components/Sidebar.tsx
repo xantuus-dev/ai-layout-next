@@ -154,24 +154,36 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
         } w-64 shadow-2xl`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-800 flex-shrink-0">
-          <div className="flex items-center space-x-3">
+        {/* Padding tightens when collapsed: at lg:w-20 the full p-6 leaves only
+            32px of content box, which is not enough for the mark and the toggle
+            side by side and silently crushes the mark to a sliver. */}
+        <div
+          className={`flex items-center justify-between border-b border-gray-800 flex-shrink-0 ${
+            isCollapsed ? 'px-3 py-6 gap-1' : 'p-6 gap-2'
+          }`}
+        >
+          {/* Expanded: the full wordmark. Collapsed: the X mark alone, since the
+              wordmark would be illegible in the narrow rail. The sidebar
+              background is dark in both themes, so the white variant is always
+              correct here. */}
+          {isCollapsed ? (
             <img
               src="/xantuus-icon-white.png"
               alt="Xantuus AI"
-              className="w-8 h-8 object-contain flex-shrink-0"
+              className="w-7 h-7 object-contain flex-shrink-0"
             />
-            {!isCollapsed && (
-              <h1 className="text-xl font-bold text-white tracking-wide">
-                Xantuus
-              </h1>
-            )}
-          </div>
+          ) : (
+            <img
+              src="/xantuus-wordmark-white.png"
+              alt="Xantuus AI"
+              className="h-7 w-auto min-w-0 object-contain object-left"
+            />
+          )}
 
           {/* Desktop Collapse Button */}
           <button
             onClick={onToggleCollapse}
-            className="hidden lg:block p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors duration-200"
+            className="hidden lg:block flex-shrink-0 p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors duration-200"
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}

@@ -484,3 +484,4 @@ After setup, you can:
 **Ready to start?** Follow [SUPABASE_QUICKSTART.md](./SUPABASE_QUICKSTART.md) to set up your database in 5 minutes!
 
 Built with Next.js, Prisma, Stripe, Supabase, and Claude AI.
+# ai-layout-next
