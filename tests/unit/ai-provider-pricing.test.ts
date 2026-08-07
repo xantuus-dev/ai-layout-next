@@ -56,7 +56,7 @@ describe('AI provider estimateCredits fallback pricing', () => {
 
   it('scales with token count', () => {
     const provider = new AnthropicProvider();
-    const haiku = provider.models.find((m) => m.id === 'claude-haiku-4-5-20250529')!;
+    const haiku = provider.models.find((m) => m.id === 'claude-haiku-4-5')!;
     const credits2k = provider.estimateCredits(2000, haiku.id);
     expect(credits2k).toBe(Math.ceil(2 * haiku.creditsPerThousandTokens));
   });

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { aiRouter } from '@/lib/ai-providers';
 import { verifyWorkspaceAccess } from '@/lib/workspace-utils';
 import { checkAndResetCredits, hasEnoughCredits, resolveBillingUserId } from '@/lib/credits';
+import { DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai-providers/catalog';
 
 export async function POST(
   request: NextRequest,
@@ -199,7 +200,7 @@ export async function POST(
         let reasoningMs = 0;
         let hasEmittedStreaming = false;
 
-        const stream = aiRouter.chatStream(model || 'claude-sonnet-4-5-20250929', {
+        const stream = aiRouter.chatStream(model || DEFAULT_ANTHROPIC_MODEL, {
           messages: [
             {
               role: 'user',
@@ -255,7 +256,7 @@ export async function POST(
 
         const totalTokens = inputTokens + outputTokens;
 
-        const creditsUsed = aiRouter.estimateCredits(model || 'claude-sonnet-4-5-20250929', totalTokens);
+        const creditsUsed = aiRouter.estimateCredits(model || DEFAULT_ANTHROPIC_MODEL, totalTokens);
         creditsDeducted = creditsUsed;
 
         // 8. Save assistant message and create task
@@ -266,7 +267,7 @@ export async function POST(
               conversationId,
               role: 'assistant',
               content: fullResponse,
-              model: model || 'claude-sonnet-4-5-20250929',
+              model: model || DEFAULT_ANTHROPIC_MODEL,
               tokens: totalTokens,
               credits: creditsUsed,
               thinkingEnabled: isThinkingEnabled || false,
@@ -290,7 +291,7 @@ export async function POST(
               description: `Agent execution: ${message}`,
               status: 'completed',
               priority: 'medium',
-              agentModel: model || 'claude-sonnet-4-5-20250929',
+              agentModel: model || DEFAULT_ANTHROPIC_MODEL,
               agentConfig: {
                 thinkingEnabled: isThinkingEnabled || false,
                 conversationId,
@@ -313,7 +314,7 @@ export async function POST(
             data: {
               userId: user.id,
               type: 'agent',
-              model: model || 'claude-sonnet-4-5-20250929',
+              model: model || DEFAULT_ANTHROPIC_MODEL,
               tokens: totalTokens,
               credits: creditsUsed,
               metadata: {
