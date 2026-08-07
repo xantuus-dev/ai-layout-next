@@ -159,7 +159,7 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
             side by side and silently crushes the mark to a sliver. */}
         <div
           className={`flex items-center justify-between border-b border-gray-800 flex-shrink-0 ${
-            isCollapsed ? 'px-3 py-6 gap-1' : 'p-6 gap-2'
+            isCollapsed ? 'px-3 py-6 gap-1' : 'px-6 py-4 gap-2'
           }`}
         >
           {/* Expanded: the full wordmark. Collapsed: the X mark alone, since the
@@ -173,10 +173,15 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
               className="w-7 h-7 object-contain flex-shrink-0"
             />
           ) : (
+            /* Sized by WIDTH, not height. The lockup's box is set by the X mark,
+               and the "XANTUUS AI" text is only ~34% of that box — so a height
+               constraint renders the wordmark far smaller than it looks like it
+               should (h-7 gave ~10px text). 150px wide puts the text near 16px,
+               in line with comparable apps, and still leaves room for the toggle. */
             <img
               src="/xantuus-wordmark-white.png"
               alt="Xantuus AI"
-              className="h-7 w-auto min-w-0 object-contain object-left"
+              className="w-[150px] max-w-full h-auto object-contain object-left"
             />
           )}
 
