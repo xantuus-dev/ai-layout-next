@@ -22,6 +22,9 @@ export function validateEnvironmentVariables(): EnvValidationResult {
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     DATABASE_URL: process.env.DATABASE_URL,
+    // Required by prisma/schema.prisma's `directUrl`. Prisma fails with a
+    // cryptic error if it is missing, so surface it here as a clear message.
+    DIRECT_URL: process.env.DIRECT_URL,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   };
 

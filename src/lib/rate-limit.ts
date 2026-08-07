@@ -1,22 +1,46 @@
-// Simple in-memory rate limiter
-// For production, consider using Redis or a service like Upstash
+/**
+ * Distributed rate limiter.
+ *
+ * This previously used a module-level Map, which does not work on serverless:
+ * every cold start gets its own process, so a limit of "20 per minute" was
+ * really "20 per minute per container" and an attacker got as many buckets as
+ * the platform gave them containers. Since these limits sit in front of paid
+ * model calls, that was an uncapped cost exposure rather than a cosmetic bug.
+ *
+ * Counting now happens in Redis (shared across all instances) via the existing
+ * connection manager in lib/queue/redis.ts, which already provides health
+ * checks and a circuit breaker.
+ *
+ * When Redis is unavailable this DEGRADES to the old in-memory behaviour
+ * rather than failing closed. That is deliberate: a Redis outage should not
+ * take down chat for every customer. It is weaker than the Redis path, not
+ * stronger, so it must not be relied on as the only defence — per-plan credit
+ * limits in lib/credits.ts remain the hard cost ceiling.
+ */
+
+import { executeWithRedis } from '@/lib/queue/redis';
 
 interface RateLimitEntry {
   count: number;
   resetTime: number;
 }
 
-const rateLimitStore = new Map<string, RateLimitEntry>();
+// Fallback store, used only when Redis is unavailable.
+const fallbackStore = new Map<string, RateLimitEntry>();
 
-// Clean up old entries every 5 minutes
-setInterval(() => {
+// Clean up expired fallback entries every 5 minutes. Unref'd so it never holds
+// a serverless invocation open. This file is typed against both the DOM and
+// Node timer signatures (setInterval returns `number` under DOM lib), so unref
+// is reached defensively rather than through the Node-only Timeout type.
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
-  for (const [key, value] of rateLimitStore.entries()) {
+  for (const [key, value] of fallbackStore.entries()) {
     if (value.resetTime < now) {
-      rateLimitStore.delete(key);
+      fallbackStore.delete(key);
     }
   }
 }, 5 * 60 * 1000);
+(cleanupTimer as unknown as { unref?: () => void }).unref?.();
 
 export interface RateLimitConfig {
   maxRequests: number;
@@ -28,65 +52,128 @@ export interface RateLimitResult {
   limit: number;
   remaining: number;
   reset: number;
+  /** True when this result came from the in-memory fallback, not Redis. */
+  degraded?: boolean;
 }
 
+const KEY_PREFIX = 'ratelimit:';
+
 /**
- * Check if a request should be rate limited
- * @param identifier - Unique identifier (user ID, IP, API key, etc.)
- * @param config - Rate limit configuration
- * @returns Rate limit result with success status and metadata
+ * In-memory fixed window. Only correct within a single process.
  */
-export function checkRateLimit(
+function checkInMemory(
   identifier: string,
   config: RateLimitConfig
 ): RateLimitResult {
   const now = Date.now();
-  const entry = rateLimitStore.get(identifier);
+  const entry = fallbackStore.get(identifier);
 
-  // No entry or expired entry - create new one
   if (!entry || entry.resetTime < now) {
     const resetTime = now + config.windowMs;
-    rateLimitStore.set(identifier, {
-      count: 1,
-      resetTime,
-    });
-
+    fallbackStore.set(identifier, { count: 1, resetTime });
     return {
       success: true,
       limit: config.maxRequests,
       remaining: config.maxRequests - 1,
       reset: resetTime,
+      degraded: true,
     };
   }
 
-  // Entry exists and is still valid
   if (entry.count >= config.maxRequests) {
     return {
       success: false,
       limit: config.maxRequests,
       remaining: 0,
       reset: entry.resetTime,
+      degraded: true,
     };
   }
 
-  // Increment count
   entry.count++;
-  rateLimitStore.set(identifier, entry);
-
+  fallbackStore.set(identifier, entry);
   return {
     success: true,
     limit: config.maxRequests,
     remaining: config.maxRequests - entry.count,
     reset: entry.resetTime,
+    degraded: true,
   };
 }
 
 /**
- * Reset rate limit for a specific identifier
- * Useful for testing or manual overrides
+ * Check whether a request should be rate limited.
+ *
+ * @param identifier - Unique identifier (user ID, IP, API key, etc.)
+ * @param config - Rate limit configuration
  */
-export function resetRateLimit(identifier: string): void {
-  rateLimitStore.delete(identifier);
+export async function checkRateLimit(
+  identifier: string,
+  config: RateLimitConfig
+): Promise<RateLimitResult> {
+  const key = `${KEY_PREFIX}${identifier}`;
+
+  return executeWithRedis(
+    async (redis) => {
+      // Fixed window: INCR creates the key at 1, then we attach the TTL.
+      // Both commands go in one pipeline so they cost a single round trip.
+      const [[incrErr, rawCount], [ttlErr, rawTtl]] = (await redis
+        .multi()
+        .incr(key)
+        .pttl(key)
+        .exec()) as [[Error | null, number], [Error | null, number]];
+
+      if (incrErr) throw incrErr;
+      if (ttlErr) throw ttlErr;
+
+      const count = Number(rawCount);
+      let ttl = Number(rawTtl);
+
+      // ttl === -1 means the key exists with no expiry. That happens on the
+      // first INCR (before we set one) and would otherwise strand the key as a
+      // permanent block, so always repair it.
+      if (ttl < 0) {
+        await redis.pexpire(key, config.windowMs);
+        ttl = config.windowMs;
+      }
+
+      const reset = Date.now() + ttl;
+
+      if (count > config.maxRequests) {
+        return {
+          success: false,
+          limit: config.maxRequests,
+          remaining: 0,
+          reset,
+        };
+      }
+
+      return {
+        success: true,
+        limit: config.maxRequests,
+        remaining: Math.max(0, config.maxRequests - count),
+        reset,
+      };
+    },
+    () => checkInMemory(identifier, config),
+    `Rate limit check for ${identifier}`
+  );
+}
+
+/**
+ * Reset the rate limit for an identifier. Useful for tests and manual overrides.
+ */
+export async function resetRateLimit(identifier: string): Promise<void> {
+  const key = `${KEY_PREFIX}${identifier}`;
+  await executeWithRedis(
+    async (redis) => {
+      await redis.del(key);
+    },
+    () => {
+      fallbackStore.delete(identifier);
+    },
+    `Rate limit reset for ${identifier}`
+  );
 }
 
 // Preset rate limit configurations

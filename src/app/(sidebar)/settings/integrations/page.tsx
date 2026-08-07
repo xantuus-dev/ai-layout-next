@@ -317,13 +317,6 @@ function IntegrationsPageContent() {
     }
   };
 
-  const handleComingSoon = (name: string) => {
-    setMessage({
-      type: 'error',
-      text: `${name} integration coming soon!`,
-    });
-  };
-
   if (sessionStatus === 'loading' || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -388,24 +381,10 @@ function IntegrationsPageContent() {
       onConnect: handleConnectTelegram,
       onDisconnect: handleDisconnectTelegram,
     },
-    {
-      id: 'notion',
-      name: 'Notion',
-      description: 'Sync and create Notion pages',
-      icon: <FileText className="w-6 h-6 text-white" />,
-      iconBg: 'bg-gray-800',
-      status: 'disconnected',
-      onConnect: () => handleComingSoon('Notion'),
-    },
-    {
-      id: 'stripe',
-      name: 'Stripe',
-      description: 'Process payments and manage subscriptions',
-      icon: <CreditCard className="w-6 h-6 text-white" />,
-      iconBg: 'bg-indigo-500',
-      status: 'disconnected',
-      onConnect: () => handleComingSoon('Stripe'),
-    },
+    // Notion and Stripe were listed here with a Connect button that only
+    // reported "coming soon". Neither has a backing API route, so they are
+    // omitted until they do — advertising an integration a customer cannot
+    // use is worse than not listing it.
   ];
 
   return (

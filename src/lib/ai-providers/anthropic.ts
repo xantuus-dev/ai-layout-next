@@ -3,7 +3,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { AIProvider, ChatParams, ChatResponse, AIModel } from './types';
+import { AIProvider, ChatParams, ChatResponse, AIModel, StreamEvent } from './types';
 
 export class AnthropicProvider implements AIProvider {
   id = 'anthropic';
@@ -60,35 +60,78 @@ export class AnthropicProvider implements AIProvider {
     return !!process.env.ANTHROPIC_API_KEY;
   }
 
-  async chat(params: ChatParams): Promise<ChatResponse> {
-    if (!this.client) {
-      throw new Error('Anthropic provider is not configured. Please set ANTHROPIC_API_KEY.');
-    }
-
-    // Convert messages to Anthropic format
+  /**
+   * Translate our provider-neutral params into Anthropic's request shape.
+   * Shared by chat() and chatStream() so the two cannot drift apart.
+   */
+  private buildApiParams(params: ChatParams): any {
     const anthropicMessages = params.messages.map(msg => ({
       role: msg.role === 'system' ? 'user' : msg.role,
       content: msg.content,
     }));
 
-    // Build API parameters
     const apiParams: any = {
       model: params.model,
       max_tokens: params.maxTokens || 4096,
       messages: anthropicMessages,
     };
 
-    // Add temperature if specified
     if (params.temperature !== undefined) {
       apiParams.temperature = params.temperature;
     }
 
-    // Add extended thinking if enabled
     if (params.thinking) {
       apiParams.thinking = params.thinking;
     }
 
-    const response = await this.client.messages.create(apiParams);
+    return apiParams;
+  }
+
+  /**
+   * Stream a completion, yielding deltas as the model produces them.
+   *
+   * Reasoning and answer text arrive as separate event types so the UI can
+   * show a "thinking" block that is distinct from the response body.
+   */
+  async *chatStream(params: ChatParams): AsyncGenerator<StreamEvent, void, unknown> {
+    if (!this.client) {
+      throw new Error('Anthropic provider is not configured. Please set ANTHROPIC_API_KEY.');
+    }
+
+    const stream = this.client.messages.stream(this.buildApiParams(params));
+
+    for await (const event of stream) {
+      if (event.type !== 'content_block_delta') continue;
+
+      const delta = event.delta;
+      if (delta.type === 'text_delta') {
+        yield { type: 'text', delta: delta.text };
+      } else if (delta.type === 'thinking_delta') {
+        yield { type: 'thinking', delta: delta.thinking };
+      }
+      // signature_delta carries the thinking signature, which is not display
+      // content and is intentionally ignored.
+    }
+
+    // Usage totals are only final once the message completes.
+    const finalMessage = await stream.finalMessage();
+    yield {
+      type: 'done',
+      usage: {
+        inputTokens: finalMessage.usage.input_tokens,
+        outputTokens: finalMessage.usage.output_tokens,
+        totalTokens: finalMessage.usage.input_tokens + finalMessage.usage.output_tokens,
+      },
+      finishReason: finalMessage.stop_reason || undefined,
+    };
+  }
+
+  async chat(params: ChatParams): Promise<ChatResponse> {
+    if (!this.client) {
+      throw new Error('Anthropic provider is not configured. Please set ANTHROPIC_API_KEY.');
+    }
+
+    const response = await this.client.messages.create(this.buildApiParams(params));
 
     // Extract text content from response
     let responseText = '';

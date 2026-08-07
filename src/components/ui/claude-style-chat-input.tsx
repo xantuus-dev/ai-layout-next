@@ -442,25 +442,10 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
         }
     };
 
-    // Handle different file source options
-    const handleGoogleDrive = () => {
-        setShowFileMenu(false);
-        alert('Google Drive integration coming soon!');
-        // TODO: Implement Google Drive picker
-    };
-
-    const handleOneDrive = () => {
-        setShowFileMenu(false);
-        alert('OneDrive integration coming soon!');
-        // TODO: Implement OneDrive picker
-    };
-
-    const handleFigma = () => {
-        setShowFileMenu(false);
-        alert('Figma integration coming soon!');
-        // TODO: Implement Figma integration
-    };
-
+    // Google Drive / OneDrive / Figma pickers are not implemented. Their menu
+    // entries were removed rather than left to alert("coming soon") on click —
+    // a control that looks live and then isn't costs more trust than an absent
+    // one. Re-add them here alongside a working picker.
     const handleLocalFiles = () => {
         setShowFileMenu(false);
         fileInputRef.current?.click();
@@ -553,34 +538,6 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
                                 {showFileMenu && (
                                     <div className="absolute bottom-full left-0 mb-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden z-[9999] animate-fade-in">
                                         <div className="py-1">
-                                            <button
-                                                onClick={handleGoogleDrive}
-                                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-                                            >
-                                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M12.01 1.485L21.302 17.26 17.793 23H6.207l-3.509-5.74L12.01 1.485zM5.585 20h12.83l2.486-4.07H3.099L5.585 20zm1.438-6.07h9.954L12.01 5.074 7.023 13.93z"/>
-                                                </svg>
-                                                <span>Add from Google Drive</span>
-                                            </button>
-                                            <button
-                                                onClick={handleOneDrive}
-                                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-                                            >
-                                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M13.25 12.5L8.5 17.25L3.75 12.5H13.25Z M11.5 1.5C14.25 1.5 16.5 3.75 16.5 6.5C16.5 7 16.38 7.5 16.25 8L20.25 10.75L15.5 15.5H8.5L3.75 10.75L8.5 8C8.38 7.5 8.25 7 8.25 6.5C8.25 3.75 10.5 1.5 13.25 1.5C14.38 1.5 15.38 2 16.13 2.75L14.63 4.25C14.13 3.88 13.5 3.63 12.88 3.63C11.75 3.63 10.88 4.5 10.88 5.63C10.88 6.75 11.75 7.63 12.88 7.63C13.5 7.63 14.13 7.38 14.63 7L16.13 8.5C15.38 9.25 14.38 9.75 13.25 9.75C12.25 9.75 11.38 9.38 10.63 8.75L7.5 10.75L12 15.25L16.5 10.75L20.25 8.75C20.63 8.5 21 8 21 7.5C21 6.25 20 5.25 18.75 5.25C18.13 5.25 17.5 5.5 17.13 6C16.5 5 15.5 4.25 14.25 4.25C13.5 4.25 12.88 4.5 12.38 5L11.5 4.13C12.25 3.38 13.25 3 14.25 3C15.5 3 16.5 3.5 17.25 4.25C17.63 3.88 18.13 3.63 18.75 3.63C20.88 3.63 22.63 5.38 22.63 7.5C22.63 8.88 21.88 10 20.75 10.75L16.5 13.25L11.5 18.25L6.5 13.25L2.25 10.75C1.13 10 0.38 8.88 0.38 7.5C0.38 5.38 2.13 3.63 4.25 3.63C4.88 3.63 5.38 3.88 5.75 4.25C6.5 3.5 7.5 3 8.75 3C9.75 3 10.75 3.38 11.5 4.13L10.63 5C10.13 4.5 9.5 4.25 8.75 4.25C7.5 4.25 6.5 5 5.88 6C5.5 5.5 4.88 5.25 4.25 5.25C3 5.25 2 6.25 2 7.5C2 8 2.38 8.5 2.75 8.75L6.5 10.75L11 15.25L15.5 10.75L18.5 8.75C17.75 9.38 16.88 9.75 15.88 9.75C15.38 9.75 14.88 9.63 14.5 9.38L13 10.88C13.88 11.5 14.88 11.88 16 11.88C17.75 11.88 19.25 10.88 20.13 9.38C20.63 9.75 21 10.38 21 11.13V22.5H3V11.13C3 10.38 3.38 9.75 3.88 9.38C4.75 10.88 6.25 11.88 8 11.88C9.13 11.88 10.13 11.5 11 10.88L13.25 13.13V12.5Z"/>
-                                                </svg>
-                                                <span>Add from OneDrive</span>
-                                            </button>
-                                            <button
-                                                onClick={handleFigma}
-                                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-                                            >
-                                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M8 2c-1.7 0-3 1.3-3 3s1.3 3 3 3h3V5c0-1.7-1.3-3-3-3zm0 6H5c-1.7 0-3 1.3-3 3s1.3 3 3 3h3c1.7 0 3-1.3 3-3s-1.3-3-3-3zm8-6h-3v3h3c1.7 0 3-1.3 3-3s-1.3-3-3-3zm-8 12H5c-1.7 0-3 1.3-3 3s1.3 3 3 3 3-1.3 3-3v-3zm8-4c-1.7 0-3 1.3-3 3s1.3 3 3 3 3-1.3 3-3-1.3-3-3-3z"/>
-                                                </svg>
-                                                <span>Add from Figma</span>
-                                            </button>
-                                            <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
                                             <button
                                                 onClick={handleLocalFiles}
                                                 className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"

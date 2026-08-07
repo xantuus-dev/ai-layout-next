@@ -27,6 +27,7 @@ jobs:
         run: npx prisma generate
         env:
           DATABASE_URL: postgresql://placeholder
+          DIRECT_URL: postgresql://placeholder
 
       - name: Run ESLint
         run: npm run lint
@@ -34,6 +35,11 @@ jobs:
 
       - name: Check TypeScript types
         run: npx tsc --noEmit
+
+      # Unit tests are pure (no database, no secrets) so they gate every push.
+      # Database-backed tests run in the separate integration-tests job below.
+      - name: Run unit tests
+        run: npm run test:unit
 
       - name: Build application
         run: npm run build
@@ -46,6 +52,55 @@ jobs:
           GOOGLE_CLIENT_ID: placeholder
           GOOGLE_CLIENT_SECRET: placeholder
           ANTHROPIC_API_KEY: placeholder
+
+  # The credit/billing tests exercise real Prisma queries against a real
+  # Postgres rather than mocks — they're what stands between a change to the
+  # credit system and a customer being over- or under-charged. They create and
+  # delete their own rows, so a throwaway database per run is sufficient.
+  integration-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: xantuus_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # db push rather than migrate deploy: this database is thrown away after
+      # the run, so we want the current schema, not migration replay.
+      - name: Push schema to test database
+        run: npx prisma db push --skip-generate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/xantuus_test
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/xantuus_test
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/xantuus_test
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/xantuus_test
 
   security-scan:
     runs-on: ubuntu-latest

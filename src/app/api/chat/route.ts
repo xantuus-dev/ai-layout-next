@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check rate limit (use user ID for consistency)
-    const rateLimitResult = checkRateLimit(
+    const rateLimitResult = await checkRateLimit(
       `chat:${user.id}`,
       RATE_LIMITS.CHAT
     );

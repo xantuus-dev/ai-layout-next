@@ -37,7 +37,9 @@ class RedisConnectionManager {
   private circuitState: CircuitState = CircuitState.CLOSED;
   private failureCount: number = 0;
   private lastFailureTime: number = 0;
-  private healthCheckInterval: NodeJS.Timeout | null = null;
+  // ReturnType<typeof setInterval> rather than NodeJS.Timeout: this file is
+  // compiled with the DOM lib, where setInterval returns number.
+  private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
 
   // Circuit breaker configuration
   private readonly FAILURE_THRESHOLD = 5;

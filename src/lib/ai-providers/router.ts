@@ -6,7 +6,7 @@
 import { AnthropicProvider } from './anthropic';
 import { OpenAIProvider } from './openai';
 import { GoogleProvider } from './google';
-import { AIProvider, AIModel, ChatParams, ChatResponse, AIRouterOptions } from './types';
+import { AIProvider, AIModel, ChatParams, ChatResponse, AIRouterOptions, StreamEvent } from './types';
 
 class AIRouter {
   private providers: Map<string, AIProvider> = new Map();
@@ -139,6 +139,40 @@ class AIRouter {
 
       throw error;
     }
+  }
+
+  /**
+   * Streaming chat interface.
+   *
+   * Yields deltas as the model produces them, so time-to-first-token is a
+   * fraction of total generation time. Providers that have not implemented
+   * chatStream() still work: their full response is awaited and emitted as a
+   * single text event, which is no worse than the previous behaviour.
+   */
+  async *chatStream(
+    modelId: string,
+    params: Omit<ChatParams, 'model'>
+  ): AsyncGenerator<StreamEvent, void, unknown> {
+    const provider = this.getProviderForModel(modelId);
+
+    if (!provider) {
+      throw new Error(
+        `No provider found for model: ${modelId}. Available models: ${this.allModels.map(m => m.id).join(', ')}`
+      );
+    }
+
+    if (provider.chatStream) {
+      yield* provider.chatStream({ ...params, model: modelId });
+      return;
+    }
+
+    const response = await provider.chat({ ...params, model: modelId });
+    yield { type: 'text', delta: response.content };
+    yield {
+      type: 'done',
+      usage: response.usage,
+      finishReason: response.finishReason,
+    };
   }
 
   /**

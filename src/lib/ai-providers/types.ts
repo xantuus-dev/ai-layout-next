@@ -54,12 +54,38 @@ export interface AIModel {
   badge?: string;
 }
 
+/**
+ * A single event from a streaming completion.
+ *
+ * `thinking` carries extended-thinking deltas, which are kept separate from
+ * `text` so the UI can render reasoning in its own collapsed block rather than
+ * inlining it into the answer.
+ */
+export type StreamEvent =
+  | { type: 'thinking'; delta: string }
+  | { type: 'text'; delta: string }
+  | {
+      type: 'done';
+      usage: {
+        inputTokens: number;
+        outputTokens: number;
+        totalTokens: number;
+      };
+      finishReason?: string;
+    };
+
 export interface AIProvider {
   id: string;
   name: string;
   models: AIModel[];
   isConfigured: () => boolean;
   chat(params: ChatParams): Promise<ChatResponse>;
+  /**
+   * Optional real token-by-token streaming. Providers that do not implement
+   * this still work — the router falls back to `chat()` and emits the whole
+   * response as a single text event.
+   */
+  chatStream?(params: ChatParams): AsyncGenerator<StreamEvent, void, unknown>;
   estimateCredits(tokens: number, model: string): number;
 }
 

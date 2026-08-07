@@ -115,9 +115,8 @@ export default function LandingPage() {
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">X</span>
-            </div>
+            <img src="/xantuus-icon-dark.png" alt="Xantuus AI" className="w-8 h-8 object-contain dark:hidden" />
+            <img src="/xantuus-icon-white.png" alt="Xantuus AI" className="w-8 h-8 object-contain hidden dark:block" />
             <span className="text-lg font-bold text-foreground">Xantuus</span>
           </div>
 
@@ -296,9 +295,8 @@ export default function LandingPage() {
       <footer className="border-t border-border">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 gradient-primary rounded flex items-center justify-center">
-              <span className="text-white font-bold text-xs">X</span>
-            </div>
+            <img src="/xantuus-icon-dark.png" alt="Xantuus AI" className="w-6 h-6 object-contain dark:hidden" />
+            <img src="/xantuus-icon-white.png" alt="Xantuus AI" className="w-6 h-6 object-contain hidden dark:block" />
             <span className="text-sm font-semibold text-foreground">Xantuus</span>
           </div>
           <nav className="flex items-center gap-6 text-sm text-muted-foreground">

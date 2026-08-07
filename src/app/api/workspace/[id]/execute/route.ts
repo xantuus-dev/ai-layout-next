@@ -188,7 +188,18 @@ export async function POST(
 
         const content = contentBlocks.length === 1 ? contentBlocks[0].text : contentBlocks;
 
-        const aiResponse = await aiRouter.chat(model || 'claude-sonnet-4-5-20250929', {
+        // Real streaming: deltas are forwarded the moment the model produces
+        // them. This previously awaited the entire completion and then replayed
+        // it through a setTimeout typewriter, which meant time-to-first-token
+        // equalled total generation time and the fake replay added delay on top.
+        // Reasoning text is streamed to the client for live display but is not
+        // persisted — Message has no column for it, so it is intentionally not
+        // accumulated here.
+        let reasoningStartedAt = 0;
+        let reasoningMs = 0;
+        let hasEmittedStreaming = false;
+
+        const stream = aiRouter.chatStream(model || 'claude-sonnet-4-5-20250929', {
           messages: [
             {
               role: 'user',
@@ -199,26 +210,50 @@ export async function POST(
           thinking: isThinkingEnabled ? { type: 'enabled', budget_tokens: 2048 } : undefined,
         });
 
-        fullResponse = aiResponse.content;
-        inputTokens = aiResponse.usage?.inputTokens || 0;
-        outputTokens = aiResponse.usage?.outputTokens || 0;
-        const totalTokens = inputTokens + outputTokens;
-
-        // Stream the response in chunks
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ type: 'streaming' })}\n\n`)
-        );
-
-        // Split response into chunks for streaming effect
-        const chunkSize = 50;
-        for (let i = 0; i < fullResponse.length; i += chunkSize) {
-          const chunk = fullResponse.substring(i, i + chunkSize);
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`)
-          );
-          // Small delay for streaming effect
-          await new Promise(resolve => setTimeout(resolve, 10));
+        for await (const event of stream) {
+          if (event.type === 'thinking') {
+            if (!reasoningStartedAt) reasoningStartedAt = Date.now();
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ type: 'reasoning', content: event.delta })}\n\n`
+              )
+            );
+          } else if (event.type === 'text') {
+            // First answer token: reasoning is finished, so freeze its duration
+            // and flip the client out of the thinking state.
+            if (!hasEmittedStreaming) {
+              if (reasoningStartedAt) {
+                reasoningMs = Date.now() - reasoningStartedAt;
+              }
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: 'streaming', reasoningMs })}\n\n`
+                )
+              );
+              hasEmittedStreaming = true;
+            }
+            fullResponse += event.delta;
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ type: 'chunk', content: event.delta })}\n\n`
+              )
+            );
+          } else if (event.type === 'done') {
+            inputTokens = event.usage.inputTokens;
+            outputTokens = event.usage.outputTokens;
+          }
         }
+
+        // A response consisting only of reasoning would leave the client stuck
+        // in the thinking state, so make sure the transition always happens.
+        if (!hasEmittedStreaming) {
+          if (reasoningStartedAt) reasoningMs = Date.now() - reasoningStartedAt;
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: 'streaming', reasoningMs })}\n\n`)
+          );
+        }
+
+        const totalTokens = inputTokens + outputTokens;
 
         const creditsUsed = aiRouter.estimateCredits(model || 'claude-sonnet-4-5-20250929', totalTokens);
         creditsDeducted = creditsUsed;

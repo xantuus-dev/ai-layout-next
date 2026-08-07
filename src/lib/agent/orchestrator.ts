@@ -30,7 +30,9 @@ const DEFAULT_CONFIG: OrchestratorConfig = {
 export class AgentOrchestratorImpl implements AgentOrchestrator {
   private config: OrchestratorConfig;
   private running = false;
-  private pollTimer: NodeJS.Timeout | null = null;
+  // ReturnType<typeof setInterval> rather than NodeJS.Timeout: this file is
+  // compiled with the DOM lib, where setInterval returns number.
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
   private startTime: Date | null = null;
   private worker: any = null;
 

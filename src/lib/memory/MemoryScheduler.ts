@@ -57,7 +57,9 @@ export class MemoryScheduler {
   private config: Required<SchedulerConfig>;
 
   private tasks: Map<string, ScheduledTask> = new Map();
-  private intervals: Map<string, NodeJS.Timeout> = new Map();
+  // ReturnType<typeof setInterval> rather than NodeJS.Timeout: this file is
+  // compiled with the DOM lib, where setInterval returns number.
+  private intervals: Map<string, ReturnType<typeof setInterval>> = new Map();
   private startTime: Date;
   private enabled: boolean;
 

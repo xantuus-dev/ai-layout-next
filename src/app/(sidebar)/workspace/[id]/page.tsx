@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
-import { Loader2, AlertCircle, CheckCircle, Home, Download, FileText, File, Mail } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle, Home, Download, FileText, File, Mail, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ClaudeChatInput from '@/components/ui/claude-style-chat-input';
 import { InlineQuickActionButtons } from '@/components/workspace/InlineQuickActionButtons';
+import ChatFooterNotice from '@/components/workspace/ChatFooterNotice';
+import ReasoningBlock from '@/components/workspace/ReasoningBlock';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -53,6 +55,10 @@ export default function WorkspacePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  // Extended-thinking output for the in-flight response, shown in its own
+  // collapsible block above the answer.
+  const [reasoningContent, setReasoningContent] = useState('');
+  const [reasoningMs, setReasoningMs] = useState<number | undefined>(undefined);
   const [executionStatus, setExecutionStatus] = useState<
     'idle' | 'thinking' | 'streaming' | 'complete' | 'error'
   >('idle');
@@ -139,6 +145,8 @@ export default function WorkspacePage() {
     setIsStreaming(true);
     setExecutionStatus('thinking');
     setStreamingContent('');
+    setReasoningContent('');
+    setReasoningMs(undefined);
     setIsLoading(false);
 
     try {
@@ -166,30 +174,55 @@ export default function WorkspacePage() {
         throw new Error('No response stream');
       }
 
+      // SSE events are delimited by a blank line but arrive on arbitrary network
+      // chunk boundaries, so incomplete trailing events must be carried over to
+      // the next read. Without this, a split event is dropped or throws in
+      // JSON.parse and kills the stream. The old fake typewriter emitted one
+      // small chunk every 10ms, which hid the problem; real streaming coalesces
+      // deltas and hits it routinely.
+      let buffer = '';
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n\n');
+        // stream: true so a multi-byte UTF-8 character split across chunks is
+        // not mangled.
+        buffer += decoder.decode(value, { stream: true });
 
-        for (const line of lines) {
+        const events = buffer.split('\n\n');
+        // The last element is whatever came after the final delimiter: either
+        // an empty string or a partial event still in flight.
+        buffer = events.pop() ?? '';
+
+        for (const line of events) {
           if (line.startsWith('data: ')) {
             const eventData = JSON.parse(line.substring(6));
 
             if (eventData.type === 'userMessage') {
-              // User message created, refresh messages
-              await fetchWorkspaceData();
+              // Refresh in the background: awaiting here blocks the read loop
+              // for three sequential round trips while the server is already
+              // pushing reasoning and text, which stalls the whole stream and
+              // makes the response look frozen for seconds.
+              void fetchWorkspaceData();
             } else if (eventData.type === 'thinking') {
               setExecutionStatus('thinking');
+            } else if (eventData.type === 'reasoning') {
+              setReasoningContent((prev) => prev + eventData.content);
             } else if (eventData.type === 'streaming') {
               setExecutionStatus('streaming');
+              // Reasoning is finished by the time the first answer token
+              // arrives; freeze its duration so the block can collapse to
+              // "Thought for Ns".
+              if (eventData.reasoningMs) setReasoningMs(eventData.reasoningMs);
             } else if (eventData.type === 'chunk') {
               setStreamingContent((prev) => prev + eventData.content);
             } else if (eventData.type === 'complete') {
               setExecutionStatus('complete');
               setIsStreaming(false);
               setStreamingContent('');
+              setReasoningContent('');
+              setReasoningMs(undefined);
               // Refresh messages to show final saved message
               await fetchWorkspaceData();
             } else if (eventData.type === 'error') {
@@ -208,8 +241,15 @@ export default function WorkspacePage() {
     }
   };
 
-  // Send message function for multi-turn conversations
-  const sendMessage = async (message: string, files?: any[]) => {
+  // Send message function for multi-turn conversations.
+  // `options` carries what the composer knows (thinking toggle, chosen model);
+  // these were previously dropped at the call site, which meant extended
+  // thinking was always off no matter what the composer sent.
+  const sendMessage = async (
+    message: string,
+    files?: any[],
+    options?: { isThinkingEnabled?: boolean; model?: string; pastedContent?: any }
+  ) => {
     if (!conversation || !message.trim()) return;
 
     setInputMessage('');
@@ -220,9 +260,9 @@ export default function WorkspacePage() {
       conversationId: conversation.id,
       message,
       files: files || [],
-      pastedContent: null,
-      model: conversation.model || 'claude-sonnet-4-5-20250929',
-      isThinkingEnabled: false,
+      pastedContent: options?.pastedContent ?? null,
+      model: options?.model || conversation.model || 'claude-sonnet-4-5-20250929',
+      isThinkingEnabled: options?.isThinkingEnabled ?? false,
     });
   };
 
@@ -325,11 +365,12 @@ export default function WorkspacePage() {
               <span>Home</span>
             </button>
             <div className="border-l border-border h-4" />
-            <div className="flex items-center gap-2">
-              <span className="text-xl">{workspace?.icon || '🤖'}</span>
-              <h1 className="text-lg font-bold text-foreground">
-                {workspace?.name || 'Agent Workspace'}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xl flex-shrink-0">{workspace?.icon || '🤖'}</span>
+              <h1 className="text-lg font-bold text-foreground truncate">
+                {conversation?.title || workspace?.name || 'Agent Workspace'}
               </h1>
+              <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             </div>
           </div>
 
@@ -406,25 +447,27 @@ export default function WorkspacePage() {
                 <MessageBubble key={msg.id} message={msg} />
               ))}
 
-              {/* Streaming message */}
-              {isStreaming && streamingContent && (
-                <div className="p-4 rounded-lg bg-card border border-border mr-8 shadow-lg">
-                  <div className="text-xs font-semibold mb-2 text-muted-foreground">
-                    AI Agent (streaming...)
-                  </div>
-                  <div className="prose dark:prose-invert max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
-                  </div>
-                </div>
-              )}
+              {/* In-flight response: reasoning block, then the answer as it
+                  streams. Both live in one bubble so they read as a single
+                  turn rather than two separate messages. */}
+              {isStreaming && (
+                <div className="p-4 rounded-lg bg-card border border-border mr-8 shadow-lg space-y-3">
+                  {(reasoningContent || executionStatus === 'thinking') && (
+                    <ReasoningBlock
+                      content={reasoningContent}
+                      isActive={executionStatus === 'thinking'}
+                      durationMs={reasoningMs}
+                    />
+                  )}
 
-              {/* Thinking indicator */}
-              {executionStatus === 'thinking' && !streamingContent && (
-                <div className="p-4 rounded-lg bg-card border border-border mr-8 shadow-lg">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                    <span>AI is thinking...</span>
-                  </div>
+                  {/* No separate spinner here: ReasoningBlock already renders
+                      an active "Thinking…" row while waiting, so adding one
+                      would show two progress indicators at once. */}
+                  {streamingContent && (
+                    <div className="prose dark:prose-invert max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -447,8 +490,15 @@ export default function WorkspacePage() {
         {conversation && !isStreaming && executionStatus !== 'thinking' && (
           <div className="sticky bottom-0 border-t border-border bg-card/80 backdrop-blur-xl p-4 flex-shrink-0">
             <div className="max-w-4xl mx-auto">
+              <ChatFooterNotice />
               <ClaudeChatInput
-                onSendMessage={(data) => sendMessage(data.message, data.files)}
+                onSendMessage={(data) =>
+                  sendMessage(data.message, data.files, {
+                    isThinkingEnabled: data.isThinkingEnabled,
+                    model: data.model,
+                    pastedContent: data.pastedContent,
+                  })
+                }
                 initialMessage={inputMessage}
                 onMessageChange={setInputMessage}
               />

@@ -28,6 +28,7 @@ import {
   Wand2,
   ChevronDown,
   MessageSquare,
+  SquarePen,
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -81,6 +82,11 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
 
   const handleLogout = () => {
     signOut({ callbackUrl: '/' });
+  };
+
+  const handleNewChat = () => {
+    router.push('/');
+    if (isOpen) setIsOpen(false);
   };
 
   const handleSessionClick = (conv: SessionSummary) => {
@@ -150,9 +156,11 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-800 flex-shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">X</span>
-            </div>
+            <img
+              src="/xantuus-icon-white.png"
+              alt="Xantuus AI"
+              className="w-8 h-8 object-contain flex-shrink-0"
+            />
             {!isCollapsed && (
               <h1 className="text-xl font-bold text-white tracking-wide">
                 Xantuus
@@ -167,6 +175,19 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
+        </div>
+
+        {/* New Chat (always first, always available) */}
+        <div className="px-4 pt-4 flex-shrink-0">
+          <button
+            onClick={handleNewChat}
+            className={`w-full flex items-center space-x-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-white transition-colors duration-200 ${
+              isCollapsed ? 'justify-center px-0 py-2.5' : 'px-4 py-2.5'
+            }`}
+          >
+            <SquarePen size={18} className="text-primary flex-shrink-0" />
+            {!isCollapsed && <span className="text-[15px] font-medium">New chat</span>}
           </button>
         </div>
 
@@ -198,7 +219,7 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
                   }`}
                 />
                 {!isCollapsed && (
-                  <span className="text-sm font-medium transition-colors duration-200">
+                  <span className="text-[15px] font-medium transition-colors duration-200">
                     {item.name}
                   </span>
                 )}
@@ -217,7 +238,7 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
                 className="text-gray-400 group-hover:text-red-400 transition-colors duration-200"
               />
               {!isCollapsed && (
-                <span className="text-sm font-medium transition-colors duration-200">
+                <span className="text-[15px] font-medium transition-colors duration-200">
                   Logout
                 </span>
               )}
@@ -253,7 +274,7 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
                         key={conv.id}
                         onClick={() => handleSessionClick(conv)}
                         title={conv.title}
-                        className={`w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg text-sm truncate transition-colors ${
+                        className={`w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg text-[15px] truncate transition-colors ${
                           isActiveSession
                             ? 'bg-white/10 text-white'
                             : 'text-gray-400 hover:bg-white/5 hover:text-white'

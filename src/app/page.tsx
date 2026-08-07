@@ -113,9 +113,14 @@ export default function Home() {
           <div className="lg:hidden">
             <a href="/" className="flex items-center">
               <img
-                src="/xantuus-logo-light.png"
+                src="/xantuus-logo-dark.png"
                 alt="Xantuus AI"
-                className="h-12 w-auto object-contain"
+                className="h-12 w-auto object-contain dark:hidden"
+              />
+              <img
+                src="/xantuus-logo-white.png"
+                alt="Xantuus AI"
+                className="h-12 w-auto object-contain hidden dark:block"
               />
             </a>
           </div>
