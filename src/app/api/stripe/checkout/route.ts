@@ -4,6 +4,10 @@ import { authOptions } from '@/lib/auth';
 import { stripe, isStripeEnabled } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 
+// Guard against a fat-fingered or hostile seat count turning into a very large
+// charge. Teams above this go through sales.
+const MAX_SEATS_PER_CHECKOUT = 500;
+
 export async function POST(req: NextRequest) {
   try {
     // Initialize Stripe client directly in the handler
@@ -48,11 +52,26 @@ export async function POST(req: NextRequest) {
     console.log('Stripe SDK initialized');
 
     const session = await getServerSession(authOptions);
-    const { priceId, billingCycle, credits } = await req.json();
+    const { priceId, billingCycle, credits, seats } = await req.json();
 
     if (!priceId) {
       return NextResponse.json(
         { error: 'Price ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Seats are the Stripe subscription item quantity: buying 20 licences
+    // means quantity 20 on one subscription, hence one invoice. Absent or
+    // malformed input means a single-seat purchase, preserving the previous
+    // behaviour for every existing caller.
+    const requestedSeats = Number.isFinite(Number(seats))
+      ? Math.max(1, Math.floor(Number(seats)))
+      : 1;
+
+    if (requestedSeats > MAX_SEATS_PER_CHECKOUT) {
+      return NextResponse.json(
+        { error: `Seats must be ${MAX_SEATS_PER_CHECKOUT} or fewer. Contact sales for larger teams.` },
         { status: 400 }
       );
     }
@@ -82,11 +101,15 @@ export async function POST(req: NextRequest) {
             items: [{
               id: subscription.items.data[0].id,
               price: priceId,
+              // Changing seat count is the same operation as changing plan:
+              // update the quantity and let Stripe prorate.
+              quantity: requestedSeats,
             }],
             proration_behavior: 'create_prorations', // Prorate the charges
             metadata: {
               userId: user.id,
               previousPriceId: subscription.items.data[0].price.id,
+              seats: String(requestedSeats),
             },
           });
 
@@ -140,7 +163,7 @@ export async function POST(req: NextRequest) {
         line_items: [
           {
             price: priceId,
-            quantity: 1,
+            quantity: requestedSeats,
           },
         ],
         success_url: `${process.env.NEXTAUTH_URL}/settings/billing?success=true`,
@@ -149,12 +172,14 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           billingCycle: billingCycle || 'monthly',
           credits: credits?.toString() || '0',
+          seats: String(requestedSeats),
         },
         subscription_data: {
           metadata: {
             userId: user.id,
             billingCycle: billingCycle || 'monthly',
             credits: credits?.toString() || '0',
+            seats: String(requestedSeats),
           },
         },
       });
@@ -184,7 +209,7 @@ export async function POST(req: NextRequest) {
       line_items: [
         {
           price: priceId,
-          quantity: 1,
+          quantity: requestedSeats,
         },
       ],
       success_url: `${process.env.NEXTAUTH_URL}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,

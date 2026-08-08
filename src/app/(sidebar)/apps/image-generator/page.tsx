@@ -39,15 +39,6 @@ export default function ImageGeneratorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // Redirect if not authenticated
-  if (status === 'unauthenticated') {
-    redirect('/api/auth/signin');
-  }
-
-  if (status === 'loading') {
-    return null;
-  }
-
   // Fetch images
   const fetchImages = async (offset = 0, append = false) => {
     if (append) {
@@ -82,10 +73,29 @@ export default function ImageGeneratorPage() {
     }
   };
 
-  // Load initial images
+  // Load initial images.
+  //
+  // This hook must stay above the auth early-returns below. When it sat after
+  // them, the `status === 'loading'` return meant React saw a different number
+  // of hooks before and after the session resolved, and threw "Rendered more
+  // hooks than during the previous render". Gate on status inside the effect
+  // instead, so the hook itself always runs.
   useEffect(() => {
+    if (status !== 'authenticated') return;
     fetchImages(0, false);
-  }, []);
+    // fetchImages is redefined every render; depending on it would refetch on
+    // each one. The effect is intentionally keyed only on the session status.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  // Redirect if not authenticated
+  if (status === 'unauthenticated') {
+    redirect('/api/auth/signin');
+  }
+
+  if (status === 'loading') {
+    return null;
+  }
 
   // Handle generate image
   const handleImageGenerated = (image: GeneratedImage) => {

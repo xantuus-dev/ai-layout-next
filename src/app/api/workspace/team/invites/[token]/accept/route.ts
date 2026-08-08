@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { hasSeatAvailable } from '@/lib/organization';
 
 // POST /api/workspace/team/invites/[token]/accept - Accept a pending team
 // invite. The signed-in user's email must match the invite's email.
@@ -48,6 +49,21 @@ export async function POST(
     if (user.billingOwnerId && user.billingOwnerId !== invite.workspace.userId) {
       return NextResponse.json(
         { error: 'You are already on another team. Leave it before accepting a new invite.' },
+        { status: 409 }
+      );
+    }
+
+    // Enforce the purchased seat count. Re-accepting an invite you have already
+    // accepted must not be blocked, since that consumes no additional seat.
+    // Teams predating the Organization model have no seat cap and are admitted
+    // (see canAdmitMember) rather than being locked out retroactively.
+    const alreadyOnTeam = user.billingOwnerId === invite.workspace.userId;
+    if (!alreadyOnTeam && !(await hasSeatAvailable(invite.workspace.userId))) {
+      return NextResponse.json(
+        {
+          error:
+            'This team has no seats left. Ask the team owner to add a seat before accepting.',
+        },
         { status: 409 }
       );
     }

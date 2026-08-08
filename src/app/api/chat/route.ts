@@ -6,6 +6,7 @@ import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAuthenticatedUserId } from '@/lib/api-auth';
 import { aiRouter } from '@/lib/ai-providers';
 import { checkAndResetCredits, hasEnoughCredits, deductCredits, getCreditStatus } from '@/lib/credits';
+import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
 
 export async function POST(request: NextRequest) {
   try {
@@ -162,9 +163,20 @@ export async function POST(request: NextRequest) {
       content: msg.content
     })) : [];
 
+    // Pull anything we already know about this user that bears on the message.
+    // Returns null (never throws) when memory is empty or unavailable.
+    const memoryContext = message
+      ? await getMemoryContext(user.id, message)
+      : null;
+
+    const memoryMessages = memoryContext
+      ? [{ role: 'system' as const, content: memoryContext }]
+      : [];
+
     // Call AI router with content blocks
     const response = await aiRouter.chat(modelId, {
       messages: [
+        ...memoryMessages,
         ...historyMessages,
         {
           role: 'user',
@@ -198,6 +210,25 @@ export async function POST(request: NextRequest) {
         provider: response.provider,
       },
     });
+
+    // Learn durable facts from the exchange. Next 14 has no `after()`, so this
+    // runs inline — hence the cadence check, which keeps most turns free of it.
+    // extractAndStoreFacts swallows its own errors: a memory failure must never
+    // cost the user a reply they have already paid credits for.
+    const totalMessages = historyMessages.length + 2;
+    if (message && shouldExtractFacts(totalMessages)) {
+      await extractAndStoreFacts({
+        userId: user.id,
+        messages: [
+          ...historyMessages.map((msg) => ({
+            role: String(msg.role),
+            content: String(msg.content),
+          })),
+          { role: 'user', content: message },
+          { role: 'assistant', content: response.content },
+        ],
+      });
+    }
 
     const creditStatus = await getCreditStatus(user.id);
 

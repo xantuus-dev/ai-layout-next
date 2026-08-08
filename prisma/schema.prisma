@@ -7,8 +7,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   // Migrations must run over a direct (non-pooled) connection. DATABASE_URL is
   // typically a pgBouncer/pooled URL, which cannot run DDL reliably.
   // .github/workflows/database-migrations.yml already supplies DIRECT_URL.
@@ -88,6 +88,10 @@ model User {
   billingOwner   User?   @relation("TeamBilling", fields: [billingOwnerId], references: [id], onDelete: SetNull)
   teamMembers    User[]  @relation("TeamBilling")
 
+  // Organization profile + seat ledger. Present only on a billing owner —
+  // members reach it through billingOwner.organization.
+  organization Organization? @relation("OrganizationOwner")
+
   // Google Integrations
   googleAccessToken     String?   @db.Text
   googleRefreshToken    String?   @db.Text
@@ -97,11 +101,11 @@ model User {
   googleCalendarEnabled Boolean   @default(false)
 
   // Usage tracking
-  usageRecords  UsageRecord[]
-  apiKeys       ApiKey[]
-  generatedImages GeneratedImage[]
+  usageRecords        UsageRecord[]
+  apiKeys             ApiKey[]
+  generatedImages     GeneratedImage[]
   imageGenerationJobs ImageGenerationJob[]
-  imageShareLinks ImageShareLink[]
+  imageShareLinks     ImageShareLink[]
 
   // Workspace features
   workspaces    Workspace[]
@@ -122,25 +126,25 @@ model User {
   referralReceived Referral?  @relation("Referred")
 
   // Personalization fields
-  nickname          String? // User's preferred nickname (50 char limit)
-  occupation        String? // User's occupation/role (100 char limit)
-  bio               String? @db.Text // User's bio/about (2000 char limit)
+  nickname           String? // User's preferred nickname (50 char limit)
+  occupation         String? // User's occupation/role (100 char limit)
+  bio                String? @db.Text // User's bio/about (2000 char limit)
   customInstructions String? @db.Text // Custom instructions for AI (3000 char limit)
 
   // Memory system relations
-  memoryMeta           UserMemoryMeta?
-  memoryFiles          MemoryFile[]
-  memorySearchLogs     MemorySearchLog[]
-  indexingConfig       UserIndexingConfig?
-  indexedSessions      IndexedSession[]
-  memoryFacts          MemoryFact[]
-  consolidationJobs    ConsolidationJob[]
-  messageImportance    MessageImportance[]
+  memoryMeta        UserMemoryMeta?
+  memoryFiles       MemoryFile[]
+  memorySearchLogs  MemorySearchLog[]
+  indexingConfig    UserIndexingConfig?
+  indexedSessions   IndexedSession[]
+  memoryFacts       MemoryFact[]
+  consolidationJobs ConsolidationJob[]
+  messageImportance MessageImportance[]
 
   // Skill marketplace relations
-  createdSkills        CustomSkill[]      @relation("SkillCreator")
-  skillInstallations   SkillInstallation[]
-  skillReviews         SkillReview[]      @relation("SkillReviews")
+  createdSkills      CustomSkill[]       @relation("SkillCreator")
+  skillInstallations SkillInstallation[]
+  skillReviews       SkillReview[]       @relation("SkillReviews")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -216,12 +220,12 @@ model GeneratedImage {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relations
+  shareLinks ImageShareLink[]
+
   @@index([userId, createdAt])
   @@index([userId])
   @@index([jobId])
-
-  // Relations
-  shareLinks ImageShareLink[]
 }
 
 // Image Templates for quick generation
@@ -232,22 +236,22 @@ model ImageTemplate {
   name        String
   description String?
   category    String // e.g., "pitch-deck", "social-media", "product", "team"
-  prompt      String @db.Text // Template prompt - can have {{variable}} placeholders
+  prompt      String  @db.Text // Template prompt - can have {{variable}} placeholders
 
   // Default settings
   defaultWidth  Int @default(1024)
   defaultHeight Int @default(1024)
 
   // UI
-  icon        String? // Icon name or emoji
-  thumbnail   String? // URL to thumbnail preview
+  icon      String? // Icon name or emoji
+  thumbnail String? // URL to thumbnail preview
 
   // Visibility
-  isPublic    Boolean @default(true)
-  createdBy   String? // Admin/creator ID
+  isPublic  Boolean @default(true)
+  createdBy String? // Admin/creator ID
 
   // Usage tracking
-  usageCount  Int @default(0)
+  usageCount Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -260,7 +264,7 @@ model ImageGenerationJob {
   id String @id @default(cuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Job info
   status String @default("pending") // pending, processing, completed, failed
@@ -273,11 +277,11 @@ model ImageGenerationJob {
 
   // Results
   images           GeneratedImage[] @relation("JobImages")
-  totalCreditsUsed Int @default(0)
+  totalCreditsUsed Int              @default(0)
 
   // Error tracking
   errorMessage String?
-  failedCount  Int @default(0)
+  failedCount  Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -294,17 +298,17 @@ model ImageShareLink {
   image   GeneratedImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Share info
-  shareToken String @unique @default(cuid()) // URL-safe token
+  shareToken String  @unique @default(cuid()) // URL-safe token
   title      String?
   message    String?
 
   // Access control
   expiresAt DateTime? // If null, never expires
-  maxViews  Int?      // If null, unlimited views
-  viewCount Int @default(0)
+  maxViews  Int? // If null, unlimited views
+  viewCount Int       @default(0)
 
   // Permissions
   allowDownload Boolean @default(true)
@@ -433,41 +437,41 @@ model Task {
   agentConfig Json? // Agent-specific configuration
 
   // Execution plan
-  plan         Json?   // Execution plan from planner
-  planTokens   Int     @default(0) // Tokens used for planning
-  planCredits  Int     @default(0) // Credits used for planning
+  plan        Json? // Execution plan from planner
+  planTokens  Int   @default(0) // Tokens used for planning
+  planCredits Int   @default(0) // Credits used for planning
 
   // Execution tracking
-  currentStep    Int       @default(0) // Which step is currently executing
-  totalSteps     Int       @default(0) // Total steps in plan
-  attempts       Int       @default(0)
-  lastRunAt      DateTime?
-  startedAt      DateTime?
-  completedAt    DateTime?
-  failedAt       DateTime?
+  currentStep Int       @default(0) // Which step is currently executing
+  totalSteps  Int       @default(0) // Total steps in plan
+  attempts    Int       @default(0)
+  lastRunAt   DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  failedAt    DateTime?
 
   // Results and state
-  result         Json?     // Final result
-  executionTrace Json?     // Full trace of what agent did
-  error          String?   @db.Text // Error message if failed
+  result         Json? // Final result
+  executionTrace Json? // Full trace of what agent did
+  error          String? @db.Text // Error message if failed
 
   // Resource usage
-  totalTokens    Int       @default(0)
-  totalCredits   Int       @default(0)
-  executionTime  Int       @default(0) // Milliseconds
+  totalTokens   Int @default(0)
+  totalCredits  Int @default(0)
+  executionTime Int @default(0) // Milliseconds
 
   // Scheduling configuration
-  schedule        String?   // Cron expression: "0 9 * * *" for daily 9 AM
+  schedule        String? // Cron expression: "0 9 * * *" for daily 9 AM
   scheduleEnabled Boolean   @default(false) // Is scheduling active?
   nextRunAt       DateTime? // Next scheduled execution time
   timezone        String?   @default("America/New_York") // User's timezone for cron
 
   // Task metadata
-  dueDate     DateTime?
-  tags        String[]
+  dueDate DateTime?
+  tags    String[]
 
   // Relations
-  executions  TaskExecution[]
+  executions TaskExecution[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -670,21 +674,21 @@ model TaskExecution {
   taskId String
   task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  step        Int    // Which step this execution represents
-  action      String // What action was taken (e.g., "browser.navigate")
-  tool        String? // Which tool was used
-  input       Json   // Input to the tool
-  output      Json?  // Output from the tool
-  reasoning   String? @db.Text // Agent's reasoning for this step
+  step      Int // Which step this execution represents
+  action    String // What action was taken (e.g., "browser.navigate")
+  tool      String? // Which tool was used
+  input     Json // Input to the tool
+  output    Json? // Output from the tool
+  reasoning String? @db.Text // Agent's reasoning for this step
 
-  status      String // "running", "completed", "failed"
-  error       String? @db.Text
+  status String // "running", "completed", "failed"
+  error  String? @db.Text
 
-  tokens      Int    @default(0)
-  credits     Int    @default(0)
-  duration    Int    @default(0) // Milliseconds
+  tokens   Int @default(0)
+  credits  Int @default(0)
+  duration Int @default(0) // Milliseconds
 
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
   completedAt DateTime?
 
   @@index([taskId, step])
@@ -723,12 +727,12 @@ model BrowserSession {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Session configuration
-  url         String  @db.Text // Current URL
-  title       String? // Current page title
-  userAgent   String? // Browser user agent
-  viewport    Json?   // { width, height }
-  cookies     Json?   // Saved cookies for session persistence
-  localStorage Json?  // Saved localStorage state
+  url          String  @db.Text // Current URL
+  title        String? // Current page title
+  userAgent    String? // Browser user agent
+  viewport     Json? // { width, height }
+  cookies      Json? // Saved cookies for session persistence
+  localStorage Json? // Saved localStorage state
 
   // Feature flags
   chatEnabled       Boolean @default(false)
@@ -736,8 +740,8 @@ model BrowserSession {
   recordingWorkflow Boolean @default(false)
 
   // Status
-  status     String   @default("active") // active, paused, closed, synced
-  startedAt  DateTime @default(now())
+  status     String    @default("active") // active, paused, closed, synced
+  startedAt  DateTime  @default(now())
   closedAt   DateTime?
   lastSyncAt DateTime? // Last cookie sync from browser extension
 
@@ -762,20 +766,20 @@ model WebpageContext {
   browserSessionId String
   browserSession   BrowserSession @relation(fields: [browserSessionId], references: [id], onDelete: Cascade)
 
-  url          String   @db.Text
-  title        String?
-  extractedAt  DateTime @default(now())
+  url         String   @db.Text
+  title       String?
+  extractedAt DateTime @default(now())
 
   // Content extraction
   mainContent    String? @db.Text // Main article/content from Readability.js
-  structuredData Json?            // Extracted structured data (headings, lists, tables)
-  metadata       Json?            // Meta tags, Open Graph data
-  links          Json?            // All links on page
-  images         Json?            // All images on page
+  structuredData Json? // Extracted structured data (headings, lists, tables)
+  metadata       Json? // Meta tags, Open Graph data
+  links          Json? // All links on page
+  images         Json? // All images on page
 
   // AI optimization
   contentSummary String? @db.Text // AI-generated summary for context window efficiency
-  embeddings     Json?            // Vector embeddings for semantic search (future)
+  embeddings     Json? // Vector embeddings for semantic search (future)
 
   // Cache management
   expiresAt DateTime? // When to refresh this context
@@ -799,8 +803,8 @@ model ChatMessage {
 
   // AI metadata
   model           String? // AI model used for assistant response
-  tokens          Int?    // Token count for this message
-  credits         Int?    // Credits consumed
+  tokens          Int? // Token count for this message
+  credits         Int? // Credits consumed
   thinkingEnabled Boolean @default(false)
 
   // Context reference
@@ -825,17 +829,17 @@ model Workflow {
   // Workflow configuration
   steps          WorkflowStep[]
   schedule       String? // Cron expression for scheduled runs
-  isAIAssisted   Boolean @default(true) // Use AI for error recovery
-  timeoutSeconds Int     @default(300) // 5 minutes default
+  isAIAssisted   Boolean        @default(true) // Use AI for error recovery
+  timeoutSeconds Int            @default(300) // 5 minutes default
 
   // Status
   isActive   Boolean @default(true)
   isTemplate Boolean @default(false) // Public template workflow
 
   // Analytics
-  totalRuns      Int @default(0)
-  successfulRuns Int @default(0)
-  failedRuns     Int @default(0)
+  totalRuns      Int       @default(0)
+  successfulRuns Int       @default(0)
+  failedRuns     Int       @default(0)
   lastRunAt      DateTime?
 
   // Relations
@@ -859,20 +863,20 @@ model WorkflowStep {
 
   // Step configuration
   type   String // "navigate", "click", "type", "extract", "wait", "conditional", "loop"
-  action Json   // Action-specific parameters
+  action Json // Action-specific parameters
 
   // Error handling
-  onError      String @default("stop") // "stop", "continue", "retry", "ai_recovery"
-  maxRetries   Int    @default(3)
-  retryDelay   Int    @default(1000) // Milliseconds
+  onError    String @default("stop") // "stop", "continue", "retry", "ai_recovery"
+  maxRetries Int    @default(3)
+  retryDelay Int    @default(1000) // Milliseconds
 
   // Conditional logic
-  condition   Json?   // Condition to evaluate before executing
+  condition   Json? // Condition to evaluate before executing
   skipIfFalse Boolean @default(false)
 
   // Output
-  saveOutput   Boolean @default(false)
-  outputName   String? // Variable name to save output
+  saveOutput Boolean @default(false)
+  outputName String? // Variable name to save output
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -887,19 +891,19 @@ model WorkflowExecution {
   workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   // Execution metadata
-  status      String   @default("running") // running, completed, failed, cancelled
-  startedAt   DateTime @default(now())
+  status      String    @default("running") // running, completed, failed, cancelled
+  startedAt   DateTime  @default(now())
   completedAt DateTime?
 
   // Results
-  currentStep    Int    @default(0)
+  currentStep    Int     @default(0)
   totalSteps     Int
-  result         Json?  // Final output/result
+  result         Json? // Final output/result
   error          String? @db.Text
-  executionTrace Json?  // Detailed trace of all steps
+  executionTrace Json? // Detailed trace of all steps
 
   // AI interventions
-  aiRecoveries     Int @default(0) // Number of times AI recovered from errors
+  aiRecoveries     Int   @default(0) // Number of times AI recovered from errors
   aiRecoveryDetail Json? // Details of AI interventions
 
   // Resource usage
@@ -924,8 +928,8 @@ model PageMonitor {
   url         String  @db.Text
 
   // Check configuration
-  checkType     String @default("text") // "text", "element", "screenshot", "ai"
-  checkInterval Int    @default(3600) // Seconds between checks (default: 1 hour)
+  checkType     String  @default("text") // "text", "element", "screenshot", "ai"
+  checkInterval Int     @default(3600) // Seconds between checks (default: 1 hour)
   selector      String? // CSS selector to monitor
   aiPrompt      String? @db.Text // AI prompt for intelligent monitoring
 
@@ -941,7 +945,7 @@ model PageMonitor {
   lastHash      String? // Hash of content for change detection
 
   // Analytics
-  totalChecks   Int @default(0)
+  totalChecks     Int @default(0)
   alertsTriggered Int @default(0)
 
   // Relations
@@ -965,15 +969,15 @@ model MonitorAlert {
   triggeredAt DateTime @default(now())
   changeType  String   @default("content_changed") // content_changed, element_appeared, element_disappeared, ai_detected
 
-  oldValue    String? @db.Text
-  newValue    String? @db.Text
+  oldValue String? @db.Text
+  newValue String? @db.Text
 
   // AI analysis
-  aiAnalysis  String? @db.Text // AI-generated explanation of the change
+  aiAnalysis String? @db.Text // AI-generated explanation of the change
 
   // Delivery status
-  delivered Boolean @default(false)
-  deliveredAt DateTime?
+  delivered        Boolean   @default(false)
+  deliveredAt      DateTime?
   deliveryChannels Json? // Which channels were notified
 
   // Screenshot comparison (future feature)
@@ -997,20 +1001,20 @@ model Integration {
   name     String // User-friendly name
 
   // OAuth/API credentials
-  accessToken  String? @db.Text
-  refreshToken String? @db.Text
+  accessToken  String?   @db.Text
+  refreshToken String?   @db.Text
   tokenExpiry  DateTime?
-  apiKey       String? @db.Text // For API key-based integrations
-  webhookUrl   String? @db.Text
+  apiKey       String?   @db.Text // For API key-based integrations
+  webhookUrl   String?   @db.Text
 
   // Configuration
   config Json? // Provider-specific configuration
   scopes String[] // Granted scopes/permissions
 
   // Status
-  isActive      Boolean @default(true)
-  lastUsedAt    DateTime?
-  lastSyncAt    DateTime?
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  lastSyncAt DateTime?
 
   // Relations
   customTools CustomTool[]
@@ -1063,11 +1067,11 @@ model UserMemoryMeta {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  totalFiles       Int      @default(0)
-  totalChunks      Int      @default(0)
-  lastIndexed      DateTime?
-  embeddingModel   String   @default("text-embedding-3-small")
-  embeddingDimensions Int   @default(1536)
+  totalFiles          Int       @default(0)
+  totalChunks         Int       @default(0)
+  lastIndexed         DateTime?
+  embeddingModel      String    @default("text-embedding-3-small")
+  embeddingDimensions Int       @default(1536)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1081,12 +1085,12 @@ model MemoryFile {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  filePath      String
-  source        String @default("memory") // memory, conversation, agent_log, daily_log
-  chunkCount    Int    @default(0)
-  lastIndexed   DateTime @default(now())
-  fileHash      String? // For detecting changes
-  contentPreview String? @db.Text // First 500 chars
+  filePath       String
+  source         String   @default("memory") // memory, conversation, agent_log, daily_log
+  chunkCount     Int      @default(0)
+  lastIndexed    DateTime @default(now())
+  fileHash       String? // For detecting changes
+  contentPreview String?  @db.Text // First 500 chars
 
   // Relations
   chunks MemoryChunk[]
@@ -1104,7 +1108,7 @@ model MemoryFile {
 
 // MemoryChunk - Text chunks with embeddings
 model MemoryChunk {
-  id     String @id @default(cuid())
+  id     String     @id @default(cuid())
   fileId String
   file   MemoryFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
@@ -1122,7 +1126,7 @@ model MemoryChunk {
   searchVector String? @db.Text // Full-text search (tsvector equivalent)
 
   // Access tracking
-  accessCount  Int      @default(0)
+  accessCount  Int       @default(0)
   lastAccessed DateTime?
 
   createdAt DateTime @default(now())
@@ -1136,8 +1140,8 @@ model MemoryChunk {
 model EmbeddingCache {
   id String @id @default(cuid())
 
-  contentHash String  @unique // SHA-256 hash of content
-  content     String  @db.Text
+  contentHash String @unique // SHA-256 hash of content
+  content     String @db.Text
   model       String // Embedding model used
   embedding   Json // Embedding vector as JSON array
 
@@ -1157,12 +1161,12 @@ model MemorySearchLog {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  query        String @db.Text
-  resultCount  Int    @default(0)
-  vectorScore  Float?
-  textScore    Float?
-  finalScore   Float?
-  latency      Int    @default(0) // Milliseconds
+  query       String @db.Text
+  resultCount Int    @default(0)
+  vectorScore Float?
+  textScore   Float?
+  finalScore  Float?
+  latency     Int    @default(0) // Milliseconds
 
   createdAt DateTime @default(now())
 
@@ -1179,12 +1183,12 @@ model UserIndexingConfig {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  autoIndexEnabled             Boolean  @default(true)
-  minMessagesToIndex           Int      @default(5)
-  indexOnSessionEnd            Boolean  @default(true)
-  consolidateOnIndex           Boolean  @default(true)
-  consolidationIntervalHours   Int      @default(6)
-  lastConsolidationAt          DateTime?
+  autoIndexEnabled           Boolean   @default(true)
+  minMessagesToIndex         Int       @default(5)
+  indexOnSessionEnd          Boolean   @default(true)
+  consolidateOnIndex         Boolean   @default(true)
+  consolidationIntervalHours Int       @default(6)
+  lastConsolidationAt        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1194,18 +1198,18 @@ model UserIndexingConfig {
 
 // IndexedSession - Track indexed conversation sessions
 model IndexedSession {
-  id        String @id @default(cuid())
-  userId    String
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   sessionId           String
   fileId              String? // Reference to MemoryFile
-  messageCount        Int     @default(0)
-  consolidationStatus String  @default("pending") // pending, processing, completed, failed
-  factsExtracted      Int     @default(0)
-  indexedAt           DateTime @default(now())
+  messageCount        Int       @default(0)
+  consolidationStatus String    @default("pending") // pending, processing, completed, failed
+  factsExtracted      Int       @default(0)
+  indexedAt           DateTime  @default(now())
   consolidatedAt      DateTime?
-  error               String?  @db.Text
+  error               String?   @db.Text
 
   metadata Json? // Session metadata
 
@@ -1224,7 +1228,7 @@ model MemoryFact {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   factType       String // preference, fact, decision, context, goal, skill
-  content        String @db.Text
+  content        String   @db.Text
   sourceFileId   String? // Reference to MemoryFile
   sourceChunkIds String[] // Array of chunk IDs
 
@@ -1236,8 +1240,8 @@ model MemoryFact {
   importanceScore Float @default(0.5)
 
   // Lifecycle
-  lastAccessed DateTime @default(now())
-  accessCount  Int      @default(0)
+  lastAccessed DateTime  @default(now())
+  accessCount  Int       @default(0)
   expiresAt    DateTime? // Optional expiration
 
   metadata Json? // Additional fact metadata
@@ -1260,11 +1264,11 @@ model ConsolidationJob {
   status  String @default("pending") // pending, running, completed, failed
 
   // Progress
-  factsExtracted   Int @default(0)
-  factsStored      Int @default(0)
-  factsMerged      Int @default(0)
-  chunksProcessed  Int @default(0)
-  totalChunks      Int @default(0)
+  factsExtracted  Int @default(0)
+  factsStored     Int @default(0)
+  factsMerged     Int @default(0)
+  chunksProcessed Int @default(0)
+  totalChunks     Int @default(0)
 
   // Timing
   startedAt   DateTime?
@@ -1289,11 +1293,11 @@ model MessageImportance {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  chunkId          String
-  importanceScore  Float
-  recencyFactor    Float
-  accessFactor     Float
-  calculatedAt     DateTime @default(now())
+  chunkId         String
+  importanceScore Float
+  recencyFactor   Float
+  accessFactor    Float
+  calculatedAt    DateTime @default(now())
 
   @@unique([userId, chunkId])
   @@index([userId, importanceScore])
@@ -1311,7 +1315,7 @@ model CustomSkill {
 
   // Skill identity
   name        String
-  description String @db.Text
+  description String   @db.Text
   category    String // productivity, data, communication, integration, entertainment
   icon        String? // Icon identifier or emoji
   tags        String[] @default([]) // Tags for filtering and search
@@ -1336,15 +1340,15 @@ model CustomSkill {
   reviewCount Int   @default(0)
 
   // Versioning
-  version   String   @default("1.0.0")
-  changelog Json     @default("[]") // Array of version changes
+  version   String @default("1.0.0")
+  changelog Json   @default("[]") // Array of version changes
 
   // Marketplace status
   status   String  @default("draft") // draft, pending_review, approved, rejected, archived
   featured Boolean @default(false)
 
   // Review feedback (if rejected)
-  reviewFeedback String? @db.Text
+  reviewFeedback String?   @db.Text
   reviewedAt     DateTime?
   reviewedBy     String? // Admin user ID
 
@@ -1353,9 +1357,9 @@ model CustomSkill {
   reviews       SkillReview[]
 
   // Analytics
-  totalRevenue    Int @default(0) // USD cents
-  monthlyRevenue  Int @default(0) // USD cents
-  totalExecutions Int @default(0)
+  totalRevenue    Int       @default(0) // USD cents
+  monthlyRevenue  Int       @default(0) // USD cents
+  totalExecutions Int       @default(0)
   lastUsedAt      DateTime?
 
   createdAt DateTime @default(now())
@@ -1376,13 +1380,13 @@ model SkillInstallation {
   skill   CustomSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   // Purchase info
-  purchaseType String  @default("free") // free, one-time, subscription
-  amountPaid   Int     @default(0) // USD cents
+  purchaseType  String  @default("free") // free, one-time, subscription
+  amountPaid    Int     @default(0) // USD cents
   transactionId String? // Stripe payment intent ID
 
   // Subscription info (if applicable)
-  subscriptionId       String? // Stripe subscription ID
-  subscriptionStatus   String? // active, cancelled, expired
+  subscriptionId        String? // Stripe subscription ID
+  subscriptionStatus    String? // active, cancelled, expired
   subscriptionPeriodEnd DateTime?
 
   // Usage tracking
@@ -1390,8 +1394,8 @@ model SkillInstallation {
   lastUsedAt     DateTime?
 
   // Installation status
-  isActive   Boolean @default(true)
-  installedAt DateTime @default(now())
+  isActive    Boolean   @default(true)
+  installedAt DateTime  @default(now())
   removedAt   DateTime?
 
   createdAt DateTime @default(now())
@@ -1410,12 +1414,12 @@ model SkillReview {
   skillId String
   skill   CustomSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
-  rating  Float  // 1-5 stars
+  rating  Float // 1-5 stars
   title   String?
   comment String? @db.Text
 
   // Creator response
-  response    String? @db.Text
+  response    String?   @db.Text
   respondedAt DateTime?
 
   // Helpful votes
@@ -1443,15 +1447,15 @@ model IndustryTemplate {
 
   // Template identity
   name        String
-  description String @db.Text
+  description String  @db.Text
   industry    String // ecommerce, content-creation, real-estate, recruiting, finance, etc
   icon        String? // Icon identifier or emoji
   color       String? // Hex color
 
   // Agent configuration
-  agentType      String  @default("custom") // Which agent type to use
-  systemPrompt   String  @db.Text // Pre-configured system prompt
-  suggestedModel String  @default("claude-sonnet-4-5-20250929") // Recommended model
+  agentType      String @default("custom") // Which agent type to use
+  systemPrompt   String @db.Text // Pre-configured system prompt
+  suggestedModel String @default("claude-sonnet-4-5-20250929") // Recommended model
 
   // Required capabilities
   requiredTools        String[] // Tools needed (browser, email, etc)
@@ -1471,9 +1475,9 @@ model IndustryTemplate {
   defaultConfig Json @default("{}") // Default agent config
 
   // Marketplace
-  tier       String  @default("free") // free, core, ultra - which tier can access
-  featured   Boolean @default(false)
-  order      Int     @default(0) // Display order
+  tier     String  @default("free") // free, core, ultra - which tier can access
+  featured Boolean @default(false)
+  order    Int     @default(0) // Display order
 
   // Analytics
   installCount Int       @default(0)
@@ -1529,8 +1533,8 @@ model AgentTeam {
   color       String? // Hex color
 
   // Team configuration
-  teamType     String @default("sequential") // sequential, parallel, hierarchical
-  maxAgents    Int    @default(5) // Max agents in team
+  teamType     String  @default("sequential") // sequential, parallel, hierarchical
+  maxAgents    Int     @default(5) // Max agents in team
   sharedMemory Boolean @default(true) // Share context between agents
 
   // Orchestration settings
@@ -1542,10 +1546,10 @@ model AgentTeam {
   collaborations AgentCollaboration[]
 
   // Analytics
-  totalTasks     Int       @default(0)
-  successfulTasks Int      @default(0)
-  failedTasks    Int       @default(0)
-  lastUsedAt     DateTime?
+  totalTasks      Int       @default(0)
+  successfulTasks Int       @default(0)
+  failedTasks     Int       @default(0)
+  lastUsedAt      DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1565,10 +1569,10 @@ model TeamAgent {
   description String? @db.Text
 
   // Agent configuration
-  agentType      String // research, writer, data, communication, browser
-  systemPrompt   String @db.Text
-  model          String @default("claude-sonnet-4-5-20250929")
-  tools          String[] // Available tools for this agent
+  agentType    String // research, writer, data, communication, browser
+  systemPrompt String   @db.Text
+  model        String   @default("claude-sonnet-4-5-20250929")
+  tools        String[] // Available tools for this agent
 
   // Team position
   isLeader Boolean @default(false)
@@ -1597,7 +1601,7 @@ model AgentCollaboration {
   team   AgentTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   // Task context
-  taskId      String // Reference to parent Task
+  taskId       String // Reference to parent Task
   parentTaskId String? // If this is a subtask
 
   // Agent communication
@@ -1605,17 +1609,17 @@ model AgentCollaboration {
   toAgentId   String // Receiving agent
 
   // Communication details
-  type        String // delegation, request_help, share_context, report_result
-  message     String @db.Text
-  context     Json? // Shared context data
+  type    String // delegation, request_help, share_context, report_result
+  message String @db.Text
+  context Json? // Shared context data
 
   // Status
-  status      String   @default("pending") // pending, in_progress, completed, failed
-  response    String?  @db.Text
-  result      Json?
+  status   String  @default("pending") // pending, in_progress, completed, failed
+  response String? @db.Text
+  result   Json?
 
   // Timing
-  sentAt      DateTime @default(now())
+  sentAt      DateTime  @default(now())
   respondedAt DateTime?
 
   createdAt DateTime @default(now())
@@ -1623,4 +1627,30 @@ model AgentCollaboration {
   @@index([teamId, taskId])
   @@index([taskId, status])
   @@index([fromAgentId, toAgentId])
+}
+
+// Organization - Billing identity and seat ledger for a team.
+//
+// Deliberately NOT a second tenancy root. Team membership and credit pooling
+// already run through User.billingOwnerId, and duplicating that would create
+// two sources of truth. This model adds only what owner-pooled billing was
+// missing: who the invoice is addressed to, and how many people it covers.
+//
+// One row per billing owner. Members resolve to it via billingOwner.
+model Organization {
+  id      String @id @default(cuid())
+  ownerId String @unique
+  owner   User   @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Invoice identity — distinct from the owner's personal account details.
+  name         String
+  billingEmail String?
+  taxId        String? // VAT / ABN / EIN, printed on the invoice
+
+  // Seats purchased. Mirrors the Stripe subscription item quantity and is the
+  // cap enforced when admitting members. 1 = the owner alone.
+  seats Int @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

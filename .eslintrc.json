@@ -1,0 +1,22 @@
+{
+  "extends": "next/core-web-vitals",
+  "ignorePatterns": [
+    ".next/**",
+    "out/**",
+    "build/**",
+    "coverage/**",
+    "next-env.d.ts",
+    "browser-extension/**",
+    "prisma/migrations/**"
+  ],
+  "rules": {
+    // Off by choice, not by accident. This flags literal ' and " in JSX text,
+    // which render correctly; it exists to avoid ambiguity with mismatched
+    // quotes. It accounted for 45 of 46 errors here, which is enough noise to
+    // make a lint gate worthless. Re-enable if you would rather escape them.
+    "react/no-unescaped-entities": "off",
+
+    // A conditional hook is a crash, not a style issue — keep it fatal.
+    "react-hooks/rules-of-hooks": "error"
+  }
+}

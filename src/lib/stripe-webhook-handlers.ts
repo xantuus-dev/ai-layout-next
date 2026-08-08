@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
 import { PLANS, getPlanByPriceId } from '@/lib/stripe';
 import { getPriceTierByPriceId, getBillingCycleFromPriceId } from '@/lib/pricing-config';
+import { syncSeatsFromSubscription } from '@/lib/organization';
 
 /**
  * Grant a one-time credit pack purchase to a user.
@@ -63,6 +64,22 @@ export async function updateUserSubscription(
   }
 
   const priceId = subscription.items.data[0].price.id;
+
+  // Mirror the seat count Stripe is actually billing for. Done before the
+  // plan branches below so it applies to both custom tiers and standard plans.
+  // Stripe is authoritative here: it is what the customer pays for, so a local
+  // seat count that disagrees is always the one that is wrong.
+  //
+  // Failure must not abort the handler — seats are metadata, whereas the plan
+  // and credit updates below are the customer's actual entitlement.
+  try {
+    await syncSeatsFromSubscription({
+      ownerId: userId,
+      quantity: subscription.items.data[0].quantity ?? 1,
+    });
+  } catch (error) {
+    console.error(`Failed to sync seats for user ${userId}:`, error);
+  }
 
   // First check if this is a custom pricing tier
   const priceTier = getPriceTierByPriceId(priceId);

@@ -22,7 +22,7 @@
     "dev": "next dev -p 3010",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint . --ext .js,.jsx,.mjs,.ts,.tsx",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
