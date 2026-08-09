@@ -329,7 +329,11 @@ export default function WorkspacePage() {
           {message.model && ` (${message.model})`}
         </div>
       )}
-      <div className="prose dark:prose-invert max-w-none">
+      {/* min-w-0 lets this shrink inside its flex/grid parent; without it a
+          wide <pre> forces the whole column wider instead of scrolling.
+          prose-pre:overflow-x-auto keeps ASCII diagrams and long code lines
+          scrolling within the message, and break-words catches unbroken URLs. */}
+      <div className="prose dark:prose-invert max-w-none min-w-0 break-words prose-pre:overflow-x-auto prose-pre:max-w-full prose-table:block prose-table:overflow-x-auto">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
       </div>
       {message.tokens && (
@@ -478,7 +482,7 @@ export default function WorkspacePage() {
                       an active "Thinking…" row while waiting, so adding one
                       would show two progress indicators at once. */}
                   {streamingContent && (
-                    <div className="prose dark:prose-invert max-w-none">
+                    <div className="prose dark:prose-invert max-w-none min-w-0 break-words prose-pre:overflow-x-auto prose-pre:max-w-full prose-table:block prose-table:overflow-x-auto">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
                     </div>
                   )}

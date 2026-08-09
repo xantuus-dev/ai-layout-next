@@ -6,6 +6,7 @@ import { aiRouter } from '@/lib/ai-providers';
 import { verifyWorkspaceAccess } from '@/lib/workspace-utils';
 import { checkAndResetCredits, hasEnoughCredits, resolveBillingUserId } from '@/lib/credits';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai-providers/catalog';
+import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
 
 export async function POST(
   request: NextRequest,
@@ -200,8 +201,15 @@ export async function POST(
         let reasoningMs = 0;
         let hasEmittedStreaming = false;
 
+        // Pull what we already know about this user. Returns null (never
+        // throws) when memory is empty or unavailable, so chat is unaffected.
+        const memoryContext = await getMemoryContext(user.id, message);
+
         const stream = aiRouter.chatStream(model || DEFAULT_ANTHROPIC_MODEL, {
           messages: [
+            ...(memoryContext
+              ? [{ role: 'system' as const, content: memoryContext }]
+              : []),
             {
               role: 'user',
               content,
@@ -333,6 +341,33 @@ export async function POST(
             },
           });
         });
+
+        // 8b. Learn durable facts from the exchange.
+        //
+        // Cadence is driven by the real message count in the database, not by
+        // anything the client sends — this endpoint receives no history, so a
+        // client-derived count would never advance and extraction would never
+        // fire. extractAndStoreFacts swallows its own errors, and this runs
+        // after the reply has already been streamed to the user.
+        try {
+          const messageCount = await prisma.message.count({ where: { conversationId } });
+
+          if (shouldExtractFacts(messageCount)) {
+            const recent = await prisma.message.findMany({
+              where: { conversationId },
+              orderBy: { createdAt: 'desc' },
+              take: 10,
+              select: { role: true, content: true },
+            });
+
+            await extractAndStoreFacts({
+              userId: user.id,
+              messages: recent.reverse().map((m) => ({ role: m.role, content: m.content })),
+            });
+          }
+        } catch (memoryError) {
+          console.error('[Memory] Post-response extraction failed:', memoryError);
+        }
 
         // 9. Send completion
         const creditsRemaining = updatedUser

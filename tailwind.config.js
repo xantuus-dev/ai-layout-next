@@ -59,5 +59,8 @@ module.exports = {
   		}
   	}
   },
-  plugins: [require("tailwindcss-animate")],
+  // @tailwindcss/typography backs the `prose` classes used by the chat
+  // markdown output, the reasoning block, and the privacy/terms pages. Without
+  // it those classes are inert and markdown renders as unstyled text.
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
 }
