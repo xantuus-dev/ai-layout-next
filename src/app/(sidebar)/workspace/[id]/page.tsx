@@ -307,18 +307,28 @@ export default function WorkspacePage() {
   };
 
   // Render message component
+  //
+  // The assistant reply sits directly on the page background with no card,
+  // border or shadow, so long answers read as a document rather than as a
+  // boxed-in panel. Only the user's own turn keeps a container, as a compact
+  // neutral bubble on the right — the same shape ChatGPT, Claude and Gemini use.
   const MessageBubble = ({ message }: { message: Message }) => (
     <div
-      className={`p-4 rounded-lg ${
+      className={
         message.role === 'user'
-          ? 'bg-primary/10 border border-primary/30 ml-8 shadow-md'
-          : 'bg-card border border-border mr-8 shadow-lg'
-      }`}
+          ? 'ml-auto w-fit max-w-[85%] rounded-2xl bg-muted px-4 py-3'
+          : 'w-full py-2'
+      }
     >
-      <div className="text-xs font-semibold mb-2 text-muted-foreground">
-        {message.role === 'user' ? 'You' : 'AI Agent'}
-        {message.model && ` (${message.model})`}
-      </div>
+      {/* A right-aligned bubble already reads as "you", and the model that
+          answered is not a property of what the user typed. Label the
+          assistant turn only, so the user's bubble can stay compact. */}
+      {message.role === 'assistant' && (
+        <div className="text-xs font-semibold mb-2 text-muted-foreground">
+          AI Agent
+          {message.model && ` (${message.model})`}
+        </div>
+      )}
       <div className="prose dark:prose-invert max-w-none">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
       </div>
@@ -452,7 +462,10 @@ export default function WorkspacePage() {
                   streams. Both live in one bubble so they read as a single
                   turn rather than two separate messages. */}
               {isStreaming && (
-                <div className="p-4 rounded-lg bg-card border border-border mr-8 shadow-lg space-y-3">
+                // Matches the finalized assistant turn above: plain on the page
+                // background. If this kept a card, the answer would visibly jump
+                // out of a box the moment streaming finished.
+                <div className="w-full py-2 space-y-3">
                   {(reasoningContent || executionStatus === 'thinking') && (
                     <ReasoningBlock
                       content={reasoningContent}
