@@ -114,10 +114,28 @@ export default function LandingPage() {
       {/* Nav */}
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src="/xantuus-icon-dark.png" alt="Xantuus AI" className="w-8 h-8 object-contain dark:hidden" />
-            <img src="/xantuus-icon-white.png" alt="Xantuus AI" className="w-8 h-8 object-contain hidden dark:block" />
-            <span className="text-lg font-bold text-foreground">Xantuus</span>
+          {/* The real wordmark lockup, not the bare X mark plus typed text.
+              The icon is 417x570 — at w-8 it is a 32px glyph, which is what made
+              the brand look undersized on a phone.
+
+              Sized by WIDTH: the wordmark is 2255x685 (aspect 3.29), so a height
+              constraint under-renders the type. 132px is ~40px tall on a phone
+              and leaves room for the theme toggle and sign-in button on a 390px
+              viewport; 168px from md up, where the nav appears alongside.
+
+              No adjacent <span> — the asset already contains "XANTUUS AI", so
+              text next to it would duplicate the brand. */}
+          <div className="flex items-center min-w-0">
+            <img
+              src="/xantuus-wordmark-dark.png"
+              alt="Xantuus AI"
+              className="w-[132px] md:w-[168px] max-w-full h-auto object-contain object-left dark:hidden"
+            />
+            <img
+              src="/xantuus-wordmark-white.png"
+              alt="Xantuus AI"
+              className="w-[132px] md:w-[168px] max-w-full h-auto object-contain object-left hidden dark:block"
+            />
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
@@ -294,10 +312,19 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-border">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <img src="/xantuus-icon-dark.png" alt="Xantuus AI" className="w-6 h-6 object-contain dark:hidden" />
-            <img src="/xantuus-icon-white.png" alt="Xantuus AI" className="w-6 h-6 object-contain hidden dark:block" />
-            <span className="text-sm font-semibold text-foreground">Xantuus</span>
+          {/* Same wordmark as the header, one step smaller — the footer is
+              secondary, but it should still be the brand rather than a 24px glyph. */}
+          <div className="flex items-center min-w-0">
+            <img
+              src="/xantuus-wordmark-dark.png"
+              alt="Xantuus AI"
+              className="w-[112px] max-w-full h-auto object-contain object-left dark:hidden"
+            />
+            <img
+              src="/xantuus-wordmark-white.png"
+              alt="Xantuus AI"
+              className="w-[112px] max-w-full h-auto object-contain object-left hidden dark:block"
+            />
           </div>
           <nav className="flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
