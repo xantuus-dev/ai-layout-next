@@ -33,3 +33,10 @@ Thumbs.db
 *.tmp
 *.temp
 /tmp/
+# Never ship local env files: Vercel injects environment variables itself,
+# and an uploaded .env.production overrides them at runtime with whatever is
+# on the developer's disk — which is how a rotated-away database password
+# reached production. These files also carry API keys and secrets.
+.env
+.env.*
+!.env.example
