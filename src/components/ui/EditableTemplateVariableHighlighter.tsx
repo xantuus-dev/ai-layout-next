@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
+import { VARIABLE_PATTERN } from '@/lib/templates/variables';
 
 interface TemplateVariable {
   name: string;
@@ -14,143 +15,118 @@ interface EditableTemplateVariableHighlighterProps {
   text: string;
   variables?: TemplateVariable[];
   className?: string;
-  onTextChange?: (newText: string) => void;
   variableValues?: Record<string, string>;
   onVariableChange?: (variableName: string, value: string) => void;
 }
 
+/** Roughly the width of one monospace character at text-xs, in px. */
+const CHAR_PX = 7;
+const MIN_FIELD_PX = 72;
+const MAX_FIELD_PX = 420;
+
+function fieldWidth(content: string, placeholder: string): number {
+  const basis = content.length > 0 ? content : placeholder;
+  return Math.min(MAX_FIELD_PX, Math.max(MIN_FIELD_PX, basis.length * CHAR_PX + 20));
+}
+
 /**
- * Component that highlights {{variable}} patterns in template text
- * with editable inline inputs that maintain the same styling
+ * Renders template text with each {{variable}} replaced by an inline field.
+ *
+ * The fields are always real inputs. A previous version rendered a button and
+ * swapped it for an input on click, which meant the element under the caret was
+ * replaced mid-interaction — a reliable way to lose focus. It also mirrored
+ * every keystroke into a second editor, which stole the caret outright after
+ * one character. Both are gone: this is the only editing surface, and it is
+ * fully controlled by the parent.
  */
 export function EditableTemplateVariableHighlighter({
   text,
   variables = [],
   className = '',
-  onTextChange,
   variableValues = {},
   onVariableChange,
 }: EditableTemplateVariableHighlighterProps) {
-  const [values, setValues] = useState<Record<string, string>>(variableValues);
-  const [editingVar, setEditingVar] = useState<string | null>(null);
-  const inputRefs = useRef<Record<string, HTMLInputElement>>({});
-
-  useEffect(() => {
-    setValues(variableValues);
-  }, [variableValues]);
-
-  const handleVariableChange = (variableName: string, value: string) => {
-    const newValues = { ...values, [variableName]: value };
-    setValues(newValues);
-    onVariableChange?.(variableName, value);
-
-    // Update the text with the new value
-    if (onTextChange) {
-      const regex = new RegExp(`\\{\\{${variableName}\\}\\}`, 'g');
-      const newText = text.replace(regex, value || `{{${variableName}}}`);
-      onTextChange(newText);
-    }
-  };
-
-  const handleVariableClick = (variableName: string) => {
-    setEditingVar(variableName);
-    setTimeout(() => {
-      inputRefs.current[variableName]?.focus();
-      inputRefs.current[variableName]?.select();
-    }, 0);
-  };
-
-  const handleBlur = () => {
-    setEditingVar(null);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent, variableName: string) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      setEditingVar(null);
-    } else if (e.key === 'Escape') {
-      setEditingVar(null);
-    }
-  };
-
-  const parts: JSX.Element[] = [];
+  const parts: React.ReactNode[] = [];
   let lastIndex = 0;
+  let occurrence = 0;
 
-  // Match {{variable}} patterns
-  const regex = /\{\{(\w+)\}\}/g;
-  let match;
-  let matchIndex = 0;
+  // matchAll avoids the shared-lastIndex hazard of reusing a /g regex object
+  // across renders.
+  for (const match of text.matchAll(VARIABLE_PATTERN)) {
+    const index = match.index ?? 0;
 
-  while ((match = regex.exec(text)) !== null) {
-    // Add text before the variable
-    if (match.index > lastIndex) {
+    if (index > lastIndex) {
       parts.push(
-        <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-          {text.substring(lastIndex, match.index)}
+        <span key={`t-${lastIndex}`} className="whitespace-pre-wrap">
+          {text.slice(lastIndex, index)}
         </span>
       );
     }
 
-    // Add the editable variable
-    const variableName = match[1];
-    const variable = variables.find((v) => v.name === variableName);
-    const displayName = variable?.label || variableName;
-    const value = values[variableName] || '';
-    const placeholder = variable?.placeholder || displayName;
-    const isEditing = editingVar === variableName;
+    const name = match[1];
+    const variable = variables.find((v) => v.name === name);
+    const label = variable?.label || name;
+    const placeholder = variable?.placeholder || label;
+    const value = variableValues[name] ?? '';
+    const isFilled = value.trim().length > 0;
 
-    parts.push(
-      <span
-        key={`var-${match.index}-${matchIndex}`}
-        className="inline-flex items-center relative mx-0.5"
-      >
-        {isEditing ? (
-          <input
-            ref={(el) => {
-              if (el) inputRefs.current[variableName] = el;
-            }}
-            type="text"
-            value={value}
-            placeholder={placeholder}
-            onChange={(e) => handleVariableChange(variableName, e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={(e) => handleKeyDown(e, variableName)}
-            className="px-1.5 py-0.5 rounded border border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 font-mono text-xs h-[22.5px] min-w-[60px] transition-all duration-200 outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500"
-            style={{
-              color: 'rgb(37, 99, 235)',
-              width: `${Math.max(60, (value || placeholder).length * 7 + 16)}px`,
-            }}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => handleVariableClick(variableName)}
-            className="px-1.5 py-0.5 rounded border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 font-mono text-xs h-[22.5px] min-w-0 transition-all duration-200 overflow-y-hidden hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 cursor-text"
-            style={{
-              color: 'rgb(37, 99, 235)',
-            }}
-          >
-            {value || displayName}
-          </button>
-        )}
-      </span>
-    );
+    // A repeated variable renders more than one field bound to the same value,
+    // so typing in either keeps them in step.
+    const key = `v-${name}-${occurrence}`;
 
-    lastIndex = regex.lastIndex;
-    matchIndex++;
+    const shared =
+      'inline-block align-baseline rounded-md border px-2 py-0.5 font-mono text-xs ' +
+      'outline-none transition-colors focus:ring-2 focus:ring-blue-400/60 ' +
+      (isFilled
+        ? 'border-blue-400/70 bg-blue-500/10 text-blue-700 dark:border-blue-500/60 dark:bg-blue-400/10 dark:text-blue-200'
+        : 'border-dashed border-blue-400/60 bg-blue-500/5 text-blue-600 dark:border-blue-500/50 dark:text-blue-300');
+
+    if (variable?.type === 'select' && variable.options?.length) {
+      parts.push(
+        <select
+          key={key}
+          aria-label={label}
+          value={value}
+          onChange={(e) => onVariableChange?.(name, e.target.value)}
+          className={`${shared} cursor-pointer`}
+        >
+          <option value="">{placeholder}</option>
+          {variable.options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      );
+    } else {
+      parts.push(
+        <input
+          key={key}
+          type={variable?.type === 'number' ? 'number' : 'text'}
+          aria-label={label}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onVariableChange?.(name, e.target.value)}
+          className={`${shared} placeholder:text-blue-500/50 dark:placeholder:text-blue-300/40`}
+          style={{ width: fieldWidth(value, placeholder) }}
+        />
+      );
+    }
+
+    lastIndex = index + match[0].length;
+    occurrence++;
   }
 
-  // Add remaining text
   if (lastIndex < text.length) {
     parts.push(
-      <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-        {text.substring(lastIndex)}
+      <span key={`t-${lastIndex}`} className="whitespace-pre-wrap">
+        {text.slice(lastIndex)}
       </span>
     );
   }
 
   return (
-    <div className={`whitespace-pre-wrap break-words ${className}`}>
+    <div className={`whitespace-pre-wrap break-words leading-7 ${className}`}>
       {parts.length > 0 ? parts : <span>{text}</span>}
     </div>
   );

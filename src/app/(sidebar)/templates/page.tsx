@@ -6,9 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Search, Sparkles, TrendingUp, Loader2, X } from 'lucide-react';
-import ClaudeChatInput from '@/components/ui/claude-style-chat-input';
 import { TemplateVariableHighlighter } from '@/components/ui/TemplateVariableHighlighter';
 import { EditableTemplateVariableHighlighter } from '@/components/ui/EditableTemplateVariableHighlighter';
+import { ANTHROPIC_MODELS, DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai-providers/catalog';
+import {
+  countFilledVariables,
+  fillTemplate,
+  tidyFilledPrompt,
+} from '@/lib/templates/variables';
 
 interface TemplateVariable {
   name: string;
@@ -52,9 +57,9 @@ export default function TemplatesGalleryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [templatePrompt, setTemplatePrompt] = useState<string>('');
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
-  const chatInputRef = useRef<{ setMessage: (msg: string) => void; focusAndHighlight?: () => void }>(null);
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_ANTHROPIC_MODEL);
+  const [isStarting, setIsStarting] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -104,54 +109,55 @@ export default function TemplatesGalleryPage() {
   };
 
   const handleTemplateSelect = async (template: Template) => {
-    // Set the selected template and show the centered chatbox
     setSelectedTemplate(template);
-    // Initialize variable values as empty
+
     const initialValues: Record<string, string> = {};
     template.variables.forEach((v) => {
       initialValues[v.name] = '';
     });
     setVariableValues(initialValues);
-    // Start with the full template text (including variables) as the base prompt
-    setTemplatePrompt(template.template);
+    setSelectedModel(DEFAULT_ANTHROPIC_MODEL);
   };
 
   const handleCloseChatbox = () => {
     setSelectedTemplate(null);
-    setTemplatePrompt('');
     setVariableValues({});
   };
 
+  // Only records the value. The prompt is derived from the template and these
+  // values at send time — rebuilding it on every keystroke is what used to
+  // move focus into a second editor after a single character.
   const handleVariableChange = (variableName: string, value: string) => {
-    const updatedValues = { ...variableValues, [variableName]: value };
-    setVariableValues(updatedValues);
+    setVariableValues((current) => ({ ...current, [variableName]: value }));
   };
 
-  // Keep the main text prompt in sync with the Template Preview content
-  const handleTemplateTextChange = (newText: string) => {
-    setTemplatePrompt(newText);
-    if (chatInputRef.current) {
-      chatInputRef.current.setMessage(newText);
-      chatInputRef.current.focusAndHighlight?.();
+  // Derived, not stored: the prompt is always the template plus whatever is
+  // currently in the fields, so there is no second copy to keep in sync.
+  const variableProgress = selectedTemplate
+    ? countFilledVariables(selectedTemplate.template, variableValues)
+    : { filled: 0, total: 0 };
+
+  const handleStartFromTemplate = async () => {
+    if (!selectedTemplate || isStarting) return;
+
+    const message = tidyFilledPrompt(
+      fillTemplate(selectedTemplate.template, variableValues)
+    );
+
+    if (!message) {
+      alert('Fill in at least one field before starting.');
+      return;
     }
-  };
 
-  const handleSendMessage = async (data: {
-    message: string;
-    files: any[];
-    pastedContent: any[];
-    model: string;
-    isThinkingEnabled: boolean;
-  }) => {
+    setIsStarting(true);
     try {
-      // Create workspace with template
       const res = await fetch('/api/workspace/create-agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: selectedTemplate?.title || 'New Conversation',
-          description: selectedTemplate?.description,
-          initialPrompt: data.message,
+          name: selectedTemplate.title || 'New Conversation',
+          description: selectedTemplate.description,
+          initialPrompt: message,
         }),
       });
 
@@ -161,24 +167,23 @@ export default function TemplatesGalleryPage() {
 
       const workspaceData = await res.json();
 
-      // Store pending execution with template prompt
       sessionStorage.setItem(
         'pendingExecution',
         JSON.stringify({
           conversationId: workspaceData.conversationId,
-          message: data.message,
-          files: data.files,
-          pastedContent: data.pastedContent,
-          model: data.model,
-          isThinkingEnabled: data.isThinkingEnabled,
+          message,
+          files: [],
+          pastedContent: [],
+          model: selectedModel,
+          isThinkingEnabled: false,
         })
       );
 
-      // Navigate to workspace
       router.push(`/workspace/${workspaceData.workspaceId}`);
     } catch (error) {
       console.error('Failed to start from template:', error);
       alert('Failed to create workspace. Please try again.');
+      setIsStarting(false);
     }
   };
 
@@ -237,32 +242,80 @@ export default function TemplatesGalleryPage() {
               </button>
             </div>
 
-            {/* Chat Input - Centered */}
-            <div className="flex-1 flex flex-col items-center justify-center p-8 md:p-12 overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900 dark:to-gray-900">
-              <div className="w-full max-w-3xl space-y-4">
-                {/* Preview with editable variables */}
-                {selectedTemplate.variables && selectedTemplate.variables.length > 0 && (
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
-                      Template Preview - Click variables to edit
-                    </p>
-                    <div className="text-sm text-gray-700 dark:text-gray-300">
+            {/* Single editing surface. The template itself is the form: fill the
+                inline fields and send. There is deliberately no second pane
+                showing the same prompt as raw text — it duplicated the content,
+                and mirroring keystrokes into it is what broke typing. */}
+            <div className="flex-1 flex flex-col overflow-hidden bg-gray-50/50 dark:bg-gray-900">
+              <div className="flex-1 overflow-y-auto p-6 md:p-10">
+                <div className="w-full max-w-3xl mx-auto">
+                  <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 p-5 md:p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        Fill in the highlighted fields
+                      </p>
+                      {variableProgress.total > 0 && (
+                        <span
+                          className={`text-xs font-medium tabular-nums ${
+                            variableProgress.filled === variableProgress.total
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-gray-500 dark:text-gray-400'
+                          }`}
+                        >
+                          {variableProgress.filled} of {variableProgress.total} filled
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-sm text-gray-800 dark:text-gray-200">
                       <EditableTemplateVariableHighlighter
                         text={selectedTemplate.template}
                         variables={selectedTemplate.variables}
                         variableValues={variableValues}
                         onVariableChange={handleVariableChange}
-                        onTextChange={handleTemplateTextChange}
                       />
                     </div>
                   </div>
-                )}
-                
-                <ClaudeChatInput
-                  ref={chatInputRef}
-                  onSendMessage={handleSendMessage}
-                  initialMessage={templatePrompt}
-                />
+                </div>
+              </div>
+
+              {/* Action bar */}
+              <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/80 backdrop-blur px-6 py-4">
+                <div className="w-full max-w-3xl mx-auto flex items-center gap-3">
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    aria-label="Model"
+                    className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm text-gray-700 dark:text-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {ANTHROPIC_MODELS.map((model) => (
+                      <option key={model.id} value={model.id}>
+                        {model.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400 flex-1 min-w-0 truncate">
+                    {variableProgress.total > 0 && variableProgress.filled < variableProgress.total
+                      ? 'Empty fields are simply left out of the prompt.'
+                      : 'Ready to send.'}
+                  </p>
+
+                  <Button
+                    onClick={handleStartFromTemplate}
+                    disabled={isStarting}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {isStarting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Starting…
+                      </>
+                    ) : (
+                      'Start conversation'
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
