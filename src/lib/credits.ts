@@ -359,6 +359,48 @@ export async function getCreditStatus(userId: string) {
 }
 
 /**
+ * Tokens assumed for a chat turn when gating before the model has run.
+ *
+ * The real cost is unknown until the response comes back, so the pre-flight
+ * check needs a floor. This is deliberately a floor and not an average: it
+ * exists to stop an exhausted account starting another request, not to bill
+ * accurately. Actual usage is reconciled by deductCredits afterwards.
+ */
+export const ESTIMATED_TOKENS_PER_TURN = 2000;
+
+/**
+ * Credits a chat turn should be assumed to cost before it runs.
+ *
+ * Pure, so the gate can be tested without a database or a provider.
+ * Exported for testing.
+ */
+export function estimateTurnCredits(creditsPerThousandTokens: number): number {
+  const perThousand = Number.isFinite(creditsPerThousandTokens) && creditsPerThousandTokens > 0
+    ? creditsPerThousandTokens
+    : 1;
+
+  return Math.max(1, Math.ceil((ESTIMATED_TOKENS_PER_TURN / 1000) * perThousand));
+}
+
+/**
+ * Whether a balance can absorb a request of `required` credits.
+ *
+ * Pure counterpart to hasEnoughCredits, so the boundary condition is testable.
+ * Note the strictness: a user whose credits are exactly exhausted must be
+ * refused. Calling hasEnoughCredits(userId, 0) evaluated `used + 0 <= monthly`,
+ * which is true at exactly the limit — so an account with nothing left kept
+ * being served, and only a user already overdrawn was ever blocked.
+ * Exported for testing.
+ */
+export function canAfford(
+  creditsUsed: number,
+  monthlyCredits: number,
+  required: number
+): boolean {
+  return creditsUsed + Math.max(1, required) <= monthlyCredits;
+}
+
+/**
  * Calculate credits for chat with webpage feature
  */
 export function calculateChatCredits(tokens: number, isFirstMessage: boolean): number {

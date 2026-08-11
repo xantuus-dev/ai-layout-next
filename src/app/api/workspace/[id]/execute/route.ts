@@ -4,10 +4,11 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { aiRouter } from '@/lib/ai-providers';
 import { verifyWorkspaceAccess } from '@/lib/workspace-utils';
-import { checkAndResetCredits, hasEnoughCredits, resolveBillingUserId } from '@/lib/credits';
+import { checkAndResetCredits, hasEnoughCredits, resolveBillingUserId, estimateTurnCredits, getCreditStatus } from '@/lib/credits';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai-providers/catalog';
 import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
 import { normalizeAttachment, isSupportedImageType, type NormalizedAttachment } from '@/lib/files/attachments';
+import { buildSystemPrompt } from '@/lib/personalization';
 
 export async function POST(
   request: NextRequest,
@@ -72,11 +73,32 @@ export async function POST(
           return;
         }
 
-        // 4. Check credits (resolves to the team billing pool if applicable)
+        // 4. Check credits (resolves to the team billing pool if applicable).
+        //
+        // Gated on the turn's estimated cost rather than 0. hasEnoughCredits
+        // (id, 0) tests `used + 0 <= monthly`, which passes at exactly the
+        // limit — an exhausted account was served, and only an already
+        // overdrawn one refused.
         await checkAndResetCredits(user.id);
-        if (!(await hasEnoughCredits(user.id, 0))) {
+
+        const estimatedCredits = estimateTurnCredits(
+          aiRouter.getModel(model || DEFAULT_ANTHROPIC_MODEL)?.creditsPerThousandTokens ?? 1
+        );
+
+        if (!(await hasEnoughCredits(user.id, estimatedCredits))) {
+          const status = await getCreditStatus(user.id);
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Insufficient credits' })}\n\n`)
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: 'error',
+                code: 'insufficient_credits',
+                message:
+                  'You have used all your monthly credits. Upgrade your plan or wait for them to reset.',
+                creditsNeeded: estimatedCredits,
+                creditsRemaining: status?.creditsRemaining ?? 0,
+                creditsResetAt: status?.creditsResetAt ?? null,
+              })}\n\n`
+            )
           );
           controller.close();
           return;
@@ -235,11 +257,13 @@ export async function POST(
         // throws) when memory is empty or unavailable, so chat is unaffected.
         const memoryContext = await getMemoryContext(user.id, message);
 
+        // The system prompt carries the user's personalization settings, which
+        // until now were stored and edited but never sent anywhere.
+        const systemPrompt = buildSystemPrompt(user, memoryContext);
+
         const stream = aiRouter.chatStream(model || DEFAULT_ANTHROPIC_MODEL, {
           messages: [
-            ...(memoryContext
-              ? [{ role: 'system' as const, content: memoryContext }]
-              : []),
+            { role: 'system' as const, content: systemPrompt },
             {
               role: 'user',
               content,

@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAuthenticatedUserId } from '@/lib/api-auth';
 import { aiRouter } from '@/lib/ai-providers';
-import { checkAndResetCredits, hasEnoughCredits, deductCredits, getCreditStatus } from '@/lib/credits';
+import { checkAndResetCredits, hasEnoughCredits, deductCredits, getCreditStatus, estimateTurnCredits } from '@/lib/credits';
+import { buildSystemPrompt } from '@/lib/personalization';
 import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
 
 export async function POST(request: NextRequest) {
@@ -71,18 +72,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Reset credits if the monthly window has rolled over, then check
+    // Reset credits if the monthly window has rolled over.
     // (transparently resolves to the team billing pool if this user is a team member)
     await checkAndResetCredits(user.id);
-    if (!(await hasEnoughCredits(user.id, 0))) {
-      return NextResponse.json(
-        {
-          error: 'Credit limit reached',
-          message: 'You have used all your monthly credits. Please upgrade your plan or wait for your credits to reset.',
-        },
-        { status: 429 }
-      );
-    }
 
     // Map legacy model IDs to new full model names for backward compatibility
     const modelMap: Record<string, string> = {
@@ -93,6 +85,32 @@ export async function POST(request: NextRequest) {
 
     // Use full model ID or map from legacy ID
     const modelId = modelMap[model] || model || 'claude-sonnet-4-5-20250929';
+
+    // Gate on what this turn is expected to cost, not on zero.
+    //
+    // This previously called hasEnoughCredits(user.id, 0), which evaluates
+    // `used + 0 <= monthly` — true at exactly the limit. An account with no
+    // credits left was served anyway, and only a user already overdrawn was
+    // ever refused. Estimating per model also means an Opus turn is refused
+    // sooner than a Haiku one, which is the point of tiered pricing.
+    const estimatedCredits = estimateTurnCredits(
+      aiRouter.getModel(modelId)?.creditsPerThousandTokens ?? 1
+    );
+
+    if (!(await hasEnoughCredits(user.id, estimatedCredits))) {
+      const status = await getCreditStatus(user.id);
+      return NextResponse.json(
+        {
+          error: 'Insufficient credits',
+          message:
+            'You have used all your monthly credits. Upgrade your plan or wait for them to reset.',
+          creditsNeeded: estimatedCredits,
+          creditsRemaining: status?.creditsRemaining ?? 0,
+          creditsResetAt: status?.creditsResetAt ?? null,
+        },
+        { status: 402 }
+      );
+    }
 
     // Verify model exists
     const modelInfo = aiRouter.getModel(modelId);
@@ -169,14 +187,14 @@ export async function POST(request: NextRequest) {
       ? await getMemoryContext(user.id, message)
       : null;
 
-    const memoryMessages = memoryContext
-      ? [{ role: 'system' as const, content: memoryContext }]
-      : [];
+    // Personalization + memory in one system message. The personalization
+    // fields had a settings page and an API but were never sent to a model.
+    const systemPrompt = buildSystemPrompt(user, memoryContext);
 
     // Call AI router with content blocks
     const response = await aiRouter.chat(modelId, {
       messages: [
-        ...memoryMessages,
+        { role: 'system' as const, content: systemPrompt },
         ...historyMessages,
         {
           role: 'user',
