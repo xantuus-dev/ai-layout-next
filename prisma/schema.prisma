@@ -146,6 +146,9 @@ model User {
   skillInstallations SkillInstallation[]
   skillReviews       SkillReview[]       @relation("SkillReviews")
 
+  // Prompt templates this user authored (the curated gallery rows have no owner)
+  promptTemplates PromptTemplate[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -366,7 +369,18 @@ model PromptTemplate {
   // JSON structure: [{ name: "variable_name", label: "Display Label", type: "text|number|select", placeholder: "...", options: [] }]
   variables Json @default("[]")
 
+  // Ownership. Null on the curated rows authored through the admin tools, set
+  // on anything a user creates for themself via /api/user/templates. The two
+  // kinds share this table so a user template can later be published into the
+  // gallery by flipping visibility rather than by copying rows between tables.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Visibility & Status
+  // visibility: 'public' (listed in the gallery) | 'private' (owner only).
+  // Defaults to public so the pre-existing curated rows keep their behaviour;
+  // user-authored templates are written as private.
+  visibility String  @default("public")
   isPublic   Boolean @default(true)
   isActive   Boolean @default(true)
   isFeatured Boolean @default(false)
@@ -392,6 +406,7 @@ model PromptTemplate {
   @@index([categoryId])
   @@index([isPublic, isActive])
   @@index([tier, isActive])
+  @@index([userId, updatedAt])
 }
 
 // Workspace Models
