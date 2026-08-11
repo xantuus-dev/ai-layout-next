@@ -52,7 +52,13 @@ export function FeaturedTemplates({ onSelectTemplate }: FeaturedTemplatesProps) 
       const response = await fetch('/api/templates?featured=true&limit=6');
       if (response.ok) {
         const data = await response.json();
-        setTemplates(data.templates || []);
+        // GET /api/templates returns a bare array. Reading data.templates gave
+        // undefined and fell through to [], so this list was permanently empty
+        // no matter what the database held. Accept the array, and still
+        // tolerate a { templates } envelope in case the route changes shape.
+        setTemplates(Array.isArray(data) ? data : data?.templates ?? []);
+      } else {
+        console.error('Featured templates request failed:', response.status);
       }
     } catch (error) {
       console.error('Error fetching featured templates:', error);
