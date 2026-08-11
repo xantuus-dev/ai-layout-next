@@ -29,17 +29,28 @@ jobs:
           DATABASE_URL: postgresql://placeholder
           DIRECT_URL: postgresql://placeholder
 
+      # Gates the build. Previously continue-on-error, which was reasonable
+      # while eslint.config.mjs was broken and lint could not run at all — that
+      # is fixed, lint is clean, so let it fail the build again.
       - name: Run ESLint
         run: npm run lint
-        continue-on-error: true
 
       - name: Check TypeScript types
         run: npx tsc --noEmit
 
-      # Unit tests are pure (no database, no secrets) so they gate every push.
-      # Database-backed tests run in the separate integration-tests job below.
+      # Unit tests need no database, but they are not free of configuration:
+      # tests/unit/stripe-webhook-signature.test.ts imports the webhook route,
+      # and src/lib/stripe.ts builds its client from STRIPE_SECRET_KEY at module
+      # load. With the key absent the route short-circuits with 503 "Stripe is
+      # not configured" before it ever reaches signature verification, so the
+      # test asserting a 400 failed on every run. Placeholders are enough — the
+      # Stripe SDK does not contact the network to construct a client, and the
+      # signature check still runs for real.
       - name: Run unit tests
         run: npm run test:unit
+        env:
+          STRIPE_SECRET_KEY: sk_test_placeholder
+          STRIPE_WEBHOOK_SECRET: whsec_placeholder
 
       - name: Build application
         run: npm run build
@@ -96,11 +107,22 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/xantuus_test
           DIRECT_URL: postgresql://postgres:postgres@localhost:5432/xantuus_test
 
+      # The subscription tests pick a tier via isPriceIdConfigured(), which only
+      # requires a "price_" prefix. With no price ids in the environment every
+      # tier resolves to null, `tier` comes back undefined, and the tests throw
+      # on tier.priceIds.monthly. Two placeholders give them something to select:
+      # one below the enterprise credit threshold and one at or above it, so both
+      # the pro and enterprise mapping paths are exercised. These are
+      # NEXT_PUBLIC_ values, not secrets.
       - name: Run integration tests
         run: npm run test:integration
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/xantuus_test
           DIRECT_URL: postgresql://postgres:postgres@localhost:5432/xantuus_test
+          STRIPE_SECRET_KEY: sk_test_placeholder
+          STRIPE_WEBHOOK_SECRET: whsec_placeholder
+          NEXT_PUBLIC_STRIPE_12000_MONTHLY_PRICE_ID: price_test_pro_monthly
+          NEXT_PUBLIC_STRIPE_40000_MONTHLY_PRICE_ID: price_test_enterprise_monthly
 
   security-scan:
     runs-on: ubuntu-latest
