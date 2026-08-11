@@ -151,21 +151,31 @@ export default function TemplatesGalleryPage() {
 
     setIsStarting(true);
     try {
+      // The route reads { prompt, model }. It previously received
+      // { name, description, initialPrompt }, so `prompt` was always
+      // undefined and every attempt came back 400 "Prompt is required" —
+      // starting a conversation from a template has never worked.
+      // name/description are not sent because the route ignores them; the
+      // workspace title is generated from the prompt server-side.
       const res = await fetch('/api/workspace/create-agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: selectedTemplate.title || 'New Conversation',
-          description: selectedTemplate.description,
-          initialPrompt: message,
+          prompt: message,
+          model: selectedModel,
         }),
       });
 
       if (!res.ok) {
-        throw new Error('Failed to create workspace');
+        const detail = await res.text().catch(() => '');
+        throw new Error(`create-agent failed (${res.status}): ${detail.slice(0, 200)}`);
       }
 
       const workspaceData = await res.json();
+
+      if (!workspaceData?.workspaceId || !workspaceData?.conversationId) {
+        throw new Error('create-agent returned no workspace or conversation id');
+      }
 
       sessionStorage.setItem(
         'pendingExecution',
@@ -181,8 +191,11 @@ export default function TemplatesGalleryPage() {
 
       router.push(`/workspace/${workspaceData.workspaceId}`);
     } catch (error) {
+      // Show the real reason. The previous generic message hid a 400
+      // "Prompt is required" for as long as this flow has existed.
       console.error('Failed to start from template:', error);
-      alert('Failed to create workspace. Please try again.');
+      const reason = error instanceof Error ? error.message : String(error);
+      alert(`Could not start the conversation.\n\n${reason}`);
       setIsStarting(false);
     }
   };
