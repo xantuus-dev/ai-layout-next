@@ -123,6 +123,12 @@ jobs:
           STRIPE_WEBHOOK_SECRET: whsec_placeholder
           NEXT_PUBLIC_STRIPE_12000_MONTHLY_PRICE_ID: price_test_pro_monthly
           NEXT_PUBLIC_STRIPE_40000_MONTHLY_PRICE_ID: price_test_enterprise_monthly
+          # The margin report prices a request via aiRouter.getModel(), and the
+          # router only registers a provider when that provider's key is set.
+          # With no key the model list is empty, every lookup misses, and every
+          # cost is 0 — which is what the margin assertions were comparing
+          # against. No network call is made; the key only has to exist.
+          ANTHROPIC_API_KEY: sk-ant-placeholder
 
   security-scan:
     runs-on: ubuntu-latest

@@ -13,6 +13,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { aiRouter } from '@/lib/ai-providers';
+import { DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai-providers/catalog';
 
 /** Fact categories the extractor is allowed to emit. */
 export const FACT_TYPES = [
@@ -330,6 +331,9 @@ export function dedupeFacts(
 const MIN_MESSAGES_TO_EXTRACT = 2;
 const MIN_CONFIDENCE_TO_STORE = 0.6;
 
+/** Cheap model for extraction. Must be a real catalog id — see the guard below. */
+const EXTRACTION_MODEL = 'claude-haiku-4-5';
+
 /** Extract every N messages rather than every turn. */
 export const EXTRACTION_CADENCE = 6;
 
@@ -360,11 +364,24 @@ export async function extractAndStoreFacts(params: {
   messages: Array<{ role: string; content: string }>;
   modelId?: string;
 }): Promise<number> {
-  const { userId, messages, modelId = 'claude-haiku-4-5-20251001' } = params;
+  const { userId, messages, modelId = EXTRACTION_MODEL } = params;
 
   if (messages.length < MIN_MESSAGES_TO_EXTRACT) return 0;
 
   try {
+    // aiRouter.chat throws on an id it cannot route, and this function
+    // swallows its own errors — so a bad id would mean extraction silently
+    // never runs. Fall back rather than lose the turn's facts.
+    const routableModel = aiRouter.getModel(modelId)
+      ? modelId
+      : DEFAULT_ANTHROPIC_MODEL;
+
+    if (routableModel !== modelId) {
+      console.warn(
+        `[Memory] Model "${modelId}" is not in the catalog; extracting with ${routableModel} instead.`
+      );
+    }
+
     const transcript = messages
       .filter((message) => message.content?.trim())
       .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
@@ -372,7 +389,7 @@ export async function extractAndStoreFacts(params: {
 
     if (!transcript) return 0;
 
-    const response = await aiRouter.chat(modelId, {
+    const response = await aiRouter.chat(routableModel, {
       messages: [
         { role: 'system', content: EXTRACTION_PROMPT },
         { role: 'user', content: transcript },

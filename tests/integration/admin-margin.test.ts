@@ -3,7 +3,12 @@ import { prisma } from '@/lib/prisma';
 import { getMarginReport } from '@/lib/admin/margin';
 import { aiRouter } from '@/lib/ai-providers';
 
-const HAIKU_MODEL = 'claude-haiku-4-5-20250529'; // inputCostPer1M: 0.25, outputCostPer1M: 1.25
+// Must be a real id from the catalog: getMarginReport prices a request by
+// looking the model up, and an unknown id silently costs 0 rather than raising.
+// This was 'claude-haiku-4-5-20250529' with $0.25/$1.25 — an id the API 404s on,
+// at pricing understated 4x. The catalog was corrected; this test was not, so
+// every cost assertion here compared against 0.
+const HAIKU_MODEL = 'claude-haiku-4-5'; // inputCostPer1M: 1, outputCostPer1M: 5
 
 describe('admin margin report', () => {
   let freeUserId: string;
@@ -35,7 +40,7 @@ describe('admin margin report', () => {
   });
 
   it('computes real cost from recorded input/output token split, and implied revenue from the paid tier rate', async () => {
-    // 1,000,000 input + 1,000,000 output tokens on Haiku = 0.25 + 1.25 = $1.50 real cost
+    // 1,000,000 input + 1,000,000 output tokens on Haiku = 1 + 5 = $6.00 real cost
     await prisma.usageRecord.create({
       data: {
         userId: paidUserId,
@@ -53,9 +58,9 @@ describe('admin margin report', () => {
     expect(row).toBeDefined();
     expect(row!.requests).toBe(1);
     expect(row!.creditsCharged).toBe(2000);
-    expect(row!.realCost).toBeCloseTo(1.5, 5);
+    expect(row!.realCost).toBeCloseTo(6, 5);
     expect(row!.impliedRevenue).toBeCloseTo(10, 5);
-    expect(row!.breakEvenRatePerCredit).toBeCloseTo(1.5 / 2000, 8);
+    expect(row!.breakEvenRatePerCredit).toBeCloseTo(6 / 2000, 8);
   });
 
   it('free-plan usage has zero implied revenue, so it shows as pure cost', async () => {
@@ -94,7 +99,7 @@ describe('admin margin report', () => {
     const row = report.byModel.find((r) => r.model === HAIKU_MODEL);
 
     // Even split of 2,000,000 tokens = 1,000,000 in + 1,000,000 out, same as the explicit-split test
-    expect(row!.realCost).toBeCloseTo(1.5, 5);
+    expect(row!.realCost).toBeCloseTo(6, 5);
     expect(report.caveats.some((c) => c.includes('estimated 50/50 split'))).toBe(true);
   });
 
