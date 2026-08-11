@@ -99,6 +99,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Required before anything imports @/lib/prisma. lint-and-test has this
+      # step; this job did not, and its db push passes --skip-generate, so the
+      # client was never generated here. Every integration file then threw
+      # "@prisma/client did not initialize yet" at import — before a single
+      # assertion ran. That, not any test logic, is why this job kept failing.
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/xantuus_test
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/xantuus_test
+
       # db push rather than migrate deploy: this database is thrown away after
       # the run, so we want the current schema, not migration replay.
       - name: Push schema to test database
