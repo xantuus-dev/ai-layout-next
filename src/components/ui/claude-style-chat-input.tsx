@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Plus, ChevronDown, ArrowUp, X, FileText, Loader2, Check, Archive, Wand2 } from "lucide-react";
 import { ANTHROPIC_MODELS, DEFAULT_ANTHROPIC_MODEL } from "@/lib/ai-providers/catalog";
+import { resolveImageMimeType, stripDataUrlPrefix } from "@/lib/files/attachments";
 
 /* --- ICONS --- */
 export const Icons = {
@@ -47,6 +48,11 @@ const formatFileSize = (bytes: number) => {
 interface AttachedFile {
     id: string;
     file: File;
+    /** Mirrored from the nested File so the server can read them directly. */
+    name?: string;
+    size?: number;
+    /** Raw base64 (no data URL prefix); set once the file has been read. */
+    data?: string;
     type: string;
     preview: string | null;
     uploadStatus: string;
@@ -350,18 +356,47 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
     // File Handling
     const handleFiles = useCallback((newFilesList: FileList | File[]) => {
         const newFiles = Array.from(newFilesList).map(file => {
-            const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
+            // Resolve to a MIME type the model actually accepts, or null. This
+            // used to force the literal 'image/unknown', which the API rejects.
+            const imageType = resolveImageMimeType(file.name, file.type);
             return {
                 id: Math.random().toString(36).substr(2, 9),
                 file,
-                type: isImage ? 'image/unknown' : (file.type || 'application/octet-stream'), // Force image type if detected by extension
-                preview: isImage ? URL.createObjectURL(file) : null,
-                uploadStatus: 'pending'
+                // Name/size/data are mirrored to the top level because the
+                // server reads file.name / file.size / file.data. Previously
+                // only the nested File carried them, so every attachment was
+                // written with fileName undefined and failed Prisma validation.
+                name: file.name,
+                size: file.size,
+                type: imageType ?? (file.type || 'application/octet-stream'),
+                preview: imageType ? URL.createObjectURL(file) : null,
+                uploadStatus: imageType ? 'uploading' : 'complete',
             };
         });
 
-        // Simulate Upload
         setFiles(prev => [...prev, ...newFiles]);
+
+        // Actually read the images. The previous "Simulate Upload" never
+        // produced any bytes, so the model received an image block with
+        // data: undefined even when everything else lined up.
+        newFiles.forEach(entry => {
+            if (!resolveImageMimeType(entry.file.name, entry.file.type)) return;
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                const data = stripDataUrlPrefix(String(reader.result ?? ''));
+                setFiles(prev => prev.map(p =>
+                    p.id === entry.id ? { ...p, data, uploadStatus: 'complete' } : p
+                ));
+            };
+            reader.onerror = () => {
+                console.error('Failed to read attachment', entry.file.name, reader.error);
+                setFiles(prev => prev.map(p =>
+                    p.id === entry.id ? { ...p, uploadStatus: 'error' } : p
+                ));
+            };
+            reader.readAsDataURL(entry.file);
+        });
 
         // Dynamic Feedback Message
         setMessage(prev => {

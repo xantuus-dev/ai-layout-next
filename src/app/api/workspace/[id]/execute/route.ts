@@ -7,6 +7,7 @@ import { verifyWorkspaceAccess } from '@/lib/workspace-utils';
 import { checkAndResetCredits, hasEnoughCredits, resolveBillingUserId } from '@/lib/credits';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai-providers/catalog';
 import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
+import { normalizeAttachment, isSupportedImageType, type NormalizedAttachment } from '@/lib/files/attachments';
 
 export async function POST(
   request: NextRequest,
@@ -97,17 +98,36 @@ export async function POST(
             },
           });
 
-          // Create attachments if files exist
+          // Create attachments if files exist.
+          //
+          // normalizeAttachment tolerates both the flat shape and the older
+          // nested { file: File } one, and drops anything without a usable
+          // name. Previously this read file.name/.size/.data straight off a
+          // payload that carried them on a nested File, so every upload hit
+          // "Argument `fileName` is missing" and took the whole message
+          // transaction down with it.
           if (files && files.length > 0) {
-            await tx.messageAttachment.createMany({
-              data: files.map((file: any) => ({
-                messageId: msg.id,
-                fileName: file.name,
-                fileType: file.type,
-                fileSize: file.size || 0,
-                fileData: file.data,
-              })),
-            });
+            const attachments = (files as unknown[])
+              .map((raw) => normalizeAttachment(raw))
+              .filter((a): a is NormalizedAttachment => a !== null);
+
+            if (attachments.length !== files.length) {
+              console.warn(
+                `[Attachments] Skipped ${files.length - attachments.length} upload(s) with no usable file name`
+              );
+            }
+
+            if (attachments.length > 0) {
+              await tx.messageAttachment.createMany({
+                data: attachments.map((file) => ({
+                  messageId: msg.id,
+                  fileName: file.name,
+                  fileType: file.type,
+                  fileSize: file.size,
+                  fileData: file.data ?? null,
+                })),
+              });
+            }
           }
 
           // Update conversation
@@ -158,10 +178,20 @@ export async function POST(
           });
         }
 
-        // Add image files
+        // Add image files.
+        //
+        // Only a type the API actually accepts qualifies as an image block, and
+        // only when bytes are present. The old check was file.type.startsWith
+        // ('image/'), which happily passed the literal 'image/unknown' the
+        // client used to send, together with data: undefined — a request the
+        // API rejects. Anything else is described in text so the model at least
+        // knows a file was attached.
         if (files && files.length > 0) {
-          files.forEach((file: any) => {
-            if (file.type.startsWith('image/')) {
+          files.forEach((raw: any) => {
+            const file = normalizeAttachment(raw);
+            if (!file) return;
+
+            if (isSupportedImageType(file.type) && file.data) {
               contentBlocks.push({
                 type: 'image',
                 source: {
