@@ -28,7 +28,6 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "orchestrator": "tsx scripts/start-orchestrator.ts",
-    "memory-scheduler": "tsx scripts/start-memory-scheduler.ts",
     "setup-memory-db": "tsx scripts/setup-memory-db.ts",
     "verify-memory-setup": "tsx scripts/verify-memory-setup.ts",
     "seed-templates": "tsx scripts/seed-templates.ts"

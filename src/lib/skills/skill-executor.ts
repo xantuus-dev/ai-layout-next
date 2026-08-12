@@ -242,65 +242,23 @@ export class SkillExecutor {
     skill: any,
     options: SkillExecutionOptions
   ): Promise<any> {
-    const { skillDefinition } = skill;
-
-    if (!skillDefinition.code || typeof skillDefinition.code !== 'string') {
-      throw new Error('Invalid skill definition: missing code');
-    }
-
-    // Create sandboxed context
-    const sandbox = this.createSandbox(options.input);
-
-    try {
-      // Execute user code in sandbox
-      const AsyncFunction = Object.getPrototypeOf(
-        async function () {}
-      ).constructor;
-      const fn = new AsyncFunction('input', 'tools', skillDefinition.code);
-
-      // Provide safe tool access
-      const safeTools = this.createSafeToolAccess(options.userId);
-
-      const result = await Promise.race([
-        fn(options.input, safeTools),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Execution timeout')), 30000)
-        ), // 30s timeout
-      ]);
-
-      return result;
-    } catch (error) {
-      console.error('[SkillExecutor] JavaScript execution failed:', error);
-      throw new Error(`Code execution failed: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * Create sandboxed execution context
-   */
-  private createSandbox(input: Record<string, any>): Record<string, any> {
-    return {
-      input,
-      // Provide safe utilities
-      console: {
-        log: (...args: any[]) =>
-          console.log('[Skill Sandbox]', ...args),
-        error: (...args: any[]) =>
-          console.error('[Skill Sandbox]', ...args),
-      },
-      // No access to process, require, etc.
-    };
-  }
-
-  /**
-   * Create safe tool access for JavaScript skills
-   */
-  private createSafeToolAccess(userId: string): Record<string, any> {
-    // TODO: Implement safe tool wrapper that checks permissions
-    // For now, return empty object
-    return {
-      // Example: fetch: async (url: string) => { ... }
-    };
+    // SECURITY: JavaScript skills are disabled.
+    //
+    // The previous implementation compiled `skillDefinition.code` with the
+    // global `AsyncFunction` constructor and ran it in this process. That is
+    // not a sandbox: the code executed in the full Node.js global scope with
+    // access to `process.env` (every API key, DATABASE_URL, NEXTAUTH_SECRET),
+    // `require`, `fetch`, and the filesystem. The `createSandbox()` context was
+    // never passed to the function and `createSafeToolAccess()` was a stub, so
+    // any user- or model-authored skill was arbitrary remote code execution
+    // plus secret exfiltration.
+    //
+    // Re-enable only once the code runs in a real out-of-process isolate with
+    // no ambient environment (e.g. Vercel Sandbox / isolated-vm / a worker
+    // spawned with a scrubbed env) and a permissioned tool bridge.
+    throw new Error(
+      'JavaScript skills are disabled for security reasons and cannot be executed.'
+    );
   }
 
   /**
