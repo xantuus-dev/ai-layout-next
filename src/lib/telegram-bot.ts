@@ -5,6 +5,8 @@
  * Documentation: https://core.telegram.org/bots/api
  */
 
+import { timingSafeEqual } from 'crypto';
+
 const TELEGRAM_API_BASE = 'https://api.telegram.org';
 
 /**
@@ -305,13 +307,25 @@ export async function getTelegramChat(
 }
 
 /**
- * Validate Telegram webhook secret token
+ * Validate the Telegram webhook secret token (the value Telegram echoes back in
+ * the `x-telegram-bot-api-secret-token` header) against the one we configured
+ * for an integration.
+ *
+ * Uses a constant-time comparison so an attacker cannot recover the secret via
+ * response-timing differences, and fails closed on a missing or empty token.
  */
 export function validateTelegramWebhook(
   requestSecretToken: string | null,
   expectedSecretToken: string
 ): boolean {
-  return requestSecretToken === expectedSecretToken;
+  if (!requestSecretToken || !expectedSecretToken) return false;
+
+  const a = Buffer.from(requestSecretToken);
+  const b = Buffer.from(expectedSecretToken);
+  // Unequal lengths cannot be compared by timingSafeEqual and are a definite
+  // mismatch; returning here does not leak the secret's contents.
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 /**

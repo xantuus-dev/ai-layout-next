@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { User, CreditCard, BarChart3, Key, ArrowLeft, Plug, Brain, Users } from 'lucide-react';
+import { User, CreditCard, BarChart3, Key, ArrowLeft, Plug, Users } from 'lucide-react';
 
 export default function SettingsLayout({
   children,
@@ -18,7 +18,6 @@ export default function SettingsLayout({
     { name: 'Usage', href: '/settings/usage', icon: BarChart3 },
     { name: 'API Keys', href: '/settings/api-keys', icon: Key },
     { name: 'Integrations', href: '/settings/integrations', icon: Plug },
-    { name: 'Memory', href: '/settings/memory', icon: Brain },
   ];
 
   return (

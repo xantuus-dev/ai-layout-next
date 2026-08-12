@@ -72,6 +72,15 @@ export function validateEnvironmentVariables(): EnvValidationResult {
     warnings.push('Turnstile (Cloudflare bot protection) is not configured.');
   }
 
+  // Field-level encryption for secrets at rest. Optional: when unset, encryption
+  // helpers are simply not invoked, but connected-account tokens then remain in
+  // plaintext at rest. Recommended for production.
+  if (!process.env.FIELD_ENCRYPTION_KEY) {
+    warnings.push(
+      'FIELD_ENCRYPTION_KEY is not set. Secrets-at-rest encryption is unavailable. Generate one with `openssl rand -base64 32`.'
+    );
+  }
+
   return {
     isValid: errors.length === 0,
     errors,

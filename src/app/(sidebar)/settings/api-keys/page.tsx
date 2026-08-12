@@ -6,13 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Copy, Eye, EyeOff, Key, Plus, Trash2 } from 'lucide-react';
+import { Copy, Key, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ApiKey {
   id: string;
   name: string;
-  key: string;
+  // The secret is never returned after creation — only a non-secret prefix.
+  keyPrefix: string | null;
   lastUsed: string | null;
   createdAt: string;
 }
@@ -25,7 +26,6 @@ export default function ApiKeysPage() {
   const [newKeyName, setNewKeyName] = useState('');
   const [newKey, setNewKey] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchApiKeys = async () => {
@@ -60,8 +60,11 @@ export default function ApiKeysPage() {
       const data = await response.json();
 
       if (data.apiKey) {
-        setApiKeys([...apiKeys, data.apiKey]);
-        setNewKey(data.apiKey.key);
+        // Keep only non-secret fields in the list; the raw key lives in `newKey`
+        // for the one-time reveal dialog and is never stored in the list state.
+        const { key, ...listRow } = data.apiKey;
+        setApiKeys([...apiKeys, listRow]);
+        setNewKey(key);
         setNewKeyName('');
       }
     } catch (error) {
@@ -87,22 +90,8 @@ export default function ApiKeysPage() {
     }
   };
 
-  const toggleKeyVisibility = (keyId: string) => {
-    const newVisible = new Set(visibleKeys);
-    if (newVisible.has(keyId)) {
-      newVisible.delete(keyId);
-    } else {
-      newVisible.add(keyId);
-    }
-    setVisibleKeys(newVisible);
-  };
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-  };
-
-  const maskKey = (key: string) => {
-    return `${key.substring(0, 8)}...${key.substring(key.length - 4)}`;
   };
 
   if (!session) {
@@ -173,24 +162,11 @@ export default function ApiKeysPage() {
                     </h3>
                     <div className="flex items-center gap-2 mt-2">
                       <code className="text-sm bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded">
-                        {visibleKeys.has(apiKey.id) ? apiKey.key : maskKey(apiKey.key)}
+                        {apiKey.keyPrefix ?? 'xan_••••'}
                       </code>
-                      <button
-                        onClick={() => toggleKeyVisibility(apiKey.id)}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                      >
-                        {visibleKeys.has(apiKey.id) ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => copyToClipboard(apiKey.key)}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Shown once at creation
+                      </span>
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                       Created {format(new Date(apiKey.createdAt), 'MMM d, yyyy')}

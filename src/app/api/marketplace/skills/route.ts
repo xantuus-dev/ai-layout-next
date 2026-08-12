@@ -227,6 +227,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // SECURITY: reject skill types that execute arbitrary code in-process.
+    // JavaScript skills were run via the global AsyncFunction constructor with
+    // full access to process.env, require, and the filesystem — remote code
+    // execution. They stay blocked at creation until a real out-of-process
+    // isolate exists (see executeJavaScriptSkill in skill-executor.ts).
+    if (skillType !== 'config') {
+      return NextResponse.json(
+        {
+          error: `Skill type "${skillType}" is not supported. Only "config" skills are allowed.`,
+        },
+        { status: 400 }
+      );
+    }
+
     // Validate skill definition structure
     if (skillType === 'config') {
       if (!skillDefinition.steps || !Array.isArray(skillDefinition.steps)) {

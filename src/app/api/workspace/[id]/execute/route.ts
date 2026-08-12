@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { aiRouter } from '@/lib/ai-providers';
-import { verifyWorkspaceAccess } from '@/lib/workspace-utils';
+import { secureChatStream } from '@/lib/ai-security/guard';
+import { verifyWorkspaceAccess, verifyConversationInWorkspace } from '@/lib/workspace-utils';
 import { checkAndResetCredits, hasEnoughCredits, resolveBillingUserId, estimateTurnCredits, getCreditStatus } from '@/lib/credits';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai-providers/catalog';
 import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
@@ -68,6 +69,29 @@ export async function POST(
         if (!message) {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Message is required' })}\n\n`)
+          );
+          controller.close();
+          return;
+        }
+
+        // Authorize the target conversation. Workspace access alone is not
+        // enough: conversationId comes from the request body and is used below
+        // to write messages into, read history from, and update the
+        // conversation. Without this check any authenticated user with access
+        // to *a* workspace could target *any* conversation id (IDOR). Binding
+        // it to this workspace also correctly allows teammates to act on a
+        // shared conversation they do not personally own.
+        if (!conversationId) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'conversationId is required' })}\n\n`)
+          );
+          controller.close();
+          return;
+        }
+
+        if (!(await verifyConversationInWorkspace(conversationId, workspaceId))) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Access denied' })}\n\n`)
           );
           controller.close();
           return;
@@ -261,17 +285,37 @@ export async function POST(
         // until now were stored and edited but never sent anywhere.
         const systemPrompt = buildSystemPrompt(user, memoryContext);
 
-        const stream = aiRouter.chatStream(model || DEFAULT_ANTHROPIC_MODEL, {
-          messages: [
-            { role: 'system' as const, content: systemPrompt },
-            {
-              role: 'user',
-              content,
+        // Stream through the security chokepoint: outbound PII is redacted
+        // before it reaches the provider and rehydrated in the streamed deltas.
+        const stream = secureChatStream(
+          model || DEFAULT_ANTHROPIC_MODEL,
+          {
+            messages: [
+              { role: 'system' as const, content: systemPrompt },
+              {
+                role: 'user',
+                content,
+              },
+            ],
+            maxTokens: isThinkingEnabled ? 8192 : 4096,
+            thinking: isThinkingEnabled ? { type: 'enabled', budget_tokens: 2048 } : undefined,
+          },
+          {
+            surface: 'workspace',
+            userId: user.id,
+            // Tell the client how much PII was scrubbed before the prompt left
+            // our servers, so the UI can show a "N items redacted" indicator.
+            onRedaction: (summary) => {
+              if (summary.total > 0) {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ type: 'redaction', total: summary.total, byType: summary.byType })}\n\n`
+                  )
+                );
+              }
             },
-          ],
-          maxTokens: isThinkingEnabled ? 8192 : 4096,
-          thinking: isThinkingEnabled ? { type: 'enabled', budget_tokens: 2048 } : undefined,
-        });
+          }
+        );
 
         for await (const event of stream) {
           if (event.type === 'thinking') {

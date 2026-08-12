@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { hashApiKey, apiKeyPreview, API_KEY_PREFIX } from '@/lib/crypto/api-keys';
 
 export interface ApiAuthResult {
   success: boolean;
@@ -29,7 +30,7 @@ export async function authenticateApiKey(
     ? authHeader.substring(7)
     : authHeader;
 
-  if (!key || !key.startsWith('xan_')) {
+  if (!key || !key.startsWith(API_KEY_PREFIX)) {
     return {
       success: false,
       error: 'Invalid API key format',
@@ -37,21 +38,28 @@ export async function authenticateApiKey(
   }
 
   try {
-    // Find API key in database
-    const apiKey = await prisma.apiKey.findUnique({
-      where: { key },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            plan: true,
-            monthlyCredits: true,
-            creditsUsed: true,
-          },
-        },
-      },
+    // Primary lookup is by hash — the plaintext key is never stored.
+    let apiKey = await prisma.apiKey.findUnique({
+      where: { keyHash: hashApiKey(key) },
+      select: { id: true, userId: true },
     });
+
+    // Legacy fallback: rows created before hashing still hold the plaintext in
+    // `key`. Match those once, then lazily upgrade the row to hashed storage and
+    // clear the plaintext, so the migration completes on first use.
+    if (!apiKey) {
+      const legacy = await prisma.apiKey.findUnique({
+        where: { key },
+        select: { id: true, userId: true },
+      });
+      if (legacy) {
+        await prisma.apiKey.update({
+          where: { id: legacy.id },
+          data: { keyHash: hashApiKey(key), keyPrefix: apiKeyPreview(key), key: null },
+        });
+        apiKey = legacy;
+      }
+    }
 
     if (!apiKey) {
       return {

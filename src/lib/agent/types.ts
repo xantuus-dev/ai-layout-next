@@ -56,6 +56,13 @@ export interface AgentConfig {
   timeout?: number;         // Max execution time (ms)
   retryCount?: number;      // Number of retries on failure
   requireApproval?: boolean; // Require human approval for critical actions
+  /**
+   * Tool names the user has pre-authorized for this task, allowing otherwise
+   * sensitive (state-changing / irreversible) tools to run without halting for
+   * approval. See src/lib/agent/approval.ts. Anything not listed that is
+   * sensitive halts execution rather than auto-running.
+   */
+  autoApprovedTools?: string[];
 }
 
 /**

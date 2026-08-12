@@ -20,6 +20,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { queueAgentTask } from '@/lib/queue/agent-queue';
 import { CronExpressionParser } from 'cron-parser';
@@ -28,33 +29,47 @@ export const runtime = 'nodejs'; // Required for Vercel Cron
 export const dynamic = 'force-dynamic'; // Disable caching
 
 /**
+ * Constant-time comparison of a bearer token against the configured secret.
+ * Returns false (rather than throwing) for any missing/mismatched-length input
+ * so callers can treat it as a plain authorization decision.
+ */
+function isAuthorizedCron(authHeader: string | null): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) return false;
+
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length)
+    : '';
+  if (!token) return false;
+
+  const a = Buffer.from(token);
+  const b = Buffer.from(cronSecret);
+  // timingSafeEqual requires equal lengths; unequal length is a definite
+  // mismatch, and comparing against a fixed-length buffer keeps it constant-time.
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+/**
  * POST /api/cron/check-scheduled-tasks
  * Check for scheduled tasks and queue them for execution
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify cron secret for security
-    const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
+    // SECURITY: always require the shared secret. This queues agent tasks that
+    // cost credits and invoke models, so it must not be triggerable by an
+    // unauthenticated caller. Vercel Cron sends `Authorization: Bearer
+    // $CRON_SECRET` automatically when CRON_SECRET is set, so there is no need
+    // for (and no safe way to trust) a user-agent-based bypass.
+    if (!process.env.CRON_SECRET) {
+      return NextResponse.json(
+        { error: 'CRON_SECRET not configured' },
+        { status: 500 }
+      );
+    }
 
-    // Allow both Vercel Cron (no auth) and external cron (with auth)
-    const isVercelCron = request.headers.get('user-agent')?.includes('vercel-cron');
-
-    if (!isVercelCron) {
-      if (!cronSecret) {
-        return NextResponse.json(
-          { error: 'CRON_SECRET not configured' },
-          { status: 500 }
-        );
-      }
-
-      const token = authHeader?.replace('Bearer ', '');
-      if (token !== cronSecret) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 401 }
-        );
-      }
+    if (!isAuthorizedCron(request.headers.get('authorization'))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     console.log('🔍 Checking for scheduled tasks...');

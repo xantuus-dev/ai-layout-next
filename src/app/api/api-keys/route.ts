@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
+import { generateApiKey, hashApiKey, apiKeyPreview } from '@/lib/crypto/api-keys';
 
 export async function GET() {
   try {
@@ -21,6 +21,16 @@ export async function GET() {
         apiKeys: {
           orderBy: {
             createdAt: 'desc',
+          },
+          // SECURITY: never return the secret (or its hash) on listing. Only the
+          // non-secret prefix is shown; the full key was revealed once at
+          // creation and cannot be retrieved again.
+          select: {
+            id: true,
+            name: true,
+            keyPrefix: true,
+            lastUsed: true,
+            createdAt: true,
           },
         },
       },
@@ -74,18 +84,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate a secure API key
-    const apiKey = `xan_${crypto.randomBytes(32).toString('hex')}`;
+    // Generate a secure API key. Only its hash and a non-secret prefix are
+    // stored; the raw value is returned to the caller exactly once here and can
+    // never be retrieved again (one-time reveal).
+    const rawKey = generateApiKey();
 
-    const newApiKey = await prisma.apiKey.create({
+    const created = await prisma.apiKey.create({
       data: {
         userId: user.id,
         name,
-        key: apiKey,
+        keyHash: hashApiKey(rawKey),
+        keyPrefix: apiKeyPreview(rawKey),
       },
+      select: { id: true, name: true, keyPrefix: true, createdAt: true },
     });
 
-    return NextResponse.json({ apiKey: newApiKey });
+    // `key` is present exactly once, in this response. The stored row never has it.
+    return NextResponse.json({ apiKey: { ...created, key: rawKey } });
   } catch (error) {
     console.error('Error creating API key:', error);
     return NextResponse.json(

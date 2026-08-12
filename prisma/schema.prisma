@@ -149,6 +149,13 @@ model User {
   // Prompt templates this user authored (the curated gallery rows have no owner)
   promptTemplates PromptTemplate[]
 
+  // Security & governance
+  role              String             @default("user") // "user" | "admin" — coarse RBAC
+  // Null = keep indefinitely (current behavior). When set, the retention job
+  // purges this user's conversations/messages older than N days.
+  dataRetentionDays Int?
+  aiInteractionLogs AiInteractionLog[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -184,14 +191,63 @@ model ApiKey {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name     String
-  key      String    @unique
-  lastUsed DateTime?
+  name String
+
+  // SECURITY: keys are stored as a SHA-256 hash, never in plaintext. The raw
+  // key is shown to the user exactly once at creation (one-time reveal).
+  // `keyHash` is what auth looks up; `keyPrefix` is a short non-secret label
+  // (e.g. "xan_ab12…") for display in the UI.
+  //
+  // `key` is the legacy plaintext column, kept nullable only so existing rows
+  // survive the migration; the migration hashes them into keyHash and clears
+  // this, after which it can be dropped. New rows never populate it.
+  key       String?   @unique
+  keyHash   String?   @unique
+  keyPrefix String?
+  lastUsed  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+/// Tamper-evident audit trail of every model interaction, for SOC 2 / EU AI Act
+/// traceability and the user-facing "AI activity" view. Stores metadata and
+/// content HASHES by default — never raw prompt/response text.
+model AiInteractionLog {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  surface  String // 'chat' | 'workspace' | 'agent' | ...
+  provider String?
+  model    String?
+
+  inputTokens  Int @default(0)
+  outputTokens Int @default(0)
+  creditsUsed  Int @default(0)
+
+  // How many PII items were scrubbed outbound, and their type counts only
+  // (e.g. { "EMAIL": 2 }) — never the values themselves.
+  redactionCount Int   @default(0)
+  redactionTypes Json?
+
+  // Whether the provider handled this request under a zero-data-retention /
+  // no-training posture (see provider-policy.ts).
+  zdr Boolean @default(false)
+
+  // Tamper-evident hash chain. entryHash = sha256(prevHash + canonical fields);
+  // prevHash links to this user's previous entry, so removing or altering any
+  // row breaks the chain and is detectable on audit.
+  promptHash   String?
+  responseHash String?
+  entryHash    String
+  prevHash     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // Image Generation
