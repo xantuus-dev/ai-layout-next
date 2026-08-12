@@ -32,16 +32,38 @@ export class AnthropicProvider implements AIProvider {
    * Shared by chat() and chatStream() so the two cannot drift apart.
    */
   private buildApiParams(params: ChatParams): any {
-    const anthropicMessages = params.messages.map(msg => ({
-      role: msg.role === 'system' ? 'user' : msg.role,
-      content: msg.content,
-    }));
+    // Instruction hierarchy (prompt-injection defense): system messages carry
+    // the app's own instructions (personalization, memory, custom-instruction
+    // preferences) and must reach the model through Anthropic's dedicated
+    // top-level `system` parameter — NOT as an ordinary `user` turn, which
+    // would be indistinguishable from, and overridable by, user input.
+    //
+    // System content is always plain text here (buildSystemPrompt returns a
+    // string); if a caller ever sends block content in a system message we
+    // extract its text parts so nothing is silently dropped.
+    const systemText = params.messages
+      .filter(msg => msg.role === 'system')
+      .map(msg =>
+        typeof msg.content === 'string'
+          ? msg.content
+          : msg.content.map(block => block.text ?? '').join('')
+      )
+      .filter(Boolean)
+      .join('\n\n');
+
+    const anthropicMessages = params.messages
+      .filter(msg => msg.role !== 'system')
+      .map(msg => ({ role: msg.role, content: msg.content }));
 
     const apiParams: any = {
       model: params.model,
       max_tokens: params.maxTokens || 4096,
       messages: anthropicMessages,
     };
+
+    if (systemText) {
+      apiParams.system = systemText;
+    }
 
     // The request shape is not portable across model generations: Claude 4.7+
     // rejects sampling parameters, and the two thinking forms are mutually

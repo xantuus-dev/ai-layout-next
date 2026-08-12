@@ -28,6 +28,7 @@ import {
   AgentEvent,
 } from './types';
 import { ToolRegistry } from './tools/registry';
+import { stepNeedsApproval, ApprovalRequiredError } from './approval';
 import { captureAgentError, captureToolError, addBreadcrumb, setUser } from '@/lib/sentry';
 import { applyExecutionGuards, withTimeout, getToolTimeout } from './guards';
 
@@ -345,17 +346,21 @@ Return ONLY the JSON array, no other text.`;
         throw new Error(`Invalid parameters: ${validation.error}`);
       }
 
-      // Check if approval required
-      if (step.requiresApproval) {
+      // Human-in-the-loop gate (OWASP LLM06). Sensitivity is decided
+      // server-side (see approval.ts), NOT from the model-authored
+      // requiresApproval flag alone. A sensitive step that the user has not
+      // pre-approved for this task halts here — it is never silently executed.
+      if (stepNeedsApproval(step, task.config)) {
         await this.emitEvent({
           type: 'approval.required',
           taskId: task.id,
           stepNumber: step.stepNumber,
           action: step.action,
         });
-        // In production, wait for user approval here
-        // For now, we'll just log and continue
-        console.log(`[Agent] Approval required for step ${step.stepNumber}`);
+        console.log(
+          `[Agent] Halting: step ${step.stepNumber} (${step.tool}) requires approval`
+        );
+        throw new ApprovalRequiredError(step.tool, step.stepNumber);
       }
 
       // Apply execution guards (timeout, cost limits, rate limiting)
@@ -423,6 +428,12 @@ Return ONLY the JSON array, no other text.`;
       console.log(`[Agent] Step ${step.stepNumber} completed in ${trace.duration}ms`);
 
     } catch (error: any) {
+      // An approval halt is an intentional stop, not a failure: do not retry it
+      // (it would loop forever) and do not report it to Sentry as an error.
+      if (error instanceof ApprovalRequiredError) {
+        throw error;
+      }
+
       console.error(`[Agent] Step ${step.stepNumber} failed:`, error);
 
       // Track step error in Sentry

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { PrivacyDataCard } from '@/components/settings/PrivacyDataCard';
 
 export default function AccountPage() {
   const { data: session } = useSession();
@@ -153,6 +154,9 @@ export default function AccountPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Privacy & Data (GDPR: export / retention / delete) */}
+      <PrivacyDataCard />
           </div>
         </div>
       </div>

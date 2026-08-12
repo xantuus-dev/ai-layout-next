@@ -122,6 +122,30 @@ export async function verifyConversationAccess(conversationId: string, userId: s
 }
 
 /**
+ * Verify that a conversation belongs to a specific workspace.
+ *
+ * Callers use this together with verifyWorkspaceAccess: once a user is known to
+ * have access to `workspaceId`, confirming the conversation lives in that same
+ * workspace authorizes reads/writes on it — including conversations owned by a
+ * teammate in a shared workspace, which a userId-only check would wrongly deny.
+ * It also closes the IDOR where a body-supplied conversationId from an unrelated
+ * workspace could otherwise be written to.
+ */
+export async function verifyConversationInWorkspace(
+  conversationId: string,
+  workspaceId: string
+) {
+  const conversation = await prisma.conversation.findFirst({
+    where: {
+      id: conversationId,
+      workspaceId,
+    },
+  });
+
+  return conversation !== null;
+}
+
+/**
  * Generate a conversation title from the first user message
  * Truncates to 50 characters max
  */

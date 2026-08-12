@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAuthenticatedUserId } from '@/lib/api-auth';
 import { aiRouter } from '@/lib/ai-providers';
+import { secureChat } from '@/lib/ai-security/guard';
 import { checkAndResetCredits, hasEnoughCredits, deductCredits, getCreditStatus, estimateTurnCredits } from '@/lib/credits';
 import { buildSystemPrompt } from '@/lib/personalization';
 import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
@@ -191,21 +192,27 @@ export async function POST(request: NextRequest) {
     // fields had a settings page and an API but were never sent to a model.
     const systemPrompt = buildSystemPrompt(user, memoryContext);
 
-    // Call AI router with content blocks
-    const response = await aiRouter.chat(modelId, {
-      messages: [
-        { role: 'system' as const, content: systemPrompt },
-        ...historyMessages,
-        {
-          role: 'user',
-          content: contentBlocks.length === 1 && contentBlocks[0].type === 'text'
-            ? contentBlocks[0].text
-            : contentBlocks,
-        },
-      ],
-      maxTokens,
-      thinking: thinkingConfig,
-    });
+    // Call the model through the security chokepoint: outbound PII is redacted
+    // before it reaches the provider and restored in the response. secureChat
+    // preserves aiRouter.chat's shape and adds a `redaction` summary.
+    const response = await secureChat(
+      modelId,
+      {
+        messages: [
+          { role: 'system' as const, content: systemPrompt },
+          ...historyMessages,
+          {
+            role: 'user',
+            content: contentBlocks.length === 1 && contentBlocks[0].type === 'text'
+              ? contentBlocks[0].text
+              : contentBlocks,
+          },
+        ],
+        maxTokens,
+        thinking: thinkingConfig,
+      },
+      { surface: 'chat', userId: user.id }
+    );
 
     if (!response.content) {
       console.error('No text content in AI response');

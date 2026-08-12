@@ -84,21 +84,37 @@ export class GoogleProvider implements AIProvider {
       throw new Error('Google provider is not configured. Please set GOOGLE_AI_API_KEY.');
     }
 
+    // Instruction hierarchy (prompt-injection defense): route system messages
+    // through Gemini's dedicated `systemInstruction` rather than folding them
+    // into the conversation as `user` turns, where they would be
+    // indistinguishable from — and overridable by — actual user input.
+    const systemText = params.messages
+      .filter(msg => msg.role === 'system')
+      .map(msg =>
+        typeof msg.content === 'string'
+          ? msg.content
+          : msg.content.map(block => block.text ?? '').join('')
+      )
+      .filter(Boolean)
+      .join('\n\n');
+
     const model = this.client.getGenerativeModel({
       model: params.model,
+      ...(systemText ? { systemInstruction: systemText } : {}),
       generationConfig: {
         maxOutputTokens: params.maxTokens || 4096,
         temperature: params.temperature,
       },
     });
 
-    // Convert messages to Gemini chat format
-    const history = params.messages.slice(0, -1).map(msg => ({
+    // Convert the non-system messages to Gemini chat format.
+    const conversation = params.messages.filter(msg => msg.role !== 'system');
+    const history = conversation.slice(0, -1).map(msg => ({
       role: msg.role === 'assistant' ? 'model' : 'user',
       parts: this.convertContent(msg.content),
     }));
 
-    const lastMessage = params.messages[params.messages.length - 1];
+    const lastMessage = conversation[conversation.length - 1];
 
     // Start chat with history
     const chat = model.startChat({
