@@ -4,11 +4,14 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { uploadMedia } from './storage';
 
 export interface GenerateImageParams {
   prompt: string;
   width?: number;
   height?: number;
+  /** Scopes the stored object path. Falls back to 'anonymous' when absent. */
+  userId?: string;
 }
 
 export interface GenerateImageResponse {
@@ -42,7 +45,7 @@ class GeminiImageService {
       throw new Error('Gemini API not configured');
     }
 
-    const { prompt, width = 1024, height = 1024 } = params;
+    const { prompt, width = 1024, height = 1024, userId } = params;
 
     // Validate prompt
     if (!prompt || prompt.trim().length < 10) {
@@ -76,7 +79,7 @@ class GeminiImageService {
       // Response will include a base64-encoded image which needs to be uploaded to Cloud Storage
 
       // For now, we'll use a direct API call to the generateImage endpoint
-      const response = await this.callGenerateImageAPI(prompt, width, height);
+      const response = await this.callGenerateImageAPI(prompt, width, height, userId);
 
       return {
         imageUrl: response.imageUrl,
@@ -99,7 +102,8 @@ class GeminiImageService {
   private async callGenerateImageAPI(
     prompt: string,
     width: number,
-    height: number
+    height: number,
+    userId?: string
   ): Promise<{ imageUrl: string }> {
     const apiKey = process.env.GOOGLE_AI_API_KEY;
     if (!apiKey) {
@@ -142,26 +146,25 @@ class GeminiImageService {
 
     // Upload base64 image to Cloud Storage and return URL
     // For MVP, we can use a data URI or upload to Firebase Storage
-    const imageUrl = await this.uploadImageToStorage(imageData);
+    const imageUrl = await this.uploadImageToStorage(imageData, userId);
 
     return { imageUrl };
   }
 
   /**
-   * Upload base64-encoded image to Cloud Storage
-   * For MVP, returns a data URI; production should use Firebase Storage or similar
+   * Persist the model's base64 output and return a URL to store on the row.
+   * Uploads to Vercel Blob when configured; lib/storage.ts degrades to a data
+   * URI (with a warning) when it is not, so local dev still works.
    */
-  private async uploadImageToStorage(base64Data: string): Promise<string> {
-    // TODO: Implement Cloud Storage upload when ready
-    // For now, return as data URI (not suitable for production)
-    // In production, this would:
-    // 1. Create a signed upload URL
-    // 2. Upload to Google Cloud Storage
-    // 3. Return the public/signed URL
-
-    // Placeholder implementation - returns a data URI
-    // This works for testing but shouldn't be used in production
-    return `data:image/jpeg;base64,${base64Data}`;
+  private async uploadImageToStorage(base64Data: string, userId?: string): Promise<string> {
+    const { url } = await uploadMedia(base64Data, {
+      kind: 'image',
+      userId: userId || 'anonymous',
+      extension: 'jpg',
+      contentType: 'image/jpeg',
+      base64: true,
+    });
+    return url;
   }
 
   /**

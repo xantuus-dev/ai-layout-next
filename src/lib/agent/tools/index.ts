@@ -19,6 +19,13 @@ import {
   EmailSendBatchTool,
 } from './email';
 
+// Document tools
+import {
+  DocumentCreatePdfTool,
+  DocumentCreateDocxTool,
+  DocumentCreateDeckTool,
+} from './documents';
+
 // Google Drive tools
 import {
   DriveUploadTool,
@@ -87,6 +94,11 @@ export function initializeTools(): void {
   toolRegistry.register(new AiChatTool());
   toolRegistry.register(new AiSummarizeTool());
   toolRegistry.register(new AiExtractTool());
+
+  // Document tools
+  toolRegistry.register(new DocumentCreatePdfTool());
+  toolRegistry.register(new DocumentCreateDocxTool());
+  toolRegistry.register(new DocumentCreateDeckTool());
 
   console.log(`[Agent] Initialized ${toolRegistry.getAllTools().length} tools`);
 }

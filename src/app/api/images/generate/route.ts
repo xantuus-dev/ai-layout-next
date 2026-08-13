@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
         prompt,
         width,
         height,
+        userId: user.id,
       });
       imageUrl = result.imageUrl;
     } catch (error) {
