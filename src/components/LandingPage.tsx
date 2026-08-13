@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AuthModal from './ui/AuthModal';
 import ThemeToggle from './ThemeToggle';
+import TerminalDemo from './TerminalDemo';
+import ShowcaseGallery from './ShowcaseGallery';
+import CodeWindow from './CodeWindow';
 import {
   Sparkles,
   Workflow,
@@ -163,12 +166,20 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="max-w-5xl mx-auto px-4 md:px-8 pt-20 pb-16 text-center">
+      <section className="relative overflow-hidden max-w-full text-center">
+        {/* Vibrant glow field behind the hero — decorative only */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-32 left-1/2 -translate-x-[80%] w-[36rem] h-[36rem] rounded-full bg-teal-500/25 blur-3xl" />
+          <div className="absolute top-24 right-[8%] w-[28rem] h-[28rem] rounded-full bg-emerald-500/20 blur-3xl" />
+          <div className="absolute bottom-0 left-[10%] w-[24rem] h-[24rem] rounded-full bg-violet-500/15 blur-3xl" />
+        </div>
+
+        <div className="relative max-w-5xl mx-auto px-4 md:px-8 pt-20 pb-16">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-accent/50 text-xs font-medium text-muted-foreground mb-6">
           <Sparkles className="w-3.5 h-3.5 text-primary" />
           Multi-model AI, built for small business
         </div>
-        <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-foreground mb-6">
+        <h1 className="text-4xl md:text-7xl font-bold tracking-tight text-foreground mb-6">
           Run your business tasks on <span className="text-gradient">every leading AI model</span> — one credit balance
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
@@ -191,7 +202,13 @@ export default function LandingPage() {
           </a>
         </div>
         <p className="text-sm text-muted-foreground mt-4">No credit card required to start.</p>
+
+        <TerminalDemo />
+        </div>
       </section>
+
+      {/* Showcase — AI images & video */}
+      <ShowcaseGallery />
 
       {/* Features */}
       <section id="features" className="max-w-6xl mx-auto px-4 md:px-8 py-16 border-t border-border">
@@ -218,20 +235,28 @@ export default function LandingPage() {
       </section>
 
       {/* How it works */}
-      <section className="max-w-5xl mx-auto px-4 md:px-8 py-16 border-t border-border">
+      <section className="max-w-6xl mx-auto px-4 md:px-8 py-16 border-t border-border">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-foreground mb-3">Up and running in three steps</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">Up and running in three steps</h2>
+          <p className="text-muted-foreground max-w-xl mx-auto">
+            And when a task becomes routine, turn it into a workflow that runs itself.
+          </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8">
-          {STEPS.map((s) => (
-            <div key={s.step} className="text-center">
-              <div className="w-10 h-10 rounded-full gradient-primary text-white font-bold flex items-center justify-center mx-auto mb-4">
-                {s.step}
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+          <div className="space-y-8">
+            {STEPS.map((s) => (
+              <div key={s.step} className="flex items-start gap-4 text-left">
+                <div className="w-10 h-10 shrink-0 rounded-full gradient-primary text-white font-bold flex items-center justify-center">
+                  {s.step}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">{s.title}</h3>
+                  <p className="text-sm text-muted-foreground">{s.description}</p>
+                </div>
               </div>
-              <h3 className="font-semibold text-foreground mb-2">{s.title}</h3>
-              <p className="text-sm text-muted-foreground">{s.description}</p>
-            </div>
-          ))}
+            ))}
+          </div>
+          <CodeWindow />
         </div>
       </section>
 

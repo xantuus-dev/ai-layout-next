@@ -100,6 +100,23 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
     (item) => !item.requireAuth || session
   );
 
+  // The single active nav item. Exact match wins; otherwise the item whose href
+  // is the LONGEST path-prefix of the current route. Without the "most specific"
+  // rule, a parent route (/workspace) also matches a child
+  // (/workspace/projects/new), so two items highlight at once and their icons
+  // read as obscured. Now only the deepest match is active.
+  const activeHref = (() => {
+    const matches = visibleMenuItems.filter((item) =>
+      item.href === '/'
+        ? pathname === '/'
+        : pathname === item.href || pathname?.startsWith(`${item.href}/`)
+    );
+    if (matches.length === 0) return null;
+    return matches.reduce((best, item) =>
+      item.href.length > best.href.length ? item : best
+    ).href;
+  })();
+
   // Load recent sessions (across all workspaces) — refetches when navigating
   // into/out of a workspace so a freshly created session shows up.
   useEffect(() => {
@@ -173,15 +190,17 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
               className="w-7 h-7 object-contain flex-shrink-0"
             />
           ) : (
-            /* Sized by WIDTH, not height. The lockup's box is set by the X mark,
-               and the "XANTUUS AI" text is only ~34% of that box — so a height
-               constraint renders the wordmark far smaller than it looks like it
-               should (h-7 gave ~10px text). 150px wide puts the text near 16px,
-               in line with comparable apps, and still leaves room for the toggle. */
+            /* Full X + wordmark lockup, grey monochrome variant
+               (xantuus-logo-grey.png = the 3281×1875 lockup trimmed to its
+               content band and recoloured to a light grey, aspect ~3.45).
+               Sized by WIDTH, not height: the art is mostly horizontal, so a
+               height constraint under-renders it. 170px wide keeps the mark +
+               text legible and still leaves room for the toggle. object-left
+               anchors it against the padding. */
             <img
-              src="/xantuus-wordmark-white.png"
+              src="/xantuus-logo-grey.png"
               alt="Xantuus AI"
-              className="w-[150px] max-w-full h-auto object-contain object-left"
+              className="w-[170px] max-w-full h-auto object-contain object-left"
             />
           )}
 
@@ -212,9 +231,7 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
         <nav className="p-4 space-y-1 flex-shrink-0">
           {visibleMenuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = item.href === '/'
-              ? pathname === '/'
-              : pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            const isActive = item.href === activeHref;
 
             return (
               <button
