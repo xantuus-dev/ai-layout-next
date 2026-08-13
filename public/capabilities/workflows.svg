@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <defs>
+    <radialGradient id="wfglow" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="node1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#9333ea"/>
+    </linearGradient>
+    <linearGradient id="node2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="node3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="#0d051d"/>
+  <ellipse cx="400" cy="250" rx="370" ry="250" fill="url(#wfglow)"/>
+  <!-- grid dots -->
+  <g fill="#c084fc" opacity="0.18">
+    <circle cx="120" cy="90" r="2"/><circle cx="220" cy="90" r="2"/><circle cx="320" cy="90" r="2"/><circle cx="420" cy="90" r="2"/><circle cx="520" cy="90" r="2"/><circle cx="620" cy="90" r="2"/>
+    <circle cx="120" cy="170" r="2"/><circle cx="620" cy="170" r="2"/><circle cx="720" cy="170" r="2"/>
+    <circle cx="120" cy="250" r="2"/><circle cx="720" cy="250" r="2"/>
+    <circle cx="120" cy="330" r="2"/><circle cx="620" cy="330" r="2"/><circle cx="720" cy="330" r="2"/>
+    <circle cx="120" cy="410" r="2"/><circle cx="220" cy="410" r="2"/><circle cx="320" cy="410" r="2"/><circle cx="420" cy="410" r="2"/><circle cx="520" cy="410" r="2"/><circle cx="620" cy="410" r="2"/>
+  </g>
+  <!-- edges -->
+  <g fill="none" stroke="url(#edge)" stroke-width="4">
+    <path d="M215 165 C290 165 300 250 360 250"/>
+    <path d="M215 345 C290 345 300 250 360 250"/>
+    <path d="M470 250 C530 250 540 160 600 160"/>
+    <path d="M470 250 C530 250 540 340 600 340"/>
+  </g>
+  <!-- flowing pulse dots -->
+  <circle cx="300" cy="200" r="6" fill="#f0abfc"/>
+  <circle cx="300" cy="305" r="6" fill="#a5b4fc"/>
+  <circle cx="540" cy="196" r="6" fill="#7dd3fc"/>
+  <!-- trigger node -->
+  <g>
+    <rect x="105" y="130" width="110" height="70" rx="16" fill="url(#node1)"/>
+    <circle cx="137" cy="165" r="13" fill="#faf5ff"/>
+    <path d="M133 158 L145 165 L133 172 Z" fill="#9333ea"/>
+    <rect x="158" y="152" width="42" height="9" rx="4.5" fill="#faf5ff" opacity="0.9"/>
+    <rect x="158" y="168" width="30" height="7" rx="3.5" fill="#faf5ff" opacity="0.6"/>
+  </g>
+  <!-- schedule node -->
+  <g>
+    <rect x="105" y="310" width="110" height="70" rx="16" fill="url(#node2)"/>
+    <circle cx="137" cy="345" r="13" fill="none" stroke="#eef2ff" stroke-width="4"/>
+    <path d="M137 337 L137 345 L143 349" stroke="#eef2ff" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <rect x="158" y="332" width="42" height="9" rx="4.5" fill="#eef2ff" opacity="0.9"/>
+    <rect x="158" y="348" width="30" height="7" rx="3.5" fill="#eef2ff" opacity="0.6"/>
+  </g>
+  <!-- AI core node -->
+  <g>
+    <rect x="360" y="205" width="110" height="90" rx="20" fill="#160a2e" stroke="url(#edge)" stroke-width="3.5"/>
+    <path d="M415 226 l7 19 19 7 -19 7 -7 19 -7 -19 -19 -7 19 -7 Z" fill="#e879f9"/>
+    <rect x="384" y="278" width="62" height="7" rx="3.5" fill="#c084fc" opacity="0.7"/>
+  </g>
+  <!-- output nodes -->
+  <g>
+    <rect x="600" y="125" width="110" height="70" rx="16" fill="url(#node3)"/>
+    <path d="M622 176 L642 148 L656 162 L672 140" stroke="#f0f9ff" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <circle cx="676" cy="140" r="4" fill="#f0f9ff"/>
+  </g>
+  <g>
+    <rect x="600" y="305" width="110" height="70" rx="16" fill="#160a2e" stroke="#38bdf8" stroke-width="3"/>
+    <rect x="620" y="325" width="46" height="30" rx="6" fill="none" stroke="#7dd3fc" stroke-width="3.5"/>
+    <path d="M620 330 L643 345 L666 330" stroke="#7dd3fc" stroke-width="3.5" fill="none"/>
+    <circle cx="684" cy="322" r="10" fill="#22c55e"/>
+    <path d="M680 322 L683 326 L689 318" stroke="#f0fdf4" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  </g>
+  <!-- play badge -->
+  <g>
+    <circle cx="415" cy="115" r="30" fill="url(#node1)"/>
+    <path d="M406 100 L432 115 L406 130 Z" fill="#faf5ff"/>
+  </g>
+  <path d="M700 70 l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5 Z" fill="#e9d5ff" opacity="0.8"/>
+  <circle cx="90" cy="440" r="3" fill="#c084fc" opacity="0.7"/>
+</svg>

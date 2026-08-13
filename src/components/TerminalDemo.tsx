@@ -58,7 +58,7 @@ export default function TerminalDemo() {
 
   return (
     <div className="max-w-2xl mx-auto mt-14 text-left">
-      <div className="rounded-xl overflow-hidden border border-border bg-[#0d1117] shadow-2xl">
+      <div className="rounded-xl overflow-hidden border border-border bg-[#0d1117] glow-ambient">
         {/* Title bar */}
         <div className="flex items-center gap-2 px-4 py-3 bg-[#161b22] border-b border-white/10">
           <span className="w-3 h-3 rounded-full bg-[#ff5f57]" />

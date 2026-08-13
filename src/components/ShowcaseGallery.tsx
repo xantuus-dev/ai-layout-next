@@ -1,63 +1,45 @@
 import { Play, ImageIcon, Clapperboard } from 'lucide-react';
 
-/* Placeholder art built from layered CSS gradients so the section ships
-   without binary assets — swap any card's `art` for a real render by
-   replacing the styled div with an <img>/<video> of the same aspect. */
+/* Card art is hand-drawn SVG in public/showcase — vector, so it stays crisp
+   at any card size. To use a real AI render later, point `art` at the new
+   file; the <img> below handles any raster format the same way. */
 const SHOWCASE_ITEMS: {
   kind: 'image' | 'video';
   prompt: string;
   duration?: string;
-  art: React.CSSProperties;
+  art: string;
 }[] = [
   {
     kind: 'image',
     prompt: 'Neon jellyfish drifting through a deep indigo ocean, cinematic light',
-    art: {
-      background:
-        'radial-gradient(ellipse 80% 60% at 30% 20%, rgba(168,85,247,0.9), transparent 60%), radial-gradient(ellipse 70% 70% at 75% 70%, rgba(236,72,153,0.8), transparent 65%), radial-gradient(ellipse 90% 80% at 50% 100%, rgba(59,130,246,0.7), transparent 70%), #0f0524',
-    },
+    art: '/showcase/jellyfish.svg',
   },
   {
     kind: 'video',
     prompt: 'Product launch teaser — smoothie pour in slow motion, studio lighting',
     duration: '0:14',
-    art: {
-      background:
-        'radial-gradient(ellipse 90% 70% at 20% 80%, rgba(16,185,129,0.9), transparent 60%), radial-gradient(ellipse 70% 60% at 80% 20%, rgba(132,204,22,0.75), transparent 60%), radial-gradient(ellipse 100% 90% at 60% 60%, rgba(13,148,136,0.6), transparent 75%), #031712',
-    },
+    art: '/showcase/smoothie.svg',
   },
   {
     kind: 'image',
     prompt: 'Golden-hour mountain ridge above a sea of clouds, ultra wide',
-    art: {
-      background:
-        'radial-gradient(ellipse 90% 60% at 50% 90%, rgba(251,146,60,0.95), transparent 65%), radial-gradient(ellipse 80% 50% at 20% 30%, rgba(244,63,94,0.6), transparent 60%), radial-gradient(ellipse 70% 60% at 85% 15%, rgba(253,224,71,0.5), transparent 55%), #1c0a02',
-    },
+    art: '/showcase/mountains.svg',
   },
   {
     kind: 'image',
     prompt: 'Isometric cyberpunk street market at night, rain reflections',
-    art: {
-      background:
-        'radial-gradient(ellipse 70% 70% at 75% 25%, rgba(34,211,238,0.85), transparent 60%), radial-gradient(ellipse 80% 60% at 20% 75%, rgba(217,70,239,0.85), transparent 65%), radial-gradient(ellipse 90% 90% at 50% 50%, rgba(99,102,241,0.5), transparent 75%), #0a0118',
-    },
+    art: '/showcase/cyberpunk.svg',
   },
   {
     kind: 'video',
     prompt: 'Animated brand story — logo morphing through liquid color',
     duration: '0:22',
-    art: {
-      background:
-        'radial-gradient(ellipse 80% 70% at 30% 30%, rgba(45,212,191,0.9), transparent 60%), radial-gradient(ellipse 70% 80% at 80% 75%, rgba(129,140,248,0.85), transparent 65%), radial-gradient(ellipse 100% 80% at 50% 100%, rgba(14,165,233,0.55), transparent 70%), #020d1c',
-    },
+    art: '/showcase/brandstory.svg',
   },
   {
     kind: 'image',
     prompt: 'Minimal product shot — matcha jar on emerald silk, soft shadows',
-    art: {
-      background:
-        'radial-gradient(ellipse 80% 60% at 60% 35%, rgba(52,211,153,0.9), transparent 60%), radial-gradient(ellipse 90% 70% at 15% 85%, rgba(16,185,129,0.7), transparent 65%), radial-gradient(ellipse 60% 50% at 90% 90%, rgba(163,230,53,0.5), transparent 55%), #04140c',
-    },
+    art: '/showcase/matcha.svg',
   },
 ];
 
@@ -80,7 +62,11 @@ export default function ShowcaseGallery() {
             key={item.prompt}
             className="group relative rounded-2xl overflow-hidden border border-border shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all"
           >
-            <div className="aspect-[4/3] w-full" style={item.art} />
+            <img
+              src={item.art}
+              alt={item.prompt}
+              className="aspect-[4/3] w-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
 
             {item.kind === 'video' && (
               <>

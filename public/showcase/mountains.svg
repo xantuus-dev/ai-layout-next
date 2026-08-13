@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1c0a02"/>
+      <stop offset="45%" stop-color="#7c2d12"/>
+      <stop offset="75%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#fde047"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fefce8"/>
+      <stop offset="35%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="m1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#451a03"/>
+      <stop offset="100%" stop-color="#1c0a02"/>
+    </linearGradient>
+    <linearGradient id="m2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7c2d12"/>
+      <stop offset="100%" stop-color="#27100a"/>
+    </linearGradient>
+    <linearGradient id="cloudsea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fed7aa" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#c2410c" stop-opacity="0.35"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#sky)"/>
+  <circle cx="400" cy="330" r="210" fill="url(#sun)"/>
+  <circle cx="400" cy="330" r="86" fill="#fefce8"/>
+  <!-- far ridge -->
+  <path d="M0 350 L120 260 L210 330 L330 220 L430 320 L560 230 L680 330 L800 250 L800 600 L0 600 Z" fill="url(#m2)" opacity="0.85"/>
+  <!-- near ridge -->
+  <path d="M0 430 L90 360 L200 430 L320 330 L470 450 L590 350 L700 440 L800 380 L800 600 L0 600 Z" fill="url(#m1)"/>
+  <!-- snow light on peaks -->
+  <g stroke="#fdba74" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.9">
+    <path d="M320 330 L354 364"/>
+    <path d="M590 350 L620 378"/>
+    <path d="M90 360 L116 382"/>
+  </g>
+  <!-- sea of clouds -->
+  <g fill="url(#cloudsea)">
+    <ellipse cx="140" cy="505" rx="220" ry="46"/>
+    <ellipse cx="430" cy="530" rx="260" ry="52"/>
+    <ellipse cx="690" cy="500" rx="200" ry="44"/>
+    <ellipse cx="290" cy="475" rx="150" ry="30" opacity="0.8"/>
+    <ellipse cx="600" cy="470" rx="130" ry="26" opacity="0.7"/>
+  </g>
+  <!-- birds -->
+  <g stroke="#451a03" stroke-width="3.5" fill="none" stroke-linecap="round">
+    <path d="M250 170 C258 162 266 162 274 170 M274 170 C282 162 290 162 298 170"/>
+    <path d="M540 140 C546 134 552 134 558 140 M558 140 C564 134 570 134 576 140" opacity="0.8"/>
+  </g>
+  <!-- thin cirrus -->
+  <g stroke="#fed7aa" stroke-linecap="round" fill="none" opacity="0.6">
+    <path d="M90 120 L260 116" stroke-width="6"/>
+    <path d="M560 90 L720 86" stroke-width="5"/>
+    <path d="M620 190 L760 186" stroke-width="4" opacity="0.5"/>
+  </g>
+</svg>

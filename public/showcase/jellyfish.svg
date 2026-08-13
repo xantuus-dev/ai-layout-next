@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <radialGradient id="bell" cx="50%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#f9a8d4"/>
+      <stop offset="45%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.6"/>
+    </radialGradient>
+    <radialGradient id="glow1" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0abfc" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#818cf8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ray" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c4b5fd" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#c4b5fd" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="#0f0524"/>
+  <polygon points="240,0 380,0 300,420" fill="url(#ray)"/>
+  <polygon points="420,0 560,0 460,380" fill="url(#ray)"/>
+  <ellipse cx="410" cy="240" rx="330" ry="260" fill="url(#glow1)"/>
+  <ellipse cx="180" cy="480" rx="260" ry="200" fill="url(#glow2)"/>
+  <!-- tentacles -->
+  <g fill="none" stroke="url(#tent)" stroke-linecap="round">
+    <path d="M340 290 C330 380 360 420 335 520" stroke-width="7"/>
+    <path d="M375 300 C370 400 400 450 380 560" stroke-width="9"/>
+    <path d="M415 302 C420 410 395 460 420 570" stroke-width="10"/>
+    <path d="M455 298 C465 390 440 440 465 545" stroke-width="8"/>
+    <path d="M485 288 C500 370 475 420 500 505" stroke-width="6"/>
+    <path d="M310 280 C290 350 310 400 285 470" stroke-width="5"/>
+    <path d="M515 275 C540 340 520 390 545 455" stroke-width="5"/>
+  </g>
+  <!-- bell -->
+  <path d="M290 280 C290 160 510 160 510 280 C510 316 460 322 400 322 C340 322 290 316 290 280 Z" fill="url(#bell)"/>
+  <path d="M290 280 C290 160 510 160 510 280" fill="none" stroke="#fdf4ff" stroke-opacity="0.55" stroke-width="4"/>
+  <ellipse cx="360" cy="215" rx="34" ry="20" fill="#ffffff" opacity="0.35"/>
+  <!-- inner glow ribs -->
+  <g stroke="#fdf4ff" stroke-opacity="0.3" stroke-width="3" fill="none">
+    <path d="M330 300 C330 220 380 200 400 200"/>
+    <path d="M470 300 C470 220 420 200 400 200"/>
+  </g>
+  <!-- particles -->
+  <g fill="#e9d5ff">
+    <circle cx="150" cy="150" r="3" opacity="0.7"/>
+    <circle cx="215" cy="335" r="2" opacity="0.5"/>
+    <circle cx="610" cy="120" r="2.5" opacity="0.6"/>
+    <circle cx="660" cy="300" r="3.5" opacity="0.5"/>
+    <circle cx="565" cy="450" r="2" opacity="0.45"/>
+    <circle cx="120" cy="520" r="2.5" opacity="0.4"/>
+    <circle cx="700" cy="510" r="2" opacity="0.5"/>
+    <circle cx="90" cy="260" r="2" opacity="0.55"/>
+  </g>
+  <!-- small companion jellyfish -->
+  <g opacity="0.55">
+    <path d="M615 395 C615 355 685 355 685 395 C685 407 668 409 650 409 C632 409 615 407 615 395 Z" fill="url(#bell)"/>
+    <g fill="none" stroke="url(#tent)" stroke-linecap="round" stroke-width="3">
+      <path d="M632 407 C628 440 640 455 632 485"/>
+      <path d="M650 410 C652 445 642 465 652 500"/>
+      <path d="M668 407 C674 438 662 458 672 488"/>
+    </g>
+  </g>
+</svg>

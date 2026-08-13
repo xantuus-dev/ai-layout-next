@@ -127,7 +127,7 @@ export default function CodeWindow() {
   }
 
   return (
-    <div className="rounded-xl overflow-hidden border border-border bg-[#0d1117] shadow-2xl text-left">
+    <div className="rounded-xl overflow-hidden border border-border bg-[#0d1117] glow-ambient text-left">
       {/* Title bar with editor tab */}
       <div className="flex items-center gap-2 px-4 pt-3 bg-[#161b22] border-b border-white/10">
         <span className="w-3 h-3 rounded-full bg-[#ff5f57] mb-3" />

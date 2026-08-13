@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <defs>
+    <radialGradient id="imgglow" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#67e8f9"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <radialGradient id="galaxy" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#e0f2fe"/>
+      <stop offset="30%" stop-color="#38bdf8"/>
+      <stop offset="70%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </radialGradient>
+    <linearGradient id="thumb1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f0abfc"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="thumb2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="#060b21"/>
+  <ellipse cx="400" cy="240" rx="370" ry="240" fill="url(#imgglow)"/>
+  <!-- main canvas frame -->
+  <rect x="250" y="80" width="300" height="240" rx="18" fill="none" stroke="url(#frame)" stroke-width="6"/>
+  <rect x="266" y="96" width="268" height="208" rx="10" fill="url(#galaxy)"/>
+  <!-- galaxy swirl -->
+  <g fill="none" stroke="#e0f2fe" stroke-linecap="round" opacity="0.85">
+    <path d="M400 200 C430 185 445 205 430 222 C412 240 375 230 372 202 C368 168 415 148 448 165" stroke-width="5"/>
+    <path d="M400 200 C370 215 355 195 370 178 C388 160 425 170 428 198 C432 232 385 252 352 235" stroke-width="4" opacity="0.7"/>
+  </g>
+  <circle cx="400" cy="200" r="10" fill="#f0f9ff"/>
+  <g fill="#e0f2fe">
+    <circle cx="320" cy="140" r="2.5" opacity="0.9"/>
+    <circle cx="480" cy="130" r="2" opacity="0.8"/>
+    <circle cx="500" cy="260" r="2.5" opacity="0.85"/>
+    <circle cx="300" cy="270" r="2" opacity="0.7"/>
+    <circle cx="450" cy="115" r="1.5" opacity="0.7"/>
+  </g>
+  <!-- side thumbnails -->
+  <rect x="120" y="120" width="90" height="70" rx="10" fill="url(#thumb1)"/>
+  <rect x="110" y="215" width="100" height="76" rx="10" fill="url(#thumb2)"/>
+  <path d="M118 280 L145 250 L165 268 L185 240 L202 258 L202 281 C202 287 197 291 191 291 L129 291 C123 291 118 287 118 281 Z" fill="#7c2d12" opacity="0.65"/>
+  <circle cx="138" cy="238" r="9" fill="#fef3c7" opacity="0.9"/>
+  <rect x="590" y="140" width="94" height="72" rx="10" fill="#0f766e"/>
+  <path d="M596 200 L622 172 L640 188 L660 162 L678 180 L678 202 C678 207 674 212 668 212 L606 212 C600 212 596 207 596 202 Z" fill="#5eead4" opacity="0.8"/>
+  <circle cx="618" cy="160" r="8" fill="#ccfbf1"/>
+  <!-- color swatches -->
+  <g>
+    <circle cx="600" cy="270" r="14" fill="#22d3ee"/>
+    <circle cx="636" cy="270" r="14" fill="#a855f7"/>
+    <circle cx="672" cy="270" r="14" fill="#f472b6"/>
+    <circle cx="618" cy="302" r="14" fill="#fbbf24"/>
+    <circle cx="654" cy="302" r="14" fill="#34d399"/>
+  </g>
+  <!-- generation progress bar under canvas -->
+  <rect x="266" y="340" width="268" height="14" rx="7" fill="#1e293b"/>
+  <rect x="266" y="340" width="186" height="14" rx="7" fill="url(#frame)"/>
+  <text x="266" y="382" font-family="monospace" font-size="17" fill="#67e8f9" opacity="0.9">"nebula spiral, dreamlike"</text>
+  <!-- cursor sparkle -->
+  <path d="M560 330 l6 16 16 6 -16 6 -6 16 -6 -16 -16 -6 16 -6 Z" fill="#a5f3fc" opacity="0.95"/>
+  <circle cx="180" cy="80" r="3" fill="#67e8f9" opacity="0.8"/>
+  <circle cx="680" cy="90" r="4" fill="#818cf8" opacity="0.7"/>
+  <circle cx="130" cy="380" r="3" fill="#f0abfc" opacity="0.7"/>
+</svg>

@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <defs>
+    <radialGradient id="modglow" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#2dd4bf" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="hub" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5eead4"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="wire" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.2"/>
+      <stop offset="50%" stop-color="#5eead4"/>
+      <stop offset="100%" stop-color="#2dd4bf" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="#03150f"/>
+  <ellipse cx="400" cy="250" rx="360" ry="240" fill="url(#modglow)"/>
+  <!-- orbit rings -->
+  <ellipse cx="400" cy="250" rx="270" ry="150" fill="none" stroke="#2dd4bf" stroke-opacity="0.25" stroke-width="2"/>
+  <ellipse cx="400" cy="250" rx="200" ry="105" fill="none" stroke="#2dd4bf" stroke-opacity="0.18" stroke-width="2"/>
+  <!-- connection wires -->
+  <g fill="none" stroke="url(#wire)" stroke-width="3.5">
+    <path d="M400 250 C330 200 250 190 175 155"/>
+    <path d="M400 250 C480 200 550 190 625 150"/>
+    <path d="M400 250 C400 320 400 350 400 385"/>
+  </g>
+  <!-- pulse dots on wires -->
+  <circle cx="300" cy="207" r="6" fill="#99f6e4"/>
+  <circle cx="520" cy="203" r="6" fill="#99f6e4"/>
+  <circle cx="400" cy="330" r="6" fill="#99f6e4"/>
+  <!-- central chat hub -->
+  <g>
+    <rect x="330" y="190" width="140" height="104" rx="26" fill="url(#hub)"/>
+    <path d="M370 294 L370 322 L402 294 Z" fill="url(#hub)"/>
+    <g fill="#022c22">
+      <circle cx="372" cy="242" r="9"/>
+      <circle cx="400" cy="242" r="9"/>
+      <circle cx="428" cy="242" r="9"/>
+    </g>
+  </g>
+  <!-- model node: Claude (left) -->
+  <g>
+    <circle cx="150" cy="140" r="46" fill="#12211c" stroke="#f97316" stroke-width="3"/>
+    <path d="M150 116 C168 116 180 132 180 146 C180 162 166 172 150 172 C134 172 120 162 120 146 C120 132 132 116 150 116 Z" fill="none" stroke="#fb923c" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="150" cy="145" r="10" fill="#fb923c"/>
+    <text x="150" y="212" font-family="sans-serif" font-size="17" fill="#fdba74" text-anchor="middle" font-weight="600">Claude</text>
+  </g>
+  <!-- model node: GPT (right) -->
+  <g>
+    <circle cx="650" cy="135" r="46" fill="#12211c" stroke="#22d3ee" stroke-width="3"/>
+    <g stroke="#67e8f9" stroke-width="5" fill="none" stroke-linecap="round">
+      <path d="M650 108 L672 121 L672 148 L650 161 L628 148 L628 121 Z"/>
+    </g>
+    <circle cx="650" cy="135" r="9" fill="#67e8f9"/>
+    <text x="650" y="207" font-family="sans-serif" font-size="17" fill="#a5f3fc" text-anchor="middle" font-weight="600">GPT</text>
+  </g>
+  <!-- model node: Gemini (bottom) -->
+  <g>
+    <circle cx="400" cy="420" r="42" fill="#12211c" stroke="#818cf8" stroke-width="3"/>
+    <path d="M400 396 C404 410 414 420 428 424 C414 428 404 438 400 448 C396 438 386 428 372 424 C386 420 396 410 400 396 Z" fill="#a5b4fc"/>
+    <text x="472" y="428" font-family="sans-serif" font-size="17" fill="#c7d2fe" text-anchor="start" font-weight="600">Gemini</text>
+  </g>
+  <!-- one credit coin -->
+  <g>
+    <circle cx="680" cy="330" r="34" fill="#022c22" stroke="#fbbf24" stroke-width="4"/>
+    <circle cx="680" cy="330" r="24" fill="none" stroke="#fde68a" stroke-width="2" stroke-dasharray="4 5"/>
+    <text x="680" y="340" font-family="Georgia, serif" font-size="26" fill="#fde68a" text-anchor="middle" font-weight="bold">1</text>
+  </g>
+  <!-- sparkles -->
+  <path d="M110 330 l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5 Z" fill="#99f6e4" opacity="0.8"/>
+  <circle cx="250" cy="420" r="3" fill="#5eead4" opacity="0.7"/>
+  <circle cx="580" cy="80" r="3" fill="#5eead4" opacity="0.7"/>
+</svg>

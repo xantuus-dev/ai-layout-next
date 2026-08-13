@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <defs>
+    <radialGradient id="tempglow" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#fb923c" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#fb923c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tcard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="hot" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="#1a0b02"/>
+  <ellipse cx="400" cy="230" rx="370" ry="240" fill="url(#tempglow)"/>
+  <!-- back row template cards -->
+  <g opacity="0.75">
+    <rect x="100" y="90" width="150" height="100" rx="14" fill="url(#tcard)" stroke="#fdba74" stroke-opacity="0.35" stroke-width="2"/>
+    <rect x="118" y="110" width="70" height="10" rx="5" fill="#fed7aa" opacity="0.8"/>
+    <rect x="118" y="130" width="114" height="7" rx="3.5" fill="#ffffff" opacity="0.25"/>
+    <rect x="118" y="145" width="96" height="7" rx="3.5" fill="#ffffff" opacity="0.2"/>
+  </g>
+  <g opacity="0.75">
+    <rect x="550" y="90" width="150" height="100" rx="14" fill="url(#tcard)" stroke="#fdba74" stroke-opacity="0.35" stroke-width="2"/>
+    <rect x="568" y="110" width="80" height="10" rx="5" fill="#fed7aa" opacity="0.8"/>
+    <rect x="568" y="130" width="114" height="7" rx="3.5" fill="#ffffff" opacity="0.25"/>
+    <rect x="568" y="145" width="88" height="7" rx="3.5" fill="#ffffff" opacity="0.2"/>
+  </g>
+  <g opacity="0.6">
+    <rect x="325" y="70" width="150" height="90" rx="14" fill="url(#tcard)" stroke="#fdba74" stroke-opacity="0.3" stroke-width="2"/>
+    <rect x="343" y="88" width="64" height="10" rx="5" fill="#fed7aa" opacity="0.7"/>
+    <rect x="343" y="108" width="114" height="7" rx="3.5" fill="#ffffff" opacity="0.2"/>
+  </g>
+  <!-- highlighted template card -->
+  <g>
+    <rect x="240" y="185" width="320" height="220" rx="20" fill="#241104" stroke="url(#hot)" stroke-width="3.5"/>
+    <rect x="264" y="210" width="56" height="56" rx="14" fill="url(#hot)"/>
+    <path d="M282 226 L302 226 M282 238 L306 238 M282 250 L296 250" stroke="#451a03" stroke-width="5" stroke-linecap="round"/>
+    <rect x="334" y="216" width="150" height="15" rx="7" fill="#ffedd5"/>
+    <rect x="334" y="242" width="108" height="10" rx="5" fill="#fdba74" opacity="0.7"/>
+    <!-- template body with variable chips -->
+    <rect x="264" y="292" width="272" height="9" rx="4.5" fill="#ffffff" opacity="0.3"/>
+    <g font-family="monospace" font-size="15">
+      <rect x="264" y="312" width="118" height="26" rx="13" fill="#7c2d12" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="323" y="330" fill="#fdba74" text-anchor="middle">{{product}}</text>
+      <rect x="394" y="312" width="94" height="26" rx="13" fill="#7c2d12" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="441" y="330" fill="#fdba74" text-anchor="middle">{{tone}}</text>
+    </g>
+    <rect x="264" y="352" width="240" height="9" rx="4.5" fill="#ffffff" opacity="0.25"/>
+    <!-- run button -->
+    <rect x="438" y="368" width="98" height="26" rx="13" fill="url(#hot)"/>
+    <path d="M470 375 L482 381 L470 387 Z" fill="#451a03"/>
+    <text x="500" y="386" font-family="sans-serif" font-size="14" fill="#451a03" font-weight="700" text-anchor="middle">Run</text>
+  </g>
+  <!-- lightning bolt = ready to run -->
+  <path d="M620 260 L586 320 L610 320 L594 372 L648 300 L620 300 Z" fill="url(#hot)"/>
+  <!-- sparkles -->
+  <path d="M150 320 l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5 Z" fill="#fde68a" opacity="0.85"/>
+  <path d="M690 190 l4 11 11 4 -11 4 -4 11 -4 -11 -11 -4 11 -4 Z" fill="#fdba74" opacity="0.7"/>
+  <circle cx="90" cy="240" r="3" fill="#fdba74" opacity="0.7"/>
+  <circle cx="720" cy="420" r="4" fill="#fb923c" opacity="0.6"/>
+</svg>

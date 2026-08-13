@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="ribbon1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+    <linearGradient id="ribbon2" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ccfbf1"/>
+      <stop offset="55%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.4"/>
+    </radialGradient>
+    <radialGradient id="bglow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#14b8a6" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#14b8a6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="600" fill="#020d1c"/>
+  <ellipse cx="400" cy="300" rx="360" ry="280" fill="url(#bglow)"/>
+  <!-- flowing ribbons -->
+  <path d="M-40 420 C160 320 240 480 400 380 C560 280 660 420 840 300 L840 600 L-40 600 Z" fill="url(#ribbon1)" opacity="0.35"/>
+  <path d="M-40 480 C180 400 300 520 460 430 C620 340 700 460 840 380 L840 600 L-40 600 Z" fill="url(#ribbon2)" opacity="0.3"/>
+  <g fill="none" stroke-linecap="round">
+    <path d="M-20 180 C180 120 300 240 480 170 C620 118 720 160 820 120" stroke="url(#ribbon1)" stroke-width="14" opacity="0.5"/>
+    <path d="M-20 230 C200 170 340 280 520 210 C660 158 740 200 820 170" stroke="url(#ribbon2)" stroke-width="8" opacity="0.45"/>
+  </g>
+  <!-- liquid morph blob -->
+  <path d="M400 160 C480 160 545 205 552 280 C559 356 505 425 415 432 C330 439 250 390 246 306 C242 224 316 160 400 160 Z" fill="url(#core)" opacity="0.92"/>
+  <path d="M400 178 C468 178 526 216 532 280 C538 346 492 406 414 412 C340 418 270 376 266 304 C262 234 328 178 400 178 Z" fill="none" stroke="#f0fdfa" stroke-opacity="0.4" stroke-width="3"/>
+  <!-- brand X mark -->
+  <g stroke="#022c22" stroke-width="26" stroke-linecap="round">
+    <path d="M352 250 L448 350"/>
+    <path d="M448 250 L352 350"/>
+  </g>
+  <g stroke="#f0fdfa" stroke-width="12" stroke-linecap="round">
+    <path d="M352 250 L448 350"/>
+    <path d="M448 250 L352 350"/>
+  </g>
+  <!-- droplets escaping the morph -->
+  <circle cx="540" cy="200" r="16" fill="url(#core)" opacity="0.85"/>
+  <circle cx="585" cy="255" r="9" fill="url(#core)" opacity="0.7"/>
+  <circle cx="245" cy="410" r="12" fill="url(#core)" opacity="0.7"/>
+  <circle cx="205" cy="215" r="8" fill="url(#core)" opacity="0.6"/>
+  <!-- sparkles -->
+  <g fill="#99f6e4">
+    <path d="M640 130 l4 12 12 4 -12 4 -4 12 -4 -12 -12 -4 12 -4 Z" opacity="0.9"/>
+    <path d="M155 320 l3 9 9 3 -9 3 -3 9 -3 -9 -9 -3 9 -3 Z" opacity="0.7"/>
+    <path d="M600 470 l3 9 9 3 -9 3 -3 9 -3 -9 -9 -3 9 -3 Z" opacity="0.6"/>
+  </g>
+</svg>

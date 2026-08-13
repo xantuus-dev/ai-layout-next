@@ -6,7 +6,9 @@ import Link from 'next/link';
 import AuthModal from './ui/AuthModal';
 import ThemeToggle from './ThemeToggle';
 import TerminalDemo from './TerminalDemo';
+import { ShinyButton } from './ui/shiny-button';
 import ShowcaseGallery from './ShowcaseGallery';
+import CapabilitiesSection from './CapabilitiesSection';
 import CodeWindow from './CodeWindow';
 import {
   Sparkles,
@@ -187,13 +189,13 @@ export default function LandingPage() {
           automation, and a credit-based plan that scales with actual usage — not seats.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <button
+          <ShinyButton
             onClick={openSignUp}
-            className="w-full sm:w-auto px-8 py-3 text-base font-semibold gradient-primary hover:gradient-primary-hover text-white rounded-full transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-2"
+            className="w-full sm:w-auto [&>span]:inline-flex [&>span]:items-center [&>span]:justify-center [&>span]:gap-2"
           >
             Get started free
             <ArrowRight className="w-4 h-4" />
-          </button>
+          </ShinyButton>
           <a
             href="#pricing"
             className="w-full sm:w-auto px-8 py-3 text-base font-semibold text-foreground border border-border rounded-full hover:bg-accent transition-colors text-center"
@@ -209,6 +211,9 @@ export default function LandingPage() {
 
       {/* Showcase — AI images & video */}
       <ShowcaseGallery />
+
+      {/* Capabilities — what Xantuus actually does */}
+      <CapabilitiesSection />
 
       {/* Features */}
       <section id="features" className="max-w-6xl mx-auto px-4 md:px-8 py-16 border-t border-border">
@@ -297,16 +302,12 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <button
+              <ShinyButton
                 onClick={() => (plan.name === 'Free' ? openSignUp() : router.push('/pricing'))}
-                className={`w-full py-2.5 rounded-lg font-semibold transition-colors ${
-                  plan.highlight
-                    ? 'gradient-primary hover:gradient-primary-hover text-white'
-                    : 'bg-secondary text-foreground hover:bg-secondary/80'
-                }`}
+                className="w-full py-2.5 text-sm"
               >
                 {plan.cta}
-              </button>
+              </ShinyButton>
             </div>
           ))}
         </div>

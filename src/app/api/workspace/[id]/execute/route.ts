@@ -285,6 +285,34 @@ export async function POST(
         // until now were stored and edited but never sent anywhere.
         const systemPrompt = buildSystemPrompt(user, memoryContext);
 
+        // Prior turns in this conversation. Without them the model saw only
+        // the current message, so any follow-up that references earlier
+        // context ("summarize your previous response") was answered from a
+        // blank slate. Capped to the 20 most recent turns to bound input
+        // tokens; attachments on old turns are not replayed, only their text.
+        const priorMessages = await prisma.message.findMany({
+          where: { conversationId, id: { not: userMessage.id } },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: { role: true, content: true },
+        });
+        // Providers require strict user/assistant alternation starting from a
+        // user turn, and a turn whose completion failed can leave consecutive
+        // same-role rows — merge those, trim a leading assistant turn, and
+        // drop a trailing user turn (the current message is the user turn).
+        const history: { role: 'user' | 'assistant'; content: string }[] = [];
+        for (const m of priorMessages.reverse()) {
+          if ((m.role !== 'user' && m.role !== 'assistant') || !m.content) continue;
+          const last = history[history.length - 1];
+          if (last && last.role === m.role) {
+            last.content += `\n\n${m.content}`;
+          } else {
+            history.push({ role: m.role, content: m.content });
+          }
+        }
+        while (history.length > 0 && history[0].role === 'assistant') history.shift();
+        while (history.length > 0 && history[history.length - 1].role === 'user') history.pop();
+
         // Stream through the security chokepoint: outbound PII is redacted
         // before it reaches the provider and rehydrated in the streamed deltas.
         const stream = secureChatStream(
@@ -292,6 +320,7 @@ export async function POST(
           {
             messages: [
               { role: 'system' as const, content: systemPrompt },
+              ...history,
               {
                 role: 'user',
                 content,

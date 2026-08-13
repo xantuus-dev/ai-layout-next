@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="silk1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#065f46"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+    <radialGradient id="spotlight" cx="50%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#a7f3d0" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#a7f3d0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="jarbody" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f5f5f4"/>
+      <stop offset="35%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#d6d3d1"/>
+    </linearGradient>
+    <linearGradient id="lid" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#a16207"/>
+      <stop offset="45%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#854d0e"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="#04140c"/>
+  <ellipse cx="400" cy="210" rx="380" ry="240" fill="url(#spotlight)"/>
+  <!-- silk backdrop waves -->
+  <path d="M-30 520 C120 380 260 520 420 420 C580 320 700 440 830 340 L830 620 L-30 620 Z" fill="url(#silk1)" opacity="0.9"/>
+  <path d="M-30 560 C160 460 320 570 480 490 C640 410 720 500 830 430 L830 620 L-30 620 Z" fill="url(#silk1)" opacity="0.7"/>
+  <path d="M-30 480 C100 420 220 470 340 430" fill="none" stroke="#6ee7b7" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
+  <path d="M470 400 C600 340 700 400 830 330" fill="none" stroke="#6ee7b7" stroke-width="3" opacity="0.45" stroke-linecap="round"/>
+  <!-- jar shadow -->
+  <ellipse cx="400" cy="470" rx="140" ry="20" fill="#01130c" opacity="0.7"/>
+  <!-- jar -->
+  <g>
+    <rect x="310" y="230" width="180" height="240" rx="26" fill="url(#jarbody)"/>
+    <!-- lid -->
+    <rect x="318" y="196" width="164" height="46" rx="20" fill="url(#lid)"/>
+    <ellipse cx="400" cy="198" rx="82" ry="12" fill="#fde68a"/>
+    <!-- label -->
+    <rect x="330" y="290" width="140" height="120" rx="10" fill="#065f46"/>
+    <text x="400" y="338" font-family="Georgia, serif" font-size="30" fill="#ecfdf5" text-anchor="middle" font-weight="bold">MATCHA</text>
+    <path d="M352 358 L448 358" stroke="#6ee7b7" stroke-width="2"/>
+    <text x="400" y="384" font-family="Georgia, serif" font-size="15" fill="#a7f3d0" text-anchor="middle" letter-spacing="3">CEREMONIAL</text>
+    <!-- leaf mark -->
+    <path d="M392 296 C400 284 412 282 420 272 C422 288 412 300 398 302 C395 302 393 300 392 296 Z" fill="#34d399"/>
+    <!-- glass highlight -->
+    <path d="M330 250 L330 440" stroke="#ffffff" stroke-width="9" stroke-linecap="round" opacity="0.8"/>
+  </g>
+  <!-- matcha powder mound -->
+  <path d="M545 452 C555 428 585 428 595 452 C600 462 590 468 570 468 C550 468 540 462 545 452 Z" fill="#4ade80"/>
+  <ellipse cx="570" cy="466" rx="42" ry="8" fill="#166534" opacity="0.6"/>
+  <!-- bamboo whisk hint -->
+  <g opacity="0.9">
+    <rect x="216" y="330 " width="16" height="60" rx="7" fill="#d6b98c"/>
+    <g stroke="#e7cfa8" stroke-width="3" fill="none" stroke-linecap="round">
+      <path d="M220 390 C210 420 206 440 208 458"/>
+      <path d="M224 392 C220 424 218 444 220 460"/>
+      <path d="M228 392 C232 424 234 444 232 460"/>
+      <path d="M232 390 C242 420 246 440 244 458"/>
+    </g>
+  </g>
+  <!-- floating leaves -->
+  <path d="M600 150 C622 134 648 136 662 122 C666 142 648 162 622 164 C610 164 602 158 600 150 Z" fill="#34d399" opacity="0.85"/>
+  <path d="M160 170 C176 158 196 160 206 150 C209 165 196 180 176 181 C167 181 161 176 160 170 Z" fill="#6ee7b7" opacity="0.7"/>
+</svg>
