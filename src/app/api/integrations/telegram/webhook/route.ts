@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { decryptField } from '@/lib/crypto/envelope';
 import {
   sendTelegramMessage,
   sendTelegramChatAction,
@@ -99,7 +100,7 @@ async function handleMessage(
     }
 
     const config = matchingIntegration.config as any;
-    const botToken = matchingIntegration.accessToken!;
+    const botToken = decryptField(matchingIntegration.accessToken!);
 
     // Extract commands
     const commands = extractTelegramCommands(message);
@@ -323,7 +324,7 @@ async function handleCallbackQuery(
       return;
     }
 
-    const botToken = matchingIntegration.accessToken!;
+    const botToken = decryptField(matchingIntegration.accessToken!);
 
     // Answer callback query
     await answerCallbackQuery(botToken, id, {

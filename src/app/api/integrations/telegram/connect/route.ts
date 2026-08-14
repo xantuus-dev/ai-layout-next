@@ -9,6 +9,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { encryptNullableIfConfigured } from '@/lib/crypto/envelope';
+import { resolveIntegrationOwnerId } from '@/lib/integrations/store';
 import {
   getTelegramBotInfo,
   setTelegramWebhook,
@@ -113,6 +115,12 @@ export async function POST(req: NextRequest) {
       // Continue anyway, webhook might still work
     }
 
+    // Encrypt the bot token at rest and attribute to the team owner. The
+    // webhook secret lives in config.secretToken and is intentionally NOT
+    // encrypted — the webhook handler compares incoming requests against it.
+    const ownerId = await resolveIntegrationOwnerId(userId);
+    const encBotToken = encryptNullableIfConfigured(botToken);
+
     // Store integration in database
     const integration = await prisma.integration.upsert({
       where: {
@@ -122,8 +130,9 @@ export async function POST(req: NextRequest) {
         },
       },
       update: {
+        ownerId,
         name: `Telegram - @${botInfo.username}`,
-        accessToken: botToken,
+        accessToken: encBotToken,
         isActive: true,
         config: {
           botId: botInfo.id,
@@ -140,9 +149,10 @@ export async function POST(req: NextRequest) {
       },
       create: {
         userId,
+        ownerId,
         provider: 'telegram',
         name: `Telegram - @${botInfo.username}`,
-        accessToken: botToken,
+        accessToken: encBotToken,
         isActive: true,
         config: {
           botId: botInfo.id,

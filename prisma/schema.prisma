@@ -1067,6 +1067,12 @@ model Integration {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Org ownership: the team owner this integration is shared under (a member's
+  // connection belongs to their team owner; a standalone user owns their own).
+  // Foundation for org-level "connect once for the whole team" integrations.
+  // Nullable during rollout; backfilled to userId for existing rows.
+  ownerId String?
+
   // Integration identity
   provider String // "notion", "slack", "zapier", "custom"
   name     String // User-friendly name
@@ -1095,6 +1101,7 @@ model Integration {
 
   @@unique([userId, provider])
   @@index([userId, isActive])
+  @@index([ownerId, provider])
 }
 
 // CustomTool - User-defined tools for workflow automation

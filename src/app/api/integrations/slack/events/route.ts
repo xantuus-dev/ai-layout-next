@@ -13,6 +13,7 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { postSlackMessage } from '@/lib/slack-oauth';
 import { captureAPIError } from '@/lib/sentry';
+import { decryptIntegration } from '@/lib/integrations/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -122,17 +123,20 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
       }
 
-      // Find integration for this team
-      const integration = await prisma.integration.findFirst({
-        where: {
-          provider: 'slack',
-          config: {
-            path: ['teamId'],
-            equals: payload.team_id,
+      // Find integration for this team. Decrypt secret fields once here so the
+      // downstream handlers see a plaintext bot token.
+      const integration = decryptIntegration(
+        await prisma.integration.findFirst({
+          where: {
+            provider: 'slack',
+            config: {
+              path: ['teamId'],
+              equals: payload.team_id,
+            },
+            isActive: true,
           },
-          isActive: true,
-        },
-      });
+        })
+      );
 
       if (!integration) {
         console.warn(`No active Slack integration found for team: ${payload.team_id}`);

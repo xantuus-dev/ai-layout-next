@@ -99,3 +99,25 @@ export function encryptNullable(value: string | null | undefined): string | null
 export function decryptNullable(value: string | null | undefined): string | null {
   return value ? decryptField(value) : null;
 }
+
+/** True when a field-encryption key is configured for this deployment. */
+export function isEncryptionConfigured(): boolean {
+  return !!process.env.FIELD_ENCRYPTION_KEY;
+}
+
+/**
+ * Graceful encrypt: enciphers only when a key is configured, and never
+ * double-encrypts an already-enveloped value. When no key is set the plaintext
+ * is returned unchanged, so enabling encryption is a pure config flip with no
+ * data migration required — existing plaintext rows stay readable (decrypt is
+ * pass-through) and new writes encrypt once the key is present.
+ */
+export function encryptFieldIfConfigured(value: string): string {
+  if (isEncrypted(value)) return value;
+  return isEncryptionConfigured() ? encryptField(value) : value;
+}
+
+/** encryptFieldIfConfigured, tolerant of null/empty. */
+export function encryptNullableIfConfigured(value: string | null | undefined): string | null {
+  return value ? encryptFieldIfConfigured(value) : null;
+}

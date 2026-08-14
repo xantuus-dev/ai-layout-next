@@ -9,6 +9,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getSlackTokensFromCode, testSlackToken } from '@/lib/slack-oauth';
 import { prisma } from '@/lib/prisma';
+import { encryptNullableIfConfigured } from '@/lib/crypto/envelope';
+import { resolveIntegrationOwnerId } from '@/lib/integrations/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,6 +82,13 @@ export async function GET(req: NextRequest) {
       throw new Error(`Slack auth test failed: ${authTest.error}`);
     }
 
+    // Encrypt credentials at rest and attribute the connection to the team
+    // owner (org-level ownership). Encryption is graceful: a no-op unless
+    // FIELD_ENCRYPTION_KEY is configured.
+    const ownerId = await resolveIntegrationOwnerId(session.user.id);
+    const encAccessToken = encryptNullableIfConfigured(tokens.access_token);
+    const encRefreshToken = encryptNullableIfConfigured(tokens.authed_user?.access_token);
+
     // Upsert Integration record
     await prisma.integration.upsert({
       where: {
@@ -90,10 +99,11 @@ export async function GET(req: NextRequest) {
       },
       create: {
         userId: session.user.id,
+        ownerId,
         provider: 'slack',
         name: `Slack - ${authTest.team || 'Workspace'}`,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.authed_user?.access_token, // User token (if any)
+        accessToken: encAccessToken,
+        refreshToken: encRefreshToken, // User token (if any)
         scopes: tokens.scope.split(','),
         config: {
           teamId: authTest.team_id,
@@ -106,9 +116,10 @@ export async function GET(req: NextRequest) {
         isActive: true,
       },
       update: {
+        ownerId,
         name: `Slack - ${authTest.team || 'Workspace'}`,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.authed_user?.access_token,
+        accessToken: encAccessToken,
+        refreshToken: encRefreshToken,
         scopes: tokens.scope.split(','),
         config: {
           teamId: authTest.team_id,
