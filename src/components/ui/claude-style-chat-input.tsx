@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
-import { Plus, ChevronDown, ArrowUp, X, FileText, Loader2, Check, Archive, Wand2 } from "lucide-react";
+import { Plus, ChevronDown, ArrowUp, X, FileText, Loader2, Check, Archive, Wand2, Mic, Square } from "lucide-react";
 import { ANTHROPIC_MODELS, DEFAULT_ANTHROPIC_MODEL } from "@/lib/ai-providers/catalog";
 import { resolveImageMimeType, stripDataUrlPrefix } from "@/lib/files/attachments";
+import { useDictation } from "@/hooks/useDictation";
 
 /* --- ICONS --- */
 export const Icons = {
@@ -29,6 +30,8 @@ export const Icons = {
     Loader2: Loader2,
     Check: Check,
     Archive: Archive,
+    Mic: Mic,
+    Square: Square,
     Clock: (props: React.SVGProps<SVGSVGElement>) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" {...props}><path d="M10.3857 2.50977C14.3486 2.71054 17.5 5.98724 17.5 10C17.5 14.1421 14.1421 17.5 10 17.5C5.85786 17.5 2.5 14.1421 2.5 10C2.5 9.72386 2.72386 9.5 3 9.5C3.27614 9.5 3.5 9.72386 3.5 10C3.5 13.5899 6.41015 16.5 10 16.5C13.5899 16.5 16.5 13.5899 16.5 10C16.5 6.5225 13.7691 3.68312 10.335 3.50879L10 3.5L9.89941 3.49023C9.67145 3.44371 9.5 3.24171 9.5 3C9.5 2.72386 9.72386 2.5 10 2.5L10.3857 2.50977ZM10 5.5C10.2761 5.5 10.5 5.72386 10.5 6V9.69043L13.2236 11.0527C13.4706 11.1762 13.5708 11.4766 13.4473 11.7236C13.3392 11.9397 13.0957 12.0435 12.8711 11.9834L12.7764 11.9473L9.77637 10.4473C9.60698 10.3626 9.5 10.1894 9.5 10V6C9.5 5.72386 9.72386 5.5 10 5.5ZM3.66211 6.94141C4.0273 6.94159 4.32303 7.23735 4.32324 7.60254C4.32324 7.96791 4.02743 8.26446 3.66211 8.26465C3.29663 8.26465 3 7.96802 3 7.60254C3.00021 7.23723 3.29676 6.94141 3.66211 6.94141ZM4.95605 4.29395C5.32146 4.29404 5.61719 4.59063 5.61719 4.95605C5.6171 5.3214 5.3214 5.61709 4.95605 5.61719C4.59063 5.61719 4.29403 5.32146 4.29395 4.95605C4.29395 4.59057 4.59057 4.29395 4.95605 4.29395ZM7.60254 3C7.96802 3 8.26465 3.29663 8.26465 3.66211C8.26446 4.02743 7.96791 4.32324 7.60254 4.32324C7.23736 4.32302 6.94159 4.0273 6.94141 3.66211C6.94141 3.29676 7.23724 3.00022 7.60254 3Z"></path></svg>,
 };
 
@@ -308,6 +311,20 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const fileMenuRef = useRef<HTMLDivElement>(null);
+
+    // Voice dictation. The transcript is appended to whatever is already typed
+    // and left in the box for editing rather than sent — speech recognition is
+    // good, not perfect, and auto-sending would ship its mistakes.
+    const dictation = useDictation({
+        onTranscript: useCallback((text: string) => {
+            setMessage(prev => {
+                const next = prev.trim() ? `${prev.trim()} ${text}` : text;
+                onMessageChange?.(next);
+                return next;
+            });
+            textareaRef.current?.focus();
+        }, [onMessageChange]),
+    });
 
     // Multi-provider model list.
     // Anthropic entries are derived from the shared catalog rather than
@@ -642,6 +659,44 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
                                     </div>
                                 </a>
                             </div>
+
+                            {/* Dictation Button — hidden entirely where the browser
+                                cannot record, rather than shown and then failing. */}
+                            {dictation.isSupported && (
+                                <div className="flex shrink min-w-8 !shrink-0">
+                                    <button
+                                        onClick={dictation.toggle}
+                                        disabled={dictation.state === 'transcribing'}
+                                        className={`group transition-all duration-200 h-8 flex items-center justify-center gap-1.5 rounded-lg active:scale-95 px-2
+                                            ${dictation.state === 'recording'
+                                                ? 'text-red-600 dark:text-red-400 bg-red-500/10'
+                                                : 'w-8 text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50'}
+                                        `}
+                                        type="button"
+                                        aria-pressed={dictation.state === 'recording'}
+                                        aria-label={dictation.state === 'recording' ? 'Stop dictation' : 'Dictate a message'}
+                                    >
+                                        {dictation.state === 'transcribing' ? (
+                                            <Icons.Loader2 className="w-5 h-5 animate-spin" />
+                                        ) : dictation.state === 'recording' ? (
+                                            <>
+                                                <Icons.Square className="w-3.5 h-3.5 fill-current" />
+                                                <span className="text-xs font-medium tabular-nums">
+                                                    {Math.floor(dictation.elapsed / 60)}:{String(dictation.elapsed % 60).padStart(2, '0')}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <Icons.Mic className="w-5 h-5" />
+                                        )}
+
+                                        {dictation.state === 'idle' && (
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+                                                Dictate a message
+                                            </div>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* Right Tools */}
@@ -700,9 +755,22 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
             />
 
             <div className="text-center mt-4">
-                <p className="text-xs text-muted-foreground">
-                    AI can make mistakes. Please check important information.
-                </p>
+                {dictation.error ? (
+                    <p className="text-xs text-red-600 dark:text-red-400">
+                        {dictation.error}{' '}
+                        <button
+                            onClick={dictation.clearError}
+                            className="underline hover:no-underline"
+                            type="button"
+                        >
+                            Dismiss
+                        </button>
+                    </p>
+                ) : (
+                    <p className="text-xs text-muted-foreground">
+                        AI can make mistakes. Please check important information.
+                    </p>
+                )}
             </div>
         </div >
     );

@@ -203,4 +203,11 @@ export const RATE_LIMITS = {
     maxRequests: 10,
     windowMs: 60 * 60 * 1000, // 1 hour
   },
+  // Voice dictation: 30 clips per 5 minutes per user. Dictating in short bursts
+  // is normal, so the ceiling is high enough not to interrupt real use while
+  // still bounding a runaway client.
+  TRANSCRIPTION: {
+    maxRequests: 30,
+    windowMs: 5 * 60 * 1000, // 5 minutes
+  },
 } as const;
