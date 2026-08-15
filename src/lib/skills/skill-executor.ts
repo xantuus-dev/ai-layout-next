@@ -9,6 +9,11 @@ import { prisma } from '@/lib/prisma';
 import { AgentExecutor } from '../agent/executor';
 import { ToolRegistry } from '../agent/tools/registry';
 import { AIRouter } from '../ai-providers/router';
+import {
+  extractSkillCode,
+  runUserCode,
+  sandboxUnavailableReason,
+} from './sandbox-runner';
 import type {
   AgentTask,
   AgentContext,
@@ -236,29 +241,48 @@ export class SkillExecutor {
   /**
    * Execute JavaScript skill
    *
-   * JavaScript skills run sandboxed user code.
+   * The body runs in a per-run Vercel Sandbox microVM with no network access
+   * and none of this process's environment — see lib/skills/sandbox-runner.
+   *
+   * History worth keeping in view: this path previously compiled
+   * `skillDefinition.code` with the global `AsyncFunction` constructor and ran
+   * it *in this process*, where it had `process.env` (every API key,
+   * DATABASE_URL, NEXTAUTH_SECRET), `require`, `fetch` and the filesystem. The
+   * `createSandbox()` context was built but never passed to the function and
+   * `createSafeToolAccess()` was a stub, making any skill arbitrary RCE plus
+   * secret exfiltration. It was disabled outright until real isolation existed.
+   *
+   * The isolation boundary is now the VM, not the JavaScript context, so
+   * arbitrary code inside it is expected and contained. If the sandbox is not
+   * configured this refuses to run rather than falling back in-process.
    */
   private async executeJavaScriptSkill(
     skill: any,
     options: SkillExecutionOptions
   ): Promise<any> {
-    // SECURITY: JavaScript skills are disabled.
-    //
-    // The previous implementation compiled `skillDefinition.code` with the
-    // global `AsyncFunction` constructor and ran it in this process. That is
-    // not a sandbox: the code executed in the full Node.js global scope with
-    // access to `process.env` (every API key, DATABASE_URL, NEXTAUTH_SECRET),
-    // `require`, `fetch`, and the filesystem. The `createSandbox()` context was
-    // never passed to the function and `createSafeToolAccess()` was a stub, so
-    // any user- or model-authored skill was arbitrary remote code execution
-    // plus secret exfiltration.
-    //
-    // Re-enable only once the code runs in a real out-of-process isolate with
-    // no ambient environment (e.g. Vercel Sandbox / isolated-vm / a worker
-    // spawned with a scrubbed env) and a permissioned tool bridge.
-    throw new Error(
-      'JavaScript skills are disabled for security reasons and cannot be executed.'
-    );
+    const unavailable = sandboxUnavailableReason();
+    if (unavailable) {
+      throw new Error(unavailable);
+    }
+
+    const code = extractSkillCode(skill.skillDefinition);
+
+    const result = await runUserCode({
+      code,
+      input: options.input ?? {},
+      tags: {
+        skillId: String(skill.id).slice(0, 64),
+        userId: String(options.userId).slice(0, 64),
+      },
+    });
+
+    if (result.logs.length > 0) {
+      console.log(
+        `[SkillExecutor] Skill ${skill.id} produced ${result.logs.length} log line(s)`
+      );
+    }
+
+    return result.output;
   }
 
   /**
