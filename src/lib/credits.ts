@@ -273,7 +273,7 @@ export async function deductCredits(
  * are logged, never thrown — a flaky email send should never break a
  * successful credit deduction.
  */
-async function checkUsageAlerts(billingUserId: string): Promise<void> {
+export async function checkUsageAlerts(billingUserId: string): Promise<void> {
   try {
     const user = await prisma.user.findUnique({
       where: { id: billingUserId },

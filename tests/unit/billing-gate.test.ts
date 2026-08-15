@@ -223,6 +223,40 @@ describe('spendCredits: the check-then-act race is closed', () => {
   });
 });
 
+describe('spendCredits: parity with deductCredits', () => {
+  // deductCredits rolls the monthly window before charging and fires the
+  // 80%/100% alert emails after. Callers were switched from one to the other,
+  // so dropping either would silently regress billing behaviour.
+  it('rolls the monthly window before charging', async () => {
+    mockUser({ creditsUsed: 0, monthlyCredits: 4000, billingOwnerId: null });
+    executeRaw.mockResolvedValue(1);
+
+    await spendCredits('u1', 10, { type: 'chat' });
+
+    expect(checkAndResetCredits).toHaveBeenCalledWith('u1');
+  });
+
+  it('fires usage alerts against the billing owner after a successful spend', async () => {
+    userFindUnique.mockImplementation(async (args: any) => {
+      if (args?.select?.billingOwnerId) return { billingOwnerId: 'owner-1' };
+      return { creditsUsed: 0, monthlyCredits: 4000 };
+    });
+    executeRaw.mockResolvedValue(1);
+
+    await spendCredits('member-1', 10, { type: 'chat' });
+
+    expect(checkUsageAlerts).toHaveBeenCalledWith('owner-1');
+  });
+
+  it('does not fire alerts when the spend was refused', async () => {
+    mockUser({ creditsUsed: 4000, monthlyCredits: 4000, billingOwnerId: null });
+    executeRaw.mockResolvedValue(0);
+
+    await expect(spendCredits('u1', 10, { type: 'chat' })).rejects.toThrow();
+    expect(checkUsageAlerts).not.toHaveBeenCalled();
+  });
+});
+
 describe('refundCredits: append-only correction', () => {
   it('appends a negative offsetting row rather than mutating the original', async () => {
     mockUser({ creditsUsed: 100, monthlyCredits: 4000, billingOwnerId: null });

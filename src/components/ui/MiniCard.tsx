@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import Link from 'next/link';
 
 interface MiniCardProps {
   title: string;
@@ -32,19 +33,25 @@ export default function MiniCard({ title, children, badges, cta }: MiniCardProps
       
       {cta && cta.length > 0 && (
         <div className="mt-4 flex gap-3">
-          {cta.map((button, index) => (
-            <a
-              key={index}
-              href={button.href}
-              className={`rounded-full px-4 py-2 text-sm font-medium ${
-                button.variant === 'primary'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:opacity-90'
-                  : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {button.text}
-            </a>
-          ))}
+          {cta.map((button, index) => {
+            const className = `rounded-full px-4 py-2 text-sm font-medium ${
+              button.variant === 'primary'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:opacity-90'
+                : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+            }`;
+
+            // Route internal hrefs through <Link> for client-side navigation;
+            // anchors and external URLs stay plain <a>.
+            return button.href.startsWith('/') ? (
+              <Link key={index} href={button.href} className={className}>
+                {button.text}
+              </Link>
+            ) : (
+              <a key={index} href={button.href} className={className}>
+                {button.text}
+              </a>
+            );
+          })}
         </div>
       )}
     </div>

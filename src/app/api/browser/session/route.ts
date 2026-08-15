@@ -9,7 +9,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { browserControl } from '@/lib/browser-control';
 import { prisma } from '@/lib/prisma';
-import { deductCredits } from '@/lib/credits';
+import { spendCredits } from '@/lib/billing/gate';
 
 const BROWSER_SESSION_COST = 50; // Credits per session
 
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Deduct credits
-    await deductCredits(user.id, BROWSER_SESSION_COST, {
+    await spendCredits(user.id, BROWSER_SESSION_COST, {
       type: 'browser_session',
       description: 'Browser automation session created',
     });

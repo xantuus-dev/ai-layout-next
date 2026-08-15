@@ -30,6 +30,22 @@ export async function authenticateApiKey(
     ? authHeader.substring(7)
     : authHeader;
 
+  return authenticateApiKeyToken(key);
+}
+
+/**
+ * Authenticate a raw API key string.
+ *
+ * Split out from `authenticateApiKey` so callers that hold a token but not a
+ * `NextRequest` — the MCP transport, which is handed a web-standard `Request`
+ * with the bearer already parsed — reuse the same lookup, including the lazy
+ * plaintext-to-hash upgrade below, instead of duplicating it.
+ *
+ * @param key - The raw API key, with no "Bearer " prefix
+ */
+export async function authenticateApiKeyToken(
+  key: string
+): Promise<ApiAuthResult> {
   if (!key || !key.startsWith(API_KEY_PREFIX)) {
     return {
       success: false,

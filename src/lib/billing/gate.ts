@@ -22,7 +22,12 @@
  */
 
 import { prisma } from '@/lib/prisma';
-import { canAfford, resolveBillingUserId } from '@/lib/credits';
+import {
+  canAfford,
+  resolveBillingUserId,
+  checkAndResetCredits,
+  checkUsageAlerts,
+} from '@/lib/credits';
 
 /**
  * Fraction of remaining balance above which a spend should be confirmed by the
@@ -158,6 +163,11 @@ export async function spendCredits(
     extra?: Record<string, unknown>;
   }
 ): Promise<{ success: true; creditsSpent: number; billingUserId: string }> {
+  // Drop-in parity with deductCredits: it rolls the monthly window first and
+  // fires the 80%/100% alert emails afterwards. Omitting either here would
+  // silently regress billing behaviour when callers switch over.
+  await checkAndResetCredits(userId);
+
   const billingUserId = await resolveBillingUserId(userId);
 
   if (!(await canConsumeCredits(userId, billingUserId))) {
@@ -196,6 +206,10 @@ export async function spendCredits(
       },
     });
   });
+
+  // After the commit, matching deductCredits. Never throws — a flaky email
+  // send must not fail a spend that already succeeded.
+  await checkUsageAlerts(billingUserId);
 
   return { success: true, creditsSpent: credits, billingUserId };
 }

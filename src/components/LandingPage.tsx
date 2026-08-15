@@ -145,6 +145,7 @@ export default function LandingPage() {
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
+            <Link href="/solutions" className="hover:text-foreground transition-colors">Solutions</Link>
             <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
             <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
           </nav>
@@ -354,6 +355,7 @@ export default function LandingPage() {
           </div>
           <nav className="flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
+            <Link href="/solutions" className="hover:text-foreground transition-colors">Solutions</Link>
             <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
             <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
             <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>

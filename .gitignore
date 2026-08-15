@@ -72,3 +72,6 @@ demo/
 # Mobile apps and browser extensions (not part of Next.js build)
 ios-mobile/
 browser-extension/
+
+# Local screenshot / preview scratch (agent-browser, manual captures)
+/main.png

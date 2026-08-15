@@ -10,7 +10,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { encryptNullableIfConfigured } from '@/lib/crypto/envelope';
-import { resolveIntegrationOwnerId } from '@/lib/integrations/store';
+import { resolveIntegrationOwnerId, canManageOrgIntegrations } from '@/lib/integrations/store';
 import {
   getTelegramBotInfo,
   setTelegramWebhook,
@@ -211,9 +211,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Org-level: resolve to the team owner so team members see the shared
+    // connection, not just the person who happened to connect it.
+    const ownerId = await resolveIntegrationOwnerId(session.user.id);
     const integration = await prisma.integration.findFirst({
       where: {
-        userId: session.user.id,
+        ownerId,
         provider: 'telegram',
       },
       select: {
@@ -269,9 +272,19 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Org-level: only the team owner or an admin may disconnect the shared
+    // integration, so a single member cannot sever the whole team's bot.
+    if (!(await canManageOrgIntegrations(session.user.id))) {
+      return NextResponse.json(
+        { error: 'Only a team owner or admin can disconnect this integration.' },
+        { status: 403 }
+      );
+    }
+
+    const ownerId = await resolveIntegrationOwnerId(session.user.id);
     const integration = await prisma.integration.findFirst({
       where: {
-        userId: session.user.id,
+        ownerId,
         provider: 'telegram',
       },
     });

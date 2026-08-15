@@ -1,4 +1,5 @@
 import MiniCard from '@/components/ui/MiniCard';
+import { SOLUTIONS } from '@/lib/solutions';
 
 interface ContactPageProps {
   searchParams: { prompt?: string };
@@ -29,52 +30,25 @@ export default function ContactPage({ searchParams }: ContactPageProps) {
           Let's discuss how we can help with your AI needs
         </p>
 
+        {/* Each card links to its solution page, which in turn links back here
+            with ?prompt= set — so the form arrives pre-scoped to what they read. */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-          <MiniCard
-            title="AI Agents"
-            badges={['Popular']}
-            cta={[
-              { text: 'Learn More', href: '#agents', variant: 'primary' }
-            ]}
-          >
-            <p className="text-gray-600 dark:text-gray-300">
-              Build intelligent agents that automate complex workflows and decision-making processes.
-            </p>
-          </MiniCard>
-
-          <MiniCard
-            title="Automation"
-            badges={['New']}
-            cta={[
-              { text: 'Explore', href: '#automation', variant: 'primary' }
-            ]}
-          >
-            <p className="text-gray-600 dark:text-gray-300">
-              Streamline your operations with AI-powered automation solutions.
-            </p>
-          </MiniCard>
-
-          <MiniCard
-            title="AI Security"
-            cta={[
-              { text: 'Discover', href: '#security', variant: 'primary' }
-            ]}
-          >
-            <p className="text-gray-600 dark:text-gray-300">
-              Protect your AI systems with advanced security measures and monitoring.
-            </p>
-          </MiniCard>
-
-          <MiniCard
-            title="Dashboards"
-            cta={[
-              { text: 'View Demos', href: '#dashboards', variant: 'primary' }
-            ]}
-          >
-            <p className="text-gray-600 dark:text-gray-300">
-              Visualize your data with intelligent, AI-enhanced dashboards.
-            </p>
-          </MiniCard>
+          {SOLUTIONS.map((solution) => (
+            <MiniCard
+              key={solution.slug}
+              title={solution.name}
+              badges={solution.badge ? [solution.badge] : undefined}
+              cta={[
+                {
+                  text: solution.ctaLabel,
+                  href: `/solutions/${solution.slug}`,
+                  variant: 'primary',
+                },
+              ]}
+            >
+              <p className="text-gray-600 dark:text-gray-300">{solution.summary}</p>
+            </MiniCard>
+          ))}
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">

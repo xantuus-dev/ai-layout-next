@@ -6,8 +6,8 @@ import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAuthenticatedUserId } from '@/lib/api-auth';
 import { aiRouter } from '@/lib/ai-providers';
 import { secureChat } from '@/lib/ai-security/guard';
-import { checkAndResetCredits, deductCredits, getCreditStatus, estimateTurnCredits } from '@/lib/credits';
-import { assertCanSpend } from '@/lib/billing/gate';
+import { checkAndResetCredits, getCreditStatus, estimateTurnCredits } from '@/lib/credits';
+import { assertCanSpend, spendCredits } from '@/lib/billing/gate';
 import { buildSystemPrompt } from '@/lib/personalization';
 import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
 
@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
     const creditsUsed = aiRouter.estimateCredits(modelId, totalTokens);
 
     // Record usage and deduct from the (possibly team-pooled) credit balance
-    await deductCredits(user.id, creditsUsed, {
+    await spendCredits(user.id, creditsUsed, {
       type: 'chat',
       model: modelId,
       tokens: totalTokens,

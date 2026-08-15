@@ -63,3 +63,19 @@ export async function resolveIntegrationOwnerId(userId: string): Promise<string>
   });
   return user?.billingOwnerId ?? userId;
 }
+
+/**
+ * Whether a user may manage (connect/disconnect) their org's shared
+ * integrations. The team owner — anyone who does not bill to someone else —
+ * manages the org's integrations, as does a global admin. Plain team members
+ * can use shared integrations but not remove them, so one member cannot sever
+ * the whole team's Slack/Telegram.
+ */
+export async function canManageOrgIntegrations(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { billingOwnerId: true, role: true },
+  });
+  if (!user) return false;
+  return user.billingOwnerId == null || user.role === 'admin';
+}

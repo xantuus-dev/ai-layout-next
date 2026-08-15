@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { deductCredits } from '@/lib/credits';
+import { spendCredits } from '@/lib/billing/gate';
 import {
   getOrCreateContext,
   processChatMessage,
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Deduct credits from user
-    await deductCredits(user.id, result.credits, {
+    await spendCredits(user.id, result.credits, {
       type: 'browser_chat',
       model: model || 'claude-sonnet-4-5-20250929',
       tokens: result.tokens,

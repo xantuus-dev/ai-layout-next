@@ -8,7 +8,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { browserControl, BrowserAction } from '@/lib/browser-control';
 import { prisma } from '@/lib/prisma';
-import { deductCredits } from '@/lib/credits';
+import { spendCredits } from '@/lib/billing/gate';
 
 const ACTION_COSTS: Record<string, number> = {
   navigate: 10,
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
 
     // Deduct credits on success
     if (result.success) {
-      await deductCredits(user.id, actionCost, {
+      await spendCredits(user.id, actionCost, {
         type: `browser_${action.type}`,
         description: `Browser ${action.type} action executed`,
       });

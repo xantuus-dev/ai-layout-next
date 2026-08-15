@@ -9,8 +9,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { geminiImageService } from '@/lib/gemini-image';
-import { deductCredits, getImageGenerationCost } from '@/lib/credits';
-import { assertCanSpend } from '@/lib/billing/gate';
+import { getImageGenerationCost } from '@/lib/credits';
+import { assertCanSpend, spendCredits } from '@/lib/billing/gate';
 import { checkAndResetCredits } from '@/lib/credits';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 10. Deduct credits and create usage record
-    await deductCredits(user.id, creditsNeeded, {
+    await spendCredits(user.id, creditsNeeded, {
       type: 'image-generation',
       model: 'gemini-2.0-flash-exp',
       description: `Image generation: ${prompt.substring(0, 50)}...`,
