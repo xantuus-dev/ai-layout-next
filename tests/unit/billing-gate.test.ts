@@ -6,6 +6,8 @@ const workspaceFindFirst = vi.fn();
 const memberFindUnique = vi.fn();
 const usageCreate = vi.fn();
 const executeRaw = vi.fn();
+const checkAndResetCredits = vi.fn();
+const checkUsageAlerts = vi.fn();
 
 /**
  * One tx surface shared by both $transaction forms. The callback form is what
@@ -33,6 +35,24 @@ vi.mock('@/lib/prisma', () => ({
         : Promise.resolve(arg),
   },
 }));
+
+/**
+ * Partial mock of the credits module. The parity tests below assert that
+ * spendCredits still rolls the monthly window and fires the usage alerts, which
+ * requires spying on those two.
+ *
+ * canAfford and resolveBillingUserId are deliberately left real: most of the
+ * suite exercises the genuine boundary arithmetic and team-pool resolution
+ * through them, and stubbing either would test the stub instead of the code.
+ */
+vi.mock('@/lib/credits', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/credits')>();
+  return {
+    ...actual,
+    checkAndResetCredits: (...args: unknown[]) => checkAndResetCredits(...args),
+    checkUsageAlerts: (...args: unknown[]) => checkUsageAlerts(...args),
+  };
+});
 
 import {
   assertCanSpend,
