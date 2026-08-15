@@ -11,16 +11,38 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Redis and the queue are optional dependencies here (see `isHealthy` below,
+ * which keys off the database alone) — but they were awaited without a bound,
+ * so an unreachable Redis hung the whole endpoint until the platform killed
+ * the request. A health check that hangs is worse than one that reports a
+ * problem: uptime monitors read the timeout as a total outage.
+ *
+ * Anything slower than this is treated as unavailable, which is the same
+ * conclusion the caller would eventually draw, just arrived at promptly.
+ */
+const OPTIONAL_CHECK_TIMEOUT_MS = 2000;
+
+/**
+ * Resolves null instead of a fabricated healthy-looking value, so an
+ * unreachable dependency is reported as unknown rather than mislabelled.
+ */
+function withTimeout<T>(promise: Promise<T>): Promise<T | null> {
+  return Promise.race([
+    promise.catch(() => null),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), OPTIONAL_CHECK_TIMEOUT_MS)),
+  ]);
+}
+
 export async function GET() {
   try {
     const startTime = Date.now();
 
-    // Check Redis health
-    const redisHealth = await getRedisHealth();
+    // Redis and queue are optional — never allowed to block the response.
+    const redisHealth = await withTimeout(getRedisHealth());
 
-    // Check queue availability
     const queueAvailable = isQueueAvailable();
-    const queueStats = await getQueueStats();
+    const queueStats = await withTimeout(getQueueStats());
 
     // Check database connection
     let databaseHealthy = false;
@@ -38,7 +60,9 @@ export async function GET() {
 
     // Determine overall health status
     const isHealthy = databaseHealthy; // Redis/queue are optional
-    const hasWarnings = !redisHealth.connected || !queueAvailable;
+    // A null redisHealth means the check timed out or threw — unknown, which
+    // is a warning, not a healthy state.
+    const hasWarnings = !redisHealth?.connected || !queueAvailable;
 
     return NextResponse.json(
       {
@@ -54,13 +78,16 @@ export async function GET() {
             latency: databaseLatency,
           },
           redis: {
-            connected: redisHealth.connected,
-            state: redisHealth.state,
-            circuitState: redisHealth.circuitState,
-            failureCount: redisHealth.failureCount,
-            lastFailure: redisHealth.lastFailure
+            connected: redisHealth?.connected ?? false,
+            state: redisHealth?.state ?? 'unknown',
+            circuitState: redisHealth?.circuitState ?? 'unknown',
+            failureCount: redisHealth?.failureCount ?? 0,
+            lastFailure: redisHealth?.lastFailure
               ? new Date(redisHealth.lastFailure).toISOString()
               : null,
+            // Distinguishes "checked, and it is down" from "the check itself
+            // did not return in time".
+            checkTimedOut: redisHealth === null,
           },
           queue: {
             available: queueAvailable,
@@ -69,7 +96,10 @@ export async function GET() {
         },
         warnings: [
           !databaseHealthy && 'Database connection failed',
-          !redisHealth.connected && 'Redis unavailable - queue operations degraded',
+          redisHealth === null && 'Redis health check timed out',
+          redisHealth !== null &&
+            !redisHealth.connected &&
+            'Redis unavailable - queue operations degraded',
           !queueAvailable && 'Queue unavailable - tasks will require manual processing',
         ].filter(Boolean),
       },

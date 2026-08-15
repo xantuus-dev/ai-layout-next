@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { aiRouter } from '@/lib/ai-providers';
 import { secureChatStream } from '@/lib/ai-security/guard';
 import { verifyWorkspaceAccess, verifyConversationInWorkspace } from '@/lib/workspace-utils';
-import { checkAndResetCredits, hasEnoughCredits, resolveBillingUserId, estimateTurnCredits, getCreditStatus } from '@/lib/credits';
+import { checkAndResetCredits, resolveBillingUserId, estimateTurnCredits, getCreditStatus } from '@/lib/credits';
+import { assertCanSpend } from '@/lib/billing/gate';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai-providers/catalog';
 import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
 import { normalizeAttachment, isSupportedImageType, type NormalizedAttachment } from '@/lib/files/attachments';
@@ -109,7 +110,11 @@ export async function POST(
           aiRouter.getModel(model || DEFAULT_ANTHROPIC_MODEL)?.creditsPerThousandTokens ?? 1
         );
 
-        if (!(await hasEnoughCredits(user.id, estimatedCredits))) {
+        // Via the billing gate, which applies canAfford (refusing an exactly
+        // exhausted balance) and reports the pool actually being charged.
+        const decision = await assertCanSpend(user.id, estimatedCredits);
+
+        if (!decision.allowed) {
           const status = await getCreditStatus(user.id);
           controller.enqueue(
             encoder.encode(
@@ -117,9 +122,11 @@ export async function POST(
                 type: 'error',
                 code: 'insufficient_credits',
                 message:
-                  'You have used all your monthly credits. Upgrade your plan or wait for them to reset.',
+                  decision.reason === 'viewer_cannot_spend'
+                    ? 'Viewers cannot spend the team credit pool. Ask an admin for access.'
+                    : 'You have used all your monthly credits. Upgrade your plan or wait for them to reset.',
                 creditsNeeded: estimatedCredits,
-                creditsRemaining: status?.creditsRemaining ?? 0,
+                creditsRemaining: Math.max(0, decision.remaining),
                 creditsResetAt: status?.creditsResetAt ?? null,
               })}\n\n`
             )

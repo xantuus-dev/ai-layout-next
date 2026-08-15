@@ -6,7 +6,8 @@ import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAuthenticatedUserId } from '@/lib/api-auth';
 import { aiRouter } from '@/lib/ai-providers';
 import { secureChat } from '@/lib/ai-security/guard';
-import { checkAndResetCredits, hasEnoughCredits, deductCredits, getCreditStatus, estimateTurnCredits } from '@/lib/credits';
+import { checkAndResetCredits, deductCredits, getCreditStatus, estimateTurnCredits } from '@/lib/credits';
+import { assertCanSpend } from '@/lib/billing/gate';
 import { buildSystemPrompt } from '@/lib/personalization';
 import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
 
@@ -98,15 +99,23 @@ export async function POST(request: NextRequest) {
       aiRouter.getModel(modelId)?.creditsPerThousandTokens ?? 1
     );
 
-    if (!(await hasEnoughCredits(user.id, estimatedCredits))) {
+    // Routed through the billing gate rather than hasEnoughCredits: the gate
+    // applies canAfford (which refuses an exactly-exhausted balance) and
+    // reports the billing owner's remaining balance for team members, rather
+    // than the acting user's.
+    const decision = await assertCanSpend(user.id, estimatedCredits);
+
+    if (!decision.allowed) {
       const status = await getCreditStatus(user.id);
       return NextResponse.json(
         {
           error: 'Insufficient credits',
           message:
-            'You have used all your monthly credits. Upgrade your plan or wait for them to reset.',
+            decision.reason === 'viewer_cannot_spend'
+              ? 'Viewers cannot spend the team credit pool. Ask an admin for access.'
+              : 'You have used all your monthly credits. Upgrade your plan or wait for them to reset.',
           creditsNeeded: estimatedCredits,
-          creditsRemaining: status?.creditsRemaining ?? 0,
+          creditsRemaining: Math.max(0, decision.remaining),
           creditsResetAt: status?.creditsResetAt ?? null,
         },
         { status: 402 }

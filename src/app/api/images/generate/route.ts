@@ -9,7 +9,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { geminiImageService } from '@/lib/gemini-image';
-import { hasEnoughCredits, deductCredits, getImageGenerationCost } from '@/lib/credits';
+import { deductCredits, getImageGenerationCost } from '@/lib/credits';
+import { assertCanSpend } from '@/lib/billing/gate';
 import { checkAndResetCredits } from '@/lib/credits';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 
@@ -67,14 +68,21 @@ export async function POST(request: NextRequest) {
     // 6. Calculate credits needed
     const creditsNeeded = getImageGenerationCost(width, height);
 
-    // 7. Check if user has enough credits
-    const hasCredits = await hasEnoughCredits(user.id, creditsNeeded);
-    if (!hasCredits) {
+    // 7. Check if user has enough credits.
+    //
+    // Via the billing gate: `creditsAvailable` previously subtracted the
+    // ACTING user's counters, which is the wrong pool for a team member —
+    // decision.remaining reports the balance actually being charged.
+    const decision = await assertCanSpend(user.id, creditsNeeded);
+    if (!decision.allowed) {
       return NextResponse.json(
         {
-          error: 'Insufficient credits',
+          error:
+            decision.reason === 'viewer_cannot_spend'
+              ? 'Viewers cannot spend the team credit pool'
+              : 'Insufficient credits',
           creditsNeeded,
-          creditsAvailable: user.monthlyCredits - user.creditsUsed,
+          creditsAvailable: Math.max(0, decision.remaining),
         },
         { status: 402 } // Payment Required
       );
