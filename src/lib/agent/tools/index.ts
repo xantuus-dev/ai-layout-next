@@ -26,6 +26,15 @@ import {
   DocumentCreateDeckTool,
 } from './documents';
 
+// Spreadsheet tool
+import { DocumentCreateXlsxTool } from './spreadsheets';
+
+// Chart rendering tool
+import { ChartRenderTool } from './charts';
+
+// Image generation tool
+import { ImageGenerateTool } from './image-generate';
+
 // Google Drive tools
 import {
   DriveUploadTool,
@@ -105,6 +114,13 @@ export function initializeTools(): void {
   toolRegistry.register(new DocumentCreatePdfTool());
   toolRegistry.register(new DocumentCreateDocxTool());
   toolRegistry.register(new DocumentCreateDeckTool());
+  toolRegistry.register(new DocumentCreateXlsxTool());
+
+  // Chart rendering
+  toolRegistry.register(new ChartRenderTool());
+
+  // Image generation
+  toolRegistry.register(new ImageGenerateTool());
 
   console.log(`[Agent] Initialized ${toolRegistry.getAllTools().length} tools`);
 }

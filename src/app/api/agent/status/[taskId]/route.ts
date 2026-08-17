@@ -70,6 +70,13 @@ export async function GET(
       error: task.error,
       startedAt: task.startedAt,
       completedAt: task.completedAt,
+      // Document generation pipeline fields (null for non-document tasks) —
+      // the UI polls this same endpoint regardless of agentType rather than
+      // a separate route, so it stays one polling loop either way.
+      agentType: task.agentType,
+      documentSpec: task.documentSpec,
+      documentPhase: task.documentPhase,
+      requestedFormats: task.requestedFormats,
       executions: task.executions.map((exec: any) => ({
         step: exec.step,
         action: exec.action,

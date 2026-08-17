@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma';
 import { AgentExecutor } from '@/lib/agent/executor';
 import { toolRegistry } from '@/lib/agent/tools';
 import { AgentTask, AgentConfig } from '@/lib/agent/types';
+import { runDocumentGenerationTask } from '@/lib/documents/run';
 
 /**
  * Process an agent task job
@@ -36,6 +37,21 @@ async function processAgentTask(job: Job<AgentTaskJob>) {
     // Verify task belongs to user
     if (task.userId !== userId) {
       throw new Error(`Task ${taskId} does not belong to user ${userId}`);
+    }
+
+    // Document generation runs its own multi-phase pipeline (see
+    // lib/documents/orchestrator.ts) rather than AgentExecutor's single flat
+    // plan — dispatch to it here and skip the plan/execute path below.
+    if (task.agentType === 'document_generation') {
+      await job.updateProgress(20);
+      await runDocumentGenerationTask(taskId, userId);
+      await job.updateProgress(100);
+
+      const finished = await prisma.task.findUnique({ where: { id: taskId } });
+      console.log(`[Worker] Document generation task ${taskId} finished with status: ${finished?.status}`);
+      await notifyUserOfCompletion(userId, task, { status: finished?.status });
+
+      return { success: true, taskId, status: finished?.status };
     }
 
     // Update task status

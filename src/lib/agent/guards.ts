@@ -29,6 +29,13 @@ export const TOOL_TIMEOUTS = {
   // AI operations can vary but should have a limit
   ai: 45000, // 45 seconds
 
+  // Document generation (Puppeteer HTML-to-PDF/DOCX/PPTX/XLSX with embedded
+  // images/charts) can take well over the 30s default under real page loads.
+  document: 60000, // 60 seconds
+
+  // A single chart render: page load + Chart.js draw + screenshot.
+  chart: 20000, // 20 seconds
+
   // Default for unknown categories
   default: 30000, // 30 seconds
 };
@@ -211,6 +218,8 @@ export const RATE_LIMITS = {
   calendar: 15, // 15 calendar operations per minute
   http: 60, // 60 HTTP requests per minute
   ai: 30, // 30 AI calls per minute
+  document: 20, // 20 document generations per minute (Puppeteer-heavy)
+  chart: 30, // 30 chart renders per minute
 
   // Default rate limit
   default: 30,

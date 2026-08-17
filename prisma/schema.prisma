@@ -642,6 +642,15 @@ model Task {
   dueDate DateTime?
   tags    String[]
 
+  // Document generation pipeline (nullable — only set when agentType is
+  // "document_generation"). documentSpec is the full DocumentSpec (see
+  // src/lib/documents/types.ts), overwritten after each phase completes so
+  // the status UI can poll mid-run progress; documentPhase mirrors its
+  // currentPhase for a cheap indexed "which phase is this task in" query.
+  documentSpec     Json?
+  documentPhase    String?
+  requestedFormats String[] @default([])
+
   // Relations
   executions TaskExecution[]
 
@@ -654,6 +663,7 @@ model Task {
   @@index([userId, createdAt])
   @@index([status, priority]) // For queue polling
   @@index([scheduleEnabled, nextRunAt]) // For orchestrator scheduling
+  @@index([userId, documentPhase])
 }
 
 // Referral System

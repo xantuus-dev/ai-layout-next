@@ -2,21 +2,24 @@
  * Document Tools - Produce real files (PDF, Word, PowerPoint) from agent output
  *
  * These turn model text into downloadable artifacts rather than chat messages.
- * Generation is pure local compute — no provider API — so the credit cost only
- * covers CPU and storage.
+ * Generation is pure local compute except for chart/image URLs the caller
+ * already produced (via chart.render / image.generate), so credit cost only
+ * covers CPU, browser rendering, and storage.
  *
  * The heavy renderers are dynamically imported inside execute(), matching
- * lib/docx-generator.ts: they are large, Node-only, and would otherwise be
+ * the rest of this module: they are large, Node-only, and would otherwise be
  * pulled into any bundle that touches the tool registry.
  */
 
 import { AgentTool, AgentContext, ToolResult } from '../types';
 import { uploadMedia } from '@/lib/storage';
+import { renderHtmlToPdf } from '../rendering/html-to-pdf';
+import type { ChartSpec, TableSpec, ImageAsset, Citation, DocumentSection } from '@/lib/documents/types';
 
 /** Local rendering only — no provider spend, so these stay cheap. */
 const DOCUMENT_CREDITS = {
-  pdf: 2,
-  docx: 2,
+  pdf: 3,
+  docx: 3,
   deck: 5,
 } as const;
 
@@ -44,8 +47,14 @@ function validateTitleAndContent(params: any): { valid: boolean; error?: string 
   if (!params?.title || typeof params.title !== 'string') {
     return { valid: false, error: 'title parameter required (string)' };
   }
+  if (params.sections) {
+    if (!Array.isArray(params.sections) || params.sections.length === 0) {
+      return { valid: false, error: 'sections must be a non-empty array when provided' };
+    }
+    return { valid: true };
+  }
   if (!params?.content || typeof params.content !== 'string') {
-    return { valid: false, error: 'content parameter required (string)' };
+    return { valid: false, error: 'content or sections parameter required' };
   }
   if (params.content.length > MAX_CONTENT_CHARS) {
     return { valid: false, error: `content exceeds ${MAX_CONTENT_CHARS} characters` };
@@ -53,24 +62,87 @@ function validateTitleAndContent(params: any): { valid: boolean; error?: string 
   return { valid: true };
 }
 
+/** Plain text ("# " headings, blank-line paragraphs) -> one DocumentSection per block. */
+function sectionsFromPlainText(content: string): DocumentSection[] {
+  const sections: DocumentSection[] = [];
+  let bodyBuffer: string[] = [];
+  let idx = 0;
+
+  const flushBody = () => {
+    if (bodyBuffer.length) {
+      sections.push({ id: `s${idx++}`, heading: '', level: 2, content: bodyBuffer.join('\n\n') });
+      bodyBuffer = [];
+    }
+  };
+
+  for (const block of content.split(/\n\s*\n/)) {
+    const text = block.trim();
+    if (!text) continue;
+    const heading = text.match(/^(#{1,3})\s+(.*)$/);
+    if (heading) {
+      flushBody();
+      const level = heading[1].length as 1 | 2 | 3;
+      sections.push({ id: `s${idx++}`, heading: heading[2], level, content: '' });
+    } else {
+      bodyBuffer.push(text);
+    }
+  }
+  flushBody();
+  return sections;
+}
+
+interface RichDocParams {
+  title: string;
+  subtitle?: string;
+  content?: string;
+  sections?: DocumentSection[];
+  charts?: ChartSpec[];
+  tables?: TableSpec[];
+  images?: ImageAsset[];
+  citations?: Citation[];
+  includeToc?: boolean;
+  theme?: string;
+  filename?: string;
+}
+
+function resolveSections(params: RichDocParams): DocumentSection[] {
+  if (params.sections?.length) return params.sections;
+  return sectionsFromPlainText(params.content || '');
+}
+
 /**
- * Create a PDF report from plain text.
+ * Create a professionally formatted PDF via headless-Chromium HTML rendering
+ * — real CSS layout (tables, images, headers/footers, page breaks) instead
+ * of jsPDF's manual text pagination.
  */
 export class DocumentCreatePdfTool implements AgentTool {
   name = 'document.createPdf';
   description =
-    'Create a PDF document from text and return a download URL. Use for reports, ' +
-    'summaries, invoices, and anything the user should be able to save or print. ' +
-    'Blank lines separate paragraphs.';
-  category = 'data' as const;
+    'Create a PDF document and return a download URL. Use for reports, summaries, and ' +
+    'anything the user should be able to save or print. Accepts either plain "content" ' +
+    '(blank lines separate paragraphs, "# " lines become headings) for simple documents, ' +
+    'or structured "sections" plus "charts"/"tables"/"images"/"citations" for rich reports ' +
+    'with embedded chart images (see chart.render), data tables, images, and a references list.';
+  category = 'document' as const;
   inputSchema = {
     type: 'object' as const,
     properties: {
-      title: { type: 'string', description: 'Document title, shown at the top of the PDF' },
-      content: { type: 'string', description: 'Document body text; blank lines separate paragraphs' },
+      title: { type: 'string', description: 'Document title, shown on the cover' },
+      subtitle: { type: 'string', description: 'Optional cover subtitle' },
+      content: { type: 'string', description: 'Simple document body text; blank lines separate paragraphs' },
+      sections: {
+        type: 'array',
+        description: 'Structured sections, each with heading/level/content and optional chartIds/tableIds/imageIds',
+        items: { type: 'object' },
+      },
+      charts: { type: 'array', description: 'Chart specs (from chart.render output) referenced by sections', items: { type: 'object' } },
+      tables: { type: 'array', description: 'Table specs referenced by sections', items: { type: 'object' } },
+      images: { type: 'array', description: 'Image assets referenced by sections', items: { type: 'object' } },
+      citations: { type: 'array', description: 'Sources; inline-referenced in section content as [c1]', items: { type: 'object' } },
+      theme: { type: 'string', description: 'Named theme preset', enum: ['default', 'investor', 'minimal'] },
       filename: { type: 'string', description: 'Optional filename (without extension)' },
     },
-    required: ['title', 'content'],
+    required: ['title'],
   };
 
   validate(params: any) {
@@ -81,55 +153,23 @@ export class DocumentCreatePdfTool implements AgentTool {
     return DOCUMENT_CREDITS.pdf;
   }
 
-  async execute(
-    params: { title: string; content: string; filename?: string },
-    context: AgentContext
-  ): Promise<ToolResult> {
+  async execute(params: RichDocParams, context: AgentContext): Promise<ToolResult> {
     const startTime = Date.now();
 
     try {
-      const { jsPDF } = await import('jspdf');
-      const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+      const sections = resolveSections(params);
+      const buffer = await renderHtmlToPdf({
+        title: params.title,
+        subtitle: params.subtitle,
+        sections,
+        charts: params.charts,
+        tables: params.tables,
+        images: params.images,
+        citations: params.citations,
+        theme: params.theme,
+      });
 
-      const MARGIN = 56;
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const usableWidth = pageWidth - MARGIN * 2;
-      let cursorY = MARGIN;
-
-      // Title
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(20);
-      for (const line of doc.splitTextToSize(params.title, usableWidth)) {
-        doc.text(line, MARGIN, cursorY);
-        cursorY += 26;
-      }
-      cursorY += 10;
-
-      // Body — paragraphs split on blank lines, wrapped and paginated manually
-      // because jsPDF has no flow layout.
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(11);
-      const LINE_HEIGHT = 16;
-
-      for (const paragraph of params.content.split(/\n\s*\n/)) {
-        const text = paragraph.trim();
-        if (!text) continue;
-
-        for (const line of doc.splitTextToSize(text, usableWidth)) {
-          if (cursorY > pageHeight - MARGIN) {
-            doc.addPage();
-            cursorY = MARGIN;
-          }
-          doc.text(line, MARGIN, cursorY);
-          cursorY += LINE_HEIGHT;
-        }
-        cursorY += LINE_HEIGHT * 0.5;
-      }
-
-      const buffer = Buffer.from(doc.output('arraybuffer'));
       const filename = safeFilename(params.filename || params.title, 'document') + '.pdf';
-
       const upload = await uploadMedia(buffer, {
         kind: 'document',
         userId: context.userId,
@@ -149,23 +189,32 @@ export class DocumentCreatePdfTool implements AgentTool {
 }
 
 /**
- * Create a Word document from text.
+ * Create a Word document from text, optionally with images, tables, a table
+ * of contents, and a references section built from citations.
  */
 export class DocumentCreateDocxTool implements AgentTool {
   name = 'document.createDocx';
   description =
-    'Create an editable Word (.docx) document from text and return a download URL. ' +
-    'Prefer this over PDF when the user will edit the result. Lines starting with ' +
-    '"# " become headings; blank lines separate paragraphs.';
-  category = 'data' as const;
+    'Create an editable Word (.docx) document and return a download URL. Prefer this over ' +
+    'PDF when the user will edit the result. Accepts plain "content" (lines starting with ' +
+    '"# " become headings, blank lines separate paragraphs) or structured "sections". ' +
+    'Optionally embeds "images", "tables", a table of contents ("includeToc"), and a ' +
+    'References section built from "citations".';
+  category = 'document' as const;
   inputSchema = {
     type: 'object' as const,
     properties: {
       title: { type: 'string', description: 'Document title' },
-      content: { type: 'string', description: 'Document body text; lines starting with "# " become headings, blank lines separate paragraphs' },
+      content: { type: 'string', description: 'Simple document body text' },
+      sections: { type: 'array', description: 'Structured sections (heading/level/content + chartIds/tableIds/imageIds)', items: { type: 'object' } },
+      charts: { type: 'array', description: 'Chart specs referenced by sections', items: { type: 'object' } },
+      tables: { type: 'array', description: 'Table specs referenced by sections', items: { type: 'object' } },
+      images: { type: 'array', description: 'Image assets referenced by sections', items: { type: 'object' } },
+      citations: { type: 'array', description: 'Sources; inline-referenced in section content as [c1]', items: { type: 'object' } },
+      includeToc: { type: 'boolean', description: 'Insert an auto-generated table of contents after the title' },
       filename: { type: 'string', description: 'Optional filename (without extension)' },
     },
-    required: ['title', 'content'],
+    required: ['title'],
   };
 
   validate(params: any) {
@@ -176,36 +225,123 @@ export class DocumentCreateDocxTool implements AgentTool {
     return DOCUMENT_CREDITS.docx;
   }
 
-  async execute(
-    params: { title: string; content: string; filename?: string },
-    context: AgentContext
-  ): Promise<ToolResult> {
+  async execute(params: RichDocParams, context: AgentContext): Promise<ToolResult> {
     const startTime = Date.now();
 
     try {
-      const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import('docx');
+      const {
+        Document,
+        Packer,
+        Paragraph,
+        TextRun,
+        HeadingLevel,
+        ImageRun,
+        Table,
+        TableRow,
+        TableCell,
+        WidthType,
+        TableOfContents,
+        ShadingType,
+      } = await import('docx');
 
-      const children: any[] = [
-        new Paragraph({ text: params.title, heading: HeadingLevel.TITLE }),
-      ];
+      const sections = resolveSections(params);
+      const charts = params.charts || [];
+      const tables = params.tables || [];
+      const images = params.images || [];
+      const citations = params.citations || [];
+      const citationIndex = new Map(citations.map((c, i) => [c.id, i + 1]));
 
-      for (const block of params.content.split(/\n\s*\n/)) {
-        const text = block.trim();
-        if (!text) continue;
+      const children: any[] = [new Paragraph({ text: params.title, heading: HeadingLevel.TITLE })];
 
-        // Markdown-style headings, since models reach for them unprompted.
-        const heading = text.match(/^(#{1,3})\s+(.*)$/);
-        if (heading) {
-          const levels = [HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3];
+      if (params.includeToc) {
+        children.push(
+          new Paragraph({ text: 'Table of Contents', heading: HeadingLevel.HEADING_1 }),
+          new TableOfContents('Table of Contents', { hyperlink: true, headingStyleRange: '1-3' })
+        );
+      }
+
+      const headingLevels = [HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3];
+
+      const stripCitationMarkers = (text: string) =>
+        text.replace(/\[(c\d+)\]/g, (m, id) => (citationIndex.has(id) ? `[${citationIndex.get(id)}]` : ''));
+
+      for (const section of sections) {
+        if (section.heading) {
           children.push(
-            new Paragraph({ text: heading[2], heading: levels[heading[1].length - 1] })
+            new Paragraph({ text: section.heading, heading: headingLevels[Math.max(0, section.level - 1)] })
           );
-          continue;
+        }
+        for (const block of section.content.split(/\n\s*\n/)) {
+          const text = block.trim();
+          if (!text) continue;
+          const heading = text.match(/^(#{1,3})\s+(.*)$/);
+          if (heading) {
+            children.push(
+              new Paragraph({ text: heading[2], heading: headingLevels[heading[1].length - 1] })
+            );
+            continue;
+          }
+          children.push(
+            new Paragraph({
+              children: [new TextRun(stripCitationMarkers(text))],
+              spacing: { after: 200 },
+            })
+          );
         }
 
-        children.push(
-          new Paragraph({ children: [new TextRun(text)], spacing: { after: 200 } })
-        );
+        // Charts embed as images (PNG already rendered by chart.render).
+        for (const chartId of section.chartIds || []) {
+          const chart = charts.find((c) => c.id === chartId);
+          if (chart?.imageUrl) {
+            try {
+              const res = await fetch(chart.imageUrl);
+              const buf = Buffer.from(await res.arrayBuffer());
+              children.push(
+                new Paragraph({
+                  children: [
+                    new ImageRun({ data: buf, transformation: { width: 500, height: 300 }, type: 'png' }),
+                  ],
+                  spacing: { before: 120, after: 120 },
+                })
+              );
+            } catch {
+              // Skip a chart that failed to fetch rather than failing the whole document.
+            }
+          }
+        }
+
+        for (const imageId of section.imageIds || []) {
+          const image = images.find((i) => i.id === imageId);
+          if (image?.url) {
+            try {
+              const res = await fetch(image.url);
+              const buf = Buffer.from(await res.arrayBuffer());
+              children.push(
+                new Paragraph({
+                  children: [
+                    new ImageRun({ data: buf, transformation: { width: 450, height: 300 }, type: 'png' }),
+                  ],
+                  spacing: { before: 120, after: 120 },
+                })
+              );
+            } catch {
+              // Skip images that fail to fetch.
+            }
+          }
+        }
+
+        for (const tableId of section.tableIds || []) {
+          const table = tables.find((t) => t.id === tableId);
+          if (table) children.push(buildDocxTable(table, { Table, TableRow, TableCell, Paragraph, TextRun, WidthType, ShadingType }));
+        }
+      }
+
+      if (citations.length) {
+        children.push(new Paragraph({ text: 'References', heading: HeadingLevel.HEADING_1, spacing: { before: 400 } }));
+        citations.forEach((c, i) => {
+          const label = `[${i + 1}] ${c.title}${c.author ? `, ${c.author}` : ''} — ${c.url} (accessed ${c.accessedDate})`;
+          children.push(new Paragraph({ children: [new TextRun({ text: label, size: 18 })], spacing: { after: 100 } }));
+        });
       }
 
       const doc = new Document({ sections: [{ properties: {}, children }] });
@@ -230,16 +366,49 @@ export class DocumentCreateDocxTool implements AgentTool {
   }
 }
 
+function buildDocxTable(
+  table: TableSpec,
+  ctor: { Table: any; TableRow: any; TableCell: any; Paragraph: any; TextRun: any; WidthType: any; ShadingType: any }
+): any {
+  const { Table, TableRow, TableCell, Paragraph, TextRun, WidthType, ShadingType } = ctor;
+
+  const headerRow = new TableRow({
+    children: table.columns.map(
+      (col) =>
+        new TableCell({
+          shading: { type: ShadingType.CLEAR, fill: '0D9488' },
+          children: [new Paragraph({ children: [new TextRun({ text: col, bold: true, color: 'FFFFFF' })] })],
+        })
+    ),
+  });
+
+  const rows = table.rows.map(
+    (row) =>
+      new TableRow({
+        children: row.map(
+          (cell) =>
+            new TableCell({
+              children: [new Paragraph({ children: [new TextRun(String(cell))] })],
+            })
+        ),
+      })
+  );
+
+  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] });
+}
+
 /**
- * Create a PowerPoint deck from structured slides.
+ * Create a PowerPoint deck from structured slides, optionally with charts,
+ * images, and speaker-note citation callouts.
  */
 export class DocumentCreateDeckTool implements AgentTool {
   name = 'document.createDeck';
   description =
-    'Create a PowerPoint (.pptx) presentation and return a download URL. Takes a ' +
-    'slides array, each with a title and bullet points. Use for pitch decks, ' +
-    'proposals, and any request for a presentation.';
-  category = 'data' as const;
+    'Create a PowerPoint (.pptx) presentation and return a download URL. Takes a slides ' +
+    'array, each with a title and bullet points, plus optional chartId (rendered via ' +
+    'chart.render), imageUrl, and speakerNotes (e.g. citation callouts). Use for pitch ' +
+    'decks, proposals, and any request for a presentation.';
+  category = 'document' as const;
   inputSchema = {
     type: 'object' as const,
     properties: {
@@ -247,16 +416,20 @@ export class DocumentCreateDeckTool implements AgentTool {
       subtitle: { type: 'string', description: 'Optional cover slide subtitle' },
       slides: {
         type: 'array',
-        description: 'Content slides, each with a title and optional bullet points (max 50)',
+        description: 'Content slides (max 50)',
         items: {
           type: 'object',
           properties: {
             title: { type: 'string' },
             bullets: { type: 'array', items: { type: 'string' } },
+            chartId: { type: 'string', description: 'Chart from the charts array to embed on this slide' },
+            imageUrl: { type: 'string', description: 'Image URL to embed on this slide' },
+            speakerNotes: { type: 'string', description: 'Speaker notes, e.g. source citations for this slide' },
           },
           required: ['title'],
         },
       },
+      charts: { type: 'array', description: 'Chart specs (from chart.render) referenced by slides via chartId', items: { type: 'object' } },
       filename: { type: 'string', description: 'Optional filename (without extension)' },
     },
     required: ['title', 'slides'],
@@ -291,7 +464,8 @@ export class DocumentCreateDeckTool implements AgentTool {
     params: {
       title: string;
       subtitle?: string;
-      slides: { title: string; bullets?: string[] }[];
+      slides: { title: string; bullets?: string[]; chartId?: string; imageUrl?: string; speakerNotes?: string }[];
+      charts?: ChartSpec[];
       filename?: string;
     },
     context: AgentContext
@@ -309,6 +483,7 @@ export class DocumentCreateDeckTool implements AgentTool {
       const ACCENT = '0D9488';
       const DARK = '0F172A';
       const BODY = '334155';
+      const charts = params.charts || [];
 
       // Title slide
       const cover = pptx.addSlide();
@@ -360,14 +535,46 @@ export class DocumentCreateDeckTool implements AgentTool {
           fill: { color: ACCENT },
         });
 
+        const hasMedia = Boolean(slide.chartId || slide.imageUrl);
         const bullets = (slide.bullets || []).filter(
           (b): b is string => typeof b === 'string' && b.trim().length > 0
         );
         if (bullets.length > 0) {
           s.addText(
             bullets.map((text) => ({ text, options: { bullet: true, breakLine: true } })),
-            { x: 0.7, y: 1.7, w: 8.6, h: 3.4, fontSize: 16, color: BODY, lineSpacing: 28 }
+            {
+              x: 0.7,
+              y: 1.7,
+              w: hasMedia ? 4.1 : 8.6,
+              h: 3.4,
+              fontSize: 16,
+              color: BODY,
+              lineSpacing: 28,
+            }
           );
+        }
+
+        const chart = slide.chartId ? charts.find((c) => c.id === slide.chartId) : undefined;
+        const mediaUrl = chart?.imageUrl || slide.imageUrl;
+        if (mediaUrl) {
+          try {
+            const res = await fetch(mediaUrl);
+            const buf = Buffer.from(await res.arrayBuffer());
+            const b64 = `data:image/png;base64,${buf.toString('base64')}`;
+            s.addImage({
+              data: b64,
+              x: bullets.length > 0 ? 5.0 : 0.7,
+              y: 1.7,
+              w: bullets.length > 0 ? 4.3 : 8.6,
+              h: 3.4,
+            });
+          } catch {
+            // Skip media that fails to fetch rather than failing the deck.
+          }
+        }
+
+        if (slide.speakerNotes) {
+          s.addNotes(slide.speakerNotes);
         }
       }
 

@@ -29,6 +29,7 @@ import {
   ChevronDown,
   MessageSquare,
   SquarePen,
+  FileStack,
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -65,6 +66,7 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
     { name: 'Dashboard', icon: LayoutDashboard, href: '/workspace', requireAuth: true },
     { name: 'Templates', icon: Sparkles, href: '/templates' },
     { name: 'Image Generator', icon: Wand2, href: '/apps/image-generator', requireAuth: true },
+    { name: 'Documents', icon: FileStack, href: '/documents/new', requireAuth: true },
     { name: 'Projects', icon: FolderOpen, href: '/workspace/projects/new', requireAuth: true },
     { name: 'Browser', icon: Link2, href: '/browser', requireAuth: true },
     { name: 'Analytics', icon: BarChart3, href: '/settings/usage', requireAuth: true },

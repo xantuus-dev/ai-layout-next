@@ -191,7 +191,7 @@ export interface ExecutionTrace {
 export interface AgentTool {
   name: string;
   description: string;
-  category: 'browser' | 'communication' | 'data' | 'integration' | 'utility';
+  category: 'browser' | 'communication' | 'data' | 'integration' | 'utility' | 'document';
 
   // JSON-schema-ish description of `params`, exposed to models via native
   // tool-calling APIs (Anthropic input_schema / OpenAI function.parameters /
