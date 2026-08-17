@@ -76,3 +76,4 @@ browser-extension/
 # Local screenshot / preview scratch (agent-browser, manual captures)
 /main.png
 preview/
+/.swc

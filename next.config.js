@@ -1,4 +1,7 @@
 const { withSentryConfig } = require('@sentry/nextjs');
+// Enables the "use workflow" / "use step" directives that the video pipeline
+// (src/workflows/) is built on. Must wrap the config before Sentry does.
+const { withWorkflow } = require('workflow/next');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -14,7 +17,18 @@ const nextConfig = {
       },
     ],
   },
-  // Add any other Next.js configuration options here
+  webpack: (config) => {
+    // Workflow generates its route handlers as ESM .js files under
+    // src/app/.well-known/workflow/. Next 14's webpack parses them as
+    // CommonJS and fails with "'import' and 'export' may appear only with
+    // sourceType: module". Marking them as ESM is what makes Workflow build
+    // on Next 14 — the Workflow docs only cover Next 16.
+    config.module.rules.push({
+      test: /[\\/]\.well-known[\\/]workflow[\\/].*\.js$/,
+      type: 'javascript/esm',
+    });
+    return config;
+  },
 }
 
 // Sentry configuration options
@@ -55,7 +69,17 @@ const sentryWebpackPluginOptions = {
   // https://docs.sentry.io/product/crons/
   // https://vercel.com/docs/cron-jobs
   automaticVercelMonitors: true,
+
+  webpack: {
+    // Workflow generates its own route handlers under .well-known/workflow/.
+    // Sentry's wrappingLoader rewrites route files and prepends an import to
+    // them, which leaves those generated modules unparseable ("'import' and
+    // 'export' may appear only with 'sourceType: module'") and fails the
+    // build. They are internal transport endpoints, so there is nothing to
+    // gain from instrumenting them anyway.
+    excludeServerRoutes: [/^\/\.well-known\/workflow\//],
+  },
 };
 
 // Make sure adding Sentry options is the last code to run before exporting
-module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions);
+module.exports = withSentryConfig(withWorkflow(nextConfig), sentryWebpackPluginOptions);
