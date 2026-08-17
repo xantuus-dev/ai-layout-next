@@ -63,6 +63,15 @@ export class DocumentCreatePdfTool implements AgentTool {
     'summaries, invoices, and anything the user should be able to save or print. ' +
     'Blank lines separate paragraphs.';
   category = 'data' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      title: { type: 'string', description: 'Document title, shown at the top of the PDF' },
+      content: { type: 'string', description: 'Document body text; blank lines separate paragraphs' },
+      filename: { type: 'string', description: 'Optional filename (without extension)' },
+    },
+    required: ['title', 'content'],
+  };
 
   validate(params: any) {
     return validateTitleAndContent(params);
@@ -149,6 +158,15 @@ export class DocumentCreateDocxTool implements AgentTool {
     'Prefer this over PDF when the user will edit the result. Lines starting with ' +
     '"# " become headings; blank lines separate paragraphs.';
   category = 'data' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      title: { type: 'string', description: 'Document title' },
+      content: { type: 'string', description: 'Document body text; lines starting with "# " become headings, blank lines separate paragraphs' },
+      filename: { type: 'string', description: 'Optional filename (without extension)' },
+    },
+    required: ['title', 'content'],
+  };
 
   validate(params: any) {
     return validateTitleAndContent(params);
@@ -222,6 +240,27 @@ export class DocumentCreateDeckTool implements AgentTool {
     'slides array, each with a title and bullet points. Use for pitch decks, ' +
     'proposals, and any request for a presentation.';
   category = 'data' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      title: { type: 'string', description: 'Presentation title, shown on the cover slide' },
+      subtitle: { type: 'string', description: 'Optional cover slide subtitle' },
+      slides: {
+        type: 'array',
+        description: 'Content slides, each with a title and optional bullet points (max 50)',
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            bullets: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['title'],
+        },
+      },
+      filename: { type: 'string', description: 'Optional filename (without extension)' },
+    },
+    required: ['title', 'slides'],
+  };
 
   validate(params: any) {
     if (!params?.title || typeof params.title !== 'string') {

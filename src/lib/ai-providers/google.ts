@@ -3,7 +3,7 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { AIProvider, ChatParams, ChatResponse, AIModel, ContentBlock } from './types';
+import { AIProvider, ChatParams, ChatResponse, AIModel, ContentBlock, ToolCall } from './types';
 
 export class GoogleProvider implements AIProvider {
   id = 'google';
@@ -20,7 +20,7 @@ export class GoogleProvider implements AIProvider {
       inputCostPer1M: 0.075,
       outputCostPer1M: 0.30,
       contextWindow: 1000000,
-      capabilities: ['vision', 'multimodal', 'code-execution'],
+      capabilities: ['vision', 'multimodal', 'code-execution', 'function-calling'],
       badge: 'Cheapest',
     },
     {
@@ -32,7 +32,7 @@ export class GoogleProvider implements AIProvider {
       inputCostPer1M: 1.25,
       outputCostPer1M: 5.00,
       contextWindow: 2000000,
-      capabilities: ['vision', 'multimodal', 'long-context'],
+      capabilities: ['vision', 'multimodal', 'long-context', 'function-calling'],
       badge: '2M Context',
     },
     {
@@ -44,7 +44,7 @@ export class GoogleProvider implements AIProvider {
       inputCostPer1M: 0.075,
       outputCostPer1M: 0.30,
       contextWindow: 1000000,
-      capabilities: ['vision', 'multimodal'],
+      capabilities: ['vision', 'multimodal', 'function-calling'],
     },
   ];
 
@@ -74,9 +74,30 @@ export class GoogleProvider implements AIProvider {
             data: block.source.data,
           },
         };
+      } else if (block.type === 'tool_use') {
+        return { functionCall: { name: block.name, args: block.input ?? {} } };
+      } else if (block.type === 'tool_result') {
+        // `response` must be an object per the SDK's FunctionResponse type —
+        // our tool_result content is always a JSON string, so wrap it.
+        return { functionResponse: { name: block.name, response: { result: block.content ?? '' } } };
       }
       return { text: '' };
     });
+  }
+
+  /**
+   * Gemini's history validation (VALID_PARTS_PER_ROLE in the SDK) rejects
+   * `functionResponse` parts under role 'user' — only role 'function' may
+   * carry them. Our internal convention keeps tool-result AIMessages at role
+   * 'user' uniformly across providers, so this maps that one case on the way
+   * out; everything else follows the existing assistant->model mapping.
+   */
+  private toGeminiRole(msg: { role: string; content: string | ContentBlock[] }): string {
+    const blocks = Array.isArray(msg.content) ? msg.content : null;
+    if (blocks?.length && blocks.every(b => b.type === 'tool_result')) {
+      return 'function';
+    }
+    return msg.role === 'assistant' ? 'model' : 'user';
   }
 
   async chat(params: ChatParams): Promise<ChatResponse> {
@@ -98,19 +119,35 @@ export class GoogleProvider implements AIProvider {
       .filter(Boolean)
       .join('\n\n');
 
-    const model = this.client.getGenerativeModel({
+    const modelConfig: any = {
       model: params.model,
       ...(systemText ? { systemInstruction: systemText } : {}),
       generationConfig: {
         maxOutputTokens: params.maxTokens || 4096,
         temperature: params.temperature,
       },
-    });
+    };
+
+    if (params.tools?.length) {
+      // Cast: the SDK's Schema type requires SchemaType enum members (nominal,
+      // not structural) where we pass plain lowercase string literals — the
+      // values line up 1:1 at runtime ('object', 'string', ...), only the
+      // static type disagrees.
+      modelConfig.tools = [{
+        functionDeclarations: params.tools.map(t => ({
+          name: t.name,
+          description: t.description,
+          parameters: t.inputSchema as any,
+        })),
+      }];
+    }
+
+    const model = this.client.getGenerativeModel(modelConfig);
 
     // Convert the non-system messages to Gemini chat format.
     const conversation = params.messages.filter(msg => msg.role !== 'system');
     const history = conversation.slice(0, -1).map(msg => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
+      role: this.toGeminiRole(msg),
       parts: this.convertContent(msg.content),
     }));
 
@@ -124,16 +161,38 @@ export class GoogleProvider implements AIProvider {
     const result = await chat.sendMessage(this.convertContent(lastMessage.content));
     const response = result.response;
 
-    if (!response.text()) {
+    const text = response.text(); // '' for a pure tool-call turn, never throws on that alone
+    const calls = response.functionCalls() ?? [];
+
+    // Gemini's FunctionCall has no id (confirmed in the SDK's own types) —
+    // synthesize one, unique enough within this loop's lifetime.
+    const toolCalls: ToolCall[] | undefined = calls.length
+      ? calls.map((fc, i) => ({
+          id: `g_${Date.now()}_${i}`,
+          name: fc.name,
+          input: (fc.args ?? {}) as Record<string, unknown>,
+        }))
+      : undefined;
+
+    const contentBlocks: ContentBlock[] | undefined = toolCalls
+      ? [
+          ...(text ? [{ type: 'text' as const, text }] : []),
+          ...toolCalls.map(c => ({ type: 'tool_use' as const, ...c })),
+        ]
+      : undefined;
+
+    if (!text && !toolCalls) {
       throw new Error('No content received from Google');
     }
 
     // Note: Gemini API doesn't always provide accurate token counts
     // We'll estimate based on response length if not available
-    const tokenEstimate = Math.ceil(response.text().length / 4);
+    const tokenEstimate = Math.ceil(text.length / 4);
 
     return {
-      content: response.text(),
+      content: text,
+      contentBlocks,
+      toolCalls,
       usage: {
         inputTokens: 0, // Gemini doesn't provide this consistently
         outputTokens: tokenEstimate,
@@ -141,6 +200,7 @@ export class GoogleProvider implements AIProvider {
       },
       model: params.model,
       provider: this.id,
+      finishReason: toolCalls ? 'tool_use' : undefined,
     };
   }
 

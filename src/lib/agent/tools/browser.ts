@@ -14,6 +14,13 @@ export class BrowserNavigateTool implements AgentTool {
   name = 'browser.navigate';
   description = 'Navigate to a web page URL';
   category = 'browser' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      url: { type: 'string', description: 'The fully-qualified URL to navigate to, e.g. https://example.com' },
+    },
+    required: ['url'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.url || typeof params.url !== 'string') {
@@ -96,6 +103,14 @@ export class BrowserExtractTool implements AgentTool {
   name = 'browser.extract';
   description = 'Extract text content from the current page using a CSS selector';
   category = 'browser' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      selector: { type: 'string', description: 'CSS selector of the element(s) to extract text from' },
+      url: { type: 'string', description: 'Optional URL to navigate to first, before extracting' },
+    },
+    required: ['selector'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.selector || typeof params.selector !== 'string') {
@@ -178,6 +193,14 @@ export class BrowserClickTool implements AgentTool {
   name = 'browser.click';
   description = 'Click an element on the current page using a CSS selector';
   category = 'browser' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      selector: { type: 'string', description: 'CSS selector of the element to click' },
+      url: { type: 'string', description: 'Optional URL to navigate to first, before clicking' },
+    },
+    required: ['selector'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.selector || typeof params.selector !== 'string') {
@@ -260,6 +283,12 @@ export class BrowserScreenshotTool implements AgentTool {
   name = 'browser.screenshot';
   description = 'Capture a screenshot of the current page';
   category = 'browser' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      url: { type: 'string', description: 'Optional URL to navigate to first, before capturing' },
+    },
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     return { valid: true };
@@ -338,6 +367,15 @@ export class BrowserWaitForTool implements AgentTool {
   name = 'browser.waitFor';
   description = 'Wait for an element to appear on the page';
   category = 'browser' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      selector: { type: 'string', description: 'CSS selector of the element to wait for' },
+      timeout: { type: 'number', description: 'Max time to wait in milliseconds (default 30000)' },
+      url: { type: 'string', description: 'Optional URL to navigate to first, before waiting' },
+    },
+    required: ['selector'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.selector || typeof params.selector !== 'string') {

@@ -14,6 +14,17 @@ export class EmailSendTool implements AgentTool {
   name = 'email.send';
   description = 'Send an email via Gmail API';
   category = 'communication' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      to: { type: 'string', description: 'Recipient email address' },
+      subject: { type: 'string', description: 'Email subject line' },
+      body: { type: 'string', description: 'Email body text' },
+      cc: { type: 'string', description: 'Optional CC email address' },
+      bcc: { type: 'string', description: 'Optional BCC email address' },
+    },
+    required: ['to', 'subject', 'body'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.to || typeof params.to !== 'string') {
@@ -119,6 +130,26 @@ export class EmailSendBatchTool implements AgentTool {
   name = 'email.sendBatch';
   description = 'Send multiple emails with rate limiting';
   category = 'communication' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      emails: {
+        type: 'array',
+        description: 'Emails to send, each with to/subject/body (max 100)',
+        items: {
+          type: 'object',
+          properties: {
+            to: { type: 'string' },
+            subject: { type: 'string' },
+            body: { type: 'string' },
+          },
+          required: ['to', 'subject', 'body'],
+        },
+      },
+      delayMs: { type: 'number', description: 'Delay between sends in milliseconds (default 1000)' },
+    },
+    required: ['emails'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!Array.isArray(params.emails)) {

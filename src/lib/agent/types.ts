@@ -193,6 +193,16 @@ export interface AgentTool {
   description: string;
   category: 'browser' | 'communication' | 'data' | 'integration' | 'utility';
 
+  // JSON-schema-ish description of `params`, exposed to models via native
+  // tool-calling APIs (Anthropic input_schema / OpenAI function.parameters /
+  // Google functionDeclarations.parameters). Kept in sync with validate()
+  // and execute()'s param usage by hand — there is no other source of truth.
+  inputSchema: {
+    type: 'object';
+    properties: Record<string, { type: string; description?: string; enum?: string[]; items?: any }>;
+    required?: string[];
+  };
+
   // Validate tool parameters
   validate(params: any): { valid: boolean; error?: string };
 

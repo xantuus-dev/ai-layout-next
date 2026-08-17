@@ -57,6 +57,9 @@ import {
   AiExtractTool,
 } from './ai';
 
+// Web search tool
+import { WebSearchTool } from './websearch';
+
 /**
  * Initialize all tools and register them
  */
@@ -94,6 +97,9 @@ export function initializeTools(): void {
   toolRegistry.register(new AiChatTool());
   toolRegistry.register(new AiSummarizeTool());
   toolRegistry.register(new AiExtractTool());
+
+  // Web search
+  toolRegistry.register(new WebSearchTool());
 
   // Document tools
   toolRegistry.register(new DocumentCreatePdfTool());

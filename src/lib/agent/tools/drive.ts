@@ -35,6 +35,16 @@ export class DriveUploadTool implements AgentTool {
   name = 'drive.upload';
   description = 'Upload a file to Google Drive. Provide fileName, content, and optional mimeType and folderId.';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      fileName: { type: 'string', description: 'Name for the uploaded file' },
+      content: { type: 'string', description: 'File content' },
+      mimeType: { type: 'string', description: 'MIME type of the file (default text/plain)' },
+      folderId: { type: 'string', description: 'Optional destination Drive folder ID' },
+    },
+    required: ['fileName', 'content'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.fileName || typeof params.fileName !== 'string') {
@@ -112,6 +122,14 @@ export class DriveListTool implements AgentTool {
   name = 'drive.list';
   description = 'List files in Google Drive. Optionally filter by folderId, query, or limit results.';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      folderId: { type: 'string', description: 'Optional folder ID to list files within' },
+      query: { type: 'string', description: 'Optional search query to filter files' },
+      maxResults: { type: 'number', description: 'Maximum files to return (default 20)' },
+    },
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     return { valid: true };
@@ -184,6 +202,15 @@ export class DriveCreateDocTool implements AgentTool {
   name = 'drive.createDoc';
   description = 'Create a new Google Doc with the specified title and content.';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      title: { type: 'string', description: 'Title of the new Google Doc' },
+      content: { type: 'string', description: 'Optional initial document content' },
+      folderId: { type: 'string', description: 'Optional destination Drive folder ID' },
+    },
+    required: ['title'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.title || typeof params.title !== 'string') {
@@ -254,6 +281,14 @@ export class DriveCreateSheetTool implements AgentTool {
   name = 'drive.createSheet';
   description = 'Create a new Google Sheet with the specified title.';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      title: { type: 'string', description: 'Title of the new Google Sheet' },
+      folderId: { type: 'string', description: 'Optional destination Drive folder ID' },
+    },
+    required: ['title'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.title || typeof params.title !== 'string') {
@@ -322,6 +357,13 @@ export class DriveDownloadTool implements AgentTool {
   name = 'drive.download';
   description = 'Download a file from Google Drive by its file ID.';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      fileId: { type: 'string', description: 'The Google Drive file ID to download' },
+    },
+    required: ['fileId'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.fileId || typeof params.fileId !== 'string') {
@@ -386,6 +428,16 @@ export class DriveShareTool implements AgentTool {
   name = 'drive.share';
   description = 'Share a Google Drive file with a specific email address or make it public.';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      fileId: { type: 'string', description: 'The Google Drive file ID to share' },
+      email: { type: 'string', description: 'Optional email address to share with' },
+      role: { type: 'string', enum: ['reader', 'writer', 'commenter'], description: 'Access level to grant (default reader)' },
+      makePublic: { type: 'boolean', description: 'Whether to make the file accessible to anyone with the link' },
+    },
+    required: ['fileId'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.fileId || typeof params.fileId !== 'string') {

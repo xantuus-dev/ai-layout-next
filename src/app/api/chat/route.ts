@@ -5,11 +5,12 @@ import { prisma } from '@/lib/prisma';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAuthenticatedUserId } from '@/lib/api-auth';
 import { aiRouter } from '@/lib/ai-providers';
-import { secureChat } from '@/lib/ai-security/guard';
-import { checkAndResetCredits, getCreditStatus, estimateTurnCredits } from '@/lib/credits';
+import type { AIMessage } from '@/lib/ai-providers/types';
+import { checkAndResetCredits, getCreditStatus, estimateAgenticTurnCredits } from '@/lib/credits';
 import { assertCanSpend, spendCredits } from '@/lib/billing/gate';
 import { buildSystemPrompt } from '@/lib/personalization';
 import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
+import { runChatLoop } from '@/lib/agent/chat-loop';
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,12 +65,35 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { message, files, pastedContent, model, isThinkingEnabled, history = [] } = body;
+    const {
+      message,
+      files,
+      pastedContent,
+      model,
+      isThinkingEnabled,
+      history = [],
+      approvedTools = [],
+      deniedTools = [],
+      resume = false,
+      resumeMessages,
+    } = body;
 
     // Validate input
-    if (!message && (!files || files.length === 0) && (!pastedContent || pastedContent.length === 0)) {
+    if (
+      !resume &&
+      !message &&
+      (!files || files.length === 0) &&
+      (!pastedContent || pastedContent.length === 0)
+    ) {
       return NextResponse.json(
         { error: 'Message, files, or pasted content is required' },
+        { status: 400 }
+      );
+    }
+
+    if (resume && (!Array.isArray(resumeMessages) || resumeMessages.length === 0)) {
+      return NextResponse.json(
+        { error: 'resumeMessages is required when resume is true' },
         { status: 400 }
       );
     }
@@ -95,7 +119,7 @@ export async function POST(request: NextRequest) {
     // credits left was served anyway, and only a user already overdrawn was
     // ever refused. Estimating per model also means an Opus turn is refused
     // sooner than a Haiku one, which is the point of tiered pricing.
-    const estimatedCredits = estimateTurnCredits(
+    const estimatedCredits = estimateAgenticTurnCredits(
       aiRouter.getModel(modelId)?.creditsPerThousandTokens ?? 1
     );
 
@@ -131,52 +155,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build message content with support for images and text
-    const contentBlocks: any[] = [];
-
-    // Add text message if provided
-    if (message) {
-      contentBlocks.push({
-        type: 'text',
-        text: message,
-      });
-    }
-
-    // Add pasted content if provided
-    if (pastedContent && pastedContent.length > 0) {
-      for (const content of pastedContent) {
-        contentBlocks.push({
-          type: 'text',
-          text: `\n\nPasted Content:\n${content}`,
-        });
-      }
-    }
-
-    // Add files if provided (images as base64)
-    if (files && files.length > 0) {
-      for (const file of files) {
-        // Check if it's an image
-        const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (imageTypes.includes(file.type)) {
-          // File should be in base64 format from the client
-          contentBlocks.push({
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: file.type,
-              data: file.data, // Base64 string without the data:image prefix
-            },
-          });
-        } else {
-          // For non-image files, add as text description
-          contentBlocks.push({
-            type: 'text',
-            text: `\n\n[File attached: ${file.name} (${file.type})]`,
-          });
-        }
-      }
-    }
-
     // Determine max tokens and extended thinking based on settings
     const maxTokens = isThinkingEnabled ? 8192 : 4096;
 
@@ -186,51 +164,106 @@ export async function POST(request: NextRequest) {
       : undefined;
 
     // Format history if present
-    const historyMessages = Array.isArray(history) ? history.map((msg: any) => ({
+    const historyMessages: AIMessage[] = Array.isArray(history) ? history.map((msg: any) => ({
       role: msg.role === 'assistant' || msg.role === 'system' ? msg.role : 'user',
       content: msg.content
     })) : [];
 
-    // Pull anything we already know about this user that bears on the message.
-    // Returns null (never throws) when memory is empty or unavailable.
-    const memoryContext = message
-      ? await getMemoryContext(user.id, message)
-      : null;
+    let loopMessages: AIMessage[];
 
-    // Personalization + memory in one system message. The personalization
-    // fields had a settings page and an API but were never sent to a model.
-    const systemPrompt = buildSystemPrompt(user, memoryContext);
+    if (resume) {
+      // Approval flow resuming mid-loop: the client echoes back the opaque
+      // internal message array from the pendingApproval response verbatim.
+      // It already contains the tool_use/tool_result blocks needed to
+      // continue — plain-text `history` can't reconstruct those, so this
+      // path skips rebuilding system/history/content entirely.
+      loopMessages = resumeMessages as AIMessage[];
+    } else {
+      // Build message content with support for images and text
+      const contentBlocks: any[] = [];
 
-    // Call the model through the security chokepoint: outbound PII is redacted
-    // before it reaches the provider and restored in the response. secureChat
-    // preserves aiRouter.chat's shape and adds a `redaction` summary.
-    const response = await secureChat(
+      if (message) {
+        contentBlocks.push({ type: 'text', text: message });
+      }
+
+      if (pastedContent && pastedContent.length > 0) {
+        for (const content of pastedContent) {
+          contentBlocks.push({ type: 'text', text: `\n\nPasted Content:\n${content}` });
+        }
+      }
+
+      if (files && files.length > 0) {
+        for (const file of files) {
+          const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+          if (imageTypes.includes(file.type)) {
+            contentBlocks.push({
+              type: 'image',
+              source: { type: 'base64', media_type: file.type, data: file.data },
+            });
+          } else {
+            contentBlocks.push({ type: 'text', text: `\n\n[File attached: ${file.name} (${file.type})]` });
+          }
+        }
+      }
+
+      // Pull anything we already know about this user that bears on the message.
+      // Returns null (never throws) when memory is empty or unavailable.
+      const memoryContext = message ? await getMemoryContext(user.id, message) : null;
+
+      // Personalization + memory in one system message. The personalization
+      // fields had a settings page and an API but were never sent to a model.
+      const systemPrompt = buildSystemPrompt(user, memoryContext);
+
+      loopMessages = [
+        { role: 'system', content: systemPrompt },
+        ...historyMessages,
+        {
+          role: 'user',
+          content: contentBlocks.length === 1 && contentBlocks[0].type === 'text'
+            ? contentBlocks[0].text
+            : contentBlocks,
+        },
+      ];
+    }
+
+    // Run the ReAct tool-calling loop. Reuses secureChat internally (outbound
+    // PII redaction, audit logging) for every model call it makes, and
+    // degrades to a single plain call when the model has no function-calling
+    // capability — functionally identical to the old direct secureChat call.
+    const loopResult = await runChatLoop({
       modelId,
-      {
-        messages: [
-          { role: 'system' as const, content: systemPrompt },
-          ...historyMessages,
-          {
-            role: 'user',
-            content: contentBlocks.length === 1 && contentBlocks[0].type === 'text'
-              ? contentBlocks[0].text
-              : contentBlocks,
-          },
-        ],
-        maxTokens,
-        thinking: thinkingConfig,
-      },
-      { surface: 'chat', userId: user.id }
-    );
+      messages: loopMessages,
+      userId: user.id,
+      approvedTools: Array.isArray(approvedTools) ? approvedTools : [],
+      deniedTools: Array.isArray(deniedTools) ? deniedTools : [],
+      surface: 'chat',
+      maxTokens,
+      thinking: thinkingConfig,
+    });
 
-    if (!response.content) {
+    if (loopResult.status === 'pendingApproval') {
+      // Not an error — a normal conversational branch waiting on the user.
+      return NextResponse.json(
+        {
+          success: false,
+          needsApproval: true,
+          pendingApproval: loopResult.pendingApproval,
+          resumeMessages: loopResult.resumeMessages,
+          toolTrace: loopResult.toolTrace,
+        },
+        { status: 200 }
+      );
+    }
+
+    if (!loopResult.content) {
       console.error('No text content in AI response');
       throw new Error('Unable to generate response - no text content received');
     }
 
-    // Calculate credits based on usage
-    const { inputTokens, outputTokens, totalTokens } = response.usage;
-    const creditsUsed = aiRouter.estimateCredits(modelId, totalTokens);
+    // Calculate credits based on usage: model tokens plus whatever the tools
+    // themselves cost, summed once for the whole loop (never per-iteration).
+    const { inputTokens, outputTokens, totalTokens } = loopResult.usage;
+    const creditsUsed = aiRouter.estimateCredits(modelId, totalTokens) + loopResult.toolCreditsUsed;
 
     // Record usage and deduct from the (possibly team-pooled) credit balance
     await spendCredits(user.id, creditsUsed, {
@@ -241,7 +274,9 @@ export async function POST(request: NextRequest) {
         inputTokens,
         outputTokens,
         modelRequested: model,
-        provider: response.provider,
+        provider: loopResult.provider,
+        toolCreditsUsed: loopResult.toolCreditsUsed,
+        toolsUsed: loopResult.toolTrace.map((t) => t.tool),
       },
     });
 
@@ -259,7 +294,7 @@ export async function POST(request: NextRequest) {
             content: String(msg.content),
           })),
           { role: 'user', content: message },
-          { role: 'assistant', content: response.content },
+          { role: 'assistant', content: loopResult.content },
         ],
       });
     }
@@ -269,10 +304,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        response: response.content,
+        response: loopResult.content,
         model: modelId,
-        provider: response.provider,
+        provider: loopResult.provider,
         timestamp: new Date().toISOString(),
+        toolTrace: loopResult.toolTrace,
         usage: {
           inputTokens,
           outputTokens,

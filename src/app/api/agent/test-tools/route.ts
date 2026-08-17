@@ -28,10 +28,10 @@ export async function GET(req: NextRequest) {
     const allTools = toolRegistry.getAllTools();
     results.tests.push({
       name: 'Tool Registry',
-      passed: allTools.length === 22,
+      passed: allTools.length === 26,
       details: {
         totalTools: allTools.length,
-        expected: 22,
+        expected: 26,
         tools: allTools.map(t => ({ name: t.name, category: t.category })),
       },
     });

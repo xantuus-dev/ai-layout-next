@@ -35,6 +35,19 @@ export class CalendarCreateEventTool implements AgentTool {
   name = 'calendar.createEvent';
   description = 'Create a new calendar event. Provide title (summary), startTime, endTime, and optional description, location, attendees.';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      title: { type: 'string', description: 'Event title (calendar summary)' },
+      startTime: { type: 'string', description: 'ISO 8601 start datetime' },
+      endTime: { type: 'string', description: 'ISO 8601 end datetime' },
+      description: { type: 'string', description: 'Optional event description' },
+      location: { type: 'string', description: 'Optional event location' },
+      attendees: { type: 'array', items: { type: 'string' }, description: 'Optional attendee email addresses' },
+      timezone: { type: 'string', description: 'Optional IANA timezone, e.g. America/New_York' },
+    },
+    required: ['title', 'startTime', 'endTime'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.title || typeof params.title !== 'string') {
@@ -129,6 +142,15 @@ export class CalendarListEventsTool implements AgentTool {
   name = 'calendar.listEvents';
   description = 'List upcoming calendar events. Optionally filter by startDate, endDate, maxResults, or search query.';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      startDate: { type: 'string', description: 'ISO 8601 lower bound (default now)' },
+      endDate: { type: 'string', description: 'ISO 8601 upper bound' },
+      maxResults: { type: 'number', description: 'Maximum events to return (default 10)' },
+      query: { type: 'string', description: 'Optional free-text search query' },
+    },
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     return { valid: true };
@@ -204,6 +226,19 @@ export class CalendarUpdateEventTool implements AgentTool {
   name = 'calendar.updateEvent';
   description = 'Update an existing calendar event. Provide eventId and the fields to update.';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      eventId: { type: 'string', description: 'ID of the event to update' },
+      title: { type: 'string', description: 'New event title' },
+      description: { type: 'string', description: 'New event description' },
+      startTime: { type: 'string', description: 'New ISO 8601 start datetime' },
+      endTime: { type: 'string', description: 'New ISO 8601 end datetime' },
+      location: { type: 'string', description: 'New event location' },
+      timezone: { type: 'string', description: 'IANA timezone for the new times, e.g. America/New_York' },
+    },
+    required: ['eventId'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.eventId || typeof params.eventId !== 'string') {
@@ -294,6 +329,13 @@ export class CalendarDeleteEventTool implements AgentTool {
   name = 'calendar.deleteEvent';
   description = 'Delete a calendar event by its eventId.';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      eventId: { type: 'string', description: 'ID of the event to delete' },
+    },
+    required: ['eventId'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.eventId || typeof params.eventId !== 'string') {

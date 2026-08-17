@@ -11,6 +11,16 @@ export class AiChatTool implements AgentTool {
   name = 'ai.chat';
   description = 'Generate text using AI models (for summarization, analysis, writing)';
   category = 'utility' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      prompt: { type: 'string', description: 'The prompt to send to the model' },
+      model: { type: 'string', description: 'Optional model ID (default a cheap Haiku model)' },
+      maxTokens: { type: 'number', description: 'Optional max output tokens (default 1024)' },
+      temperature: { type: 'number', description: 'Optional sampling temperature 0-1 (default 0.7)' },
+    },
+    required: ['prompt'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.prompt || typeof params.prompt !== 'string') {
@@ -86,6 +96,15 @@ export class AiSummarizeTool implements AgentTool {
   name = 'ai.summarize';
   description = 'Summarize long text into key points';
   category = 'utility' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      text: { type: 'string', description: 'The text to summarize' },
+      maxLength: { type: 'number', description: 'Approximate max summary length in words (default 200)' },
+      style: { type: 'string', enum: ['bullet', 'paragraph'], description: 'Summary format (default bullet)' },
+    },
+    required: ['text'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.text || typeof params.text !== 'string') {
@@ -130,6 +149,14 @@ export class AiExtractTool implements AgentTool {
   name = 'ai.extract';
   description = 'Extract structured data from unstructured text';
   category = 'utility' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      text: { type: 'string', description: 'The unstructured text to extract data from' },
+      schema: { type: 'object', description: 'Map of field name to a description of what to extract for it' },
+    },
+    required: ['text', 'schema'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.text || typeof params.text !== 'string') {

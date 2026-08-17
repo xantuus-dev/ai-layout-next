@@ -9,13 +9,48 @@ export interface AIMessage {
 }
 
 export interface ContentBlock {
-  type: 'text' | 'image';
+  type: 'text' | 'image' | 'tool_use' | 'tool_result';
   text?: string;
   source?: {
     type: 'base64';
     media_type: string;
     data: string;
   };
+  // tool_use — "I want to call this tool" (assistant turn)
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  // tool_result — "here's what it returned" (user turn). `name` is also set
+  // here (= the originating call's tool name) so google.ts can build a
+  // functionResponse part without an id->name lookup table — Gemini's
+  // function calling has no id concept at all.
+  tool_use_id?: string;
+  content?: string;
+  is_error?: boolean;
+}
+
+/**
+ * Provider-neutral tool definition, translated by each provider into its own
+ * wire format (Anthropic input_schema / OpenAI function.parameters / Google
+ * functionDeclarations.parameters).
+ */
+export interface ToolInputSchema {
+  type: 'object';
+  properties: Record<string, { type: string; description?: string; enum?: string[]; items?: any }>;
+  required?: string[];
+}
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: ToolInputSchema;
+}
+
+/** A single tool invocation requested by the model. */
+export interface ToolCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
 }
 
 export interface ChatParams {
@@ -27,10 +62,20 @@ export interface ChatParams {
     type: 'enabled';
     budget_tokens: number;
   };
+  tools?: ToolDefinition[];
 }
 
 export interface ChatResponse {
   content: string;
+  /**
+   * The exact ordered content-block sequence to replay as the next assistant
+   * AIMessage. Needed (rather than just `content`) because order matters for
+   * interleaved text/tool_use blocks and because tool_use blocks carry fields
+   * `content` alone can't represent. Absent when the turn was plain text.
+   */
+  contentBlocks?: ContentBlock[];
+  /** Convenience extraction of the tool_use blocks in `contentBlocks`, if any. */
+  toolCalls?: ToolCall[];
   usage: {
     inputTokens: number;
     outputTokens: number;

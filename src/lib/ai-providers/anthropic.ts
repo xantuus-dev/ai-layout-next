@@ -3,8 +3,19 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { AIProvider, ChatParams, ChatResponse, AIModel, StreamEvent } from './types';
+import { AIProvider, ChatParams, ChatResponse, AIModel, StreamEvent, ContentBlock, ToolCall } from './types';
 import { ANTHROPIC_MODELS } from './catalog';
+
+/** Translate our provider-neutral content blocks into Anthropic's native block shapes. */
+function toAnthropicBlocks(content: string | ContentBlock[]): any {
+  if (typeof content === 'string') return content;
+  return content.map((b) => {
+    if (b.type === 'text') return { type: 'text', text: b.text ?? '' };
+    if (b.type === 'image') return { type: 'image', source: b.source };
+    if (b.type === 'tool_use') return { type: 'tool_use', id: b.id, name: b.name, input: b.input ?? {} };
+    return { type: 'tool_result', tool_use_id: b.tool_use_id, content: b.content ?? '', is_error: b.is_error };
+  });
+}
 
 export class AnthropicProvider implements AIProvider {
   id = 'anthropic';
@@ -53,7 +64,7 @@ export class AnthropicProvider implements AIProvider {
 
     const anthropicMessages = params.messages
       .filter(msg => msg.role !== 'system')
-      .map(msg => ({ role: msg.role, content: msg.content }));
+      .map(msg => ({ role: msg.role, content: toAnthropicBlocks(msg.content) }));
 
     const apiParams: any = {
       model: params.model,
@@ -63,6 +74,14 @@ export class AnthropicProvider implements AIProvider {
 
     if (systemText) {
       apiParams.system = systemText;
+    }
+
+    if (params.tools?.length) {
+      apiParams.tools = params.tools.map(t => ({
+        name: t.name,
+        description: t.description,
+        input_schema: t.inputSchema,
+      }));
     }
 
     // The request shape is not portable across model generations: Claude 4.7+
@@ -146,22 +165,36 @@ export class AnthropicProvider implements AIProvider {
 
     const response = await this.client.messages.create(this.buildApiParams(params));
 
-    // Extract text content from response
+    // Extract text and tool_use blocks from response
     let responseText = '';
+    const toolCalls: ToolCall[] = [];
+    const contentBlocks: ContentBlock[] = [];
     if (response.content && response.content.length > 0) {
       for (const block of response.content) {
         if (block.type === 'text') {
           responseText += block.text;
+          contentBlocks.push({ type: 'text', text: block.text });
+        } else if (block.type === 'tool_use') {
+          const call: ToolCall = {
+            id: block.id,
+            name: block.name,
+            input: (block.input ?? {}) as Record<string, unknown>,
+          };
+          toolCalls.push(call);
+          contentBlocks.push({ type: 'tool_use', ...call });
         }
       }
     }
 
-    if (!responseText) {
+    // A pure tool-use turn has no text — only throw when there is neither.
+    if (!responseText && toolCalls.length === 0) {
       throw new Error('No text content received from Anthropic');
     }
 
     return {
       content: responseText,
+      contentBlocks: contentBlocks.length ? contentBlocks : undefined,
+      toolCalls: toolCalls.length ? toolCalls : undefined,
       usage: {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,

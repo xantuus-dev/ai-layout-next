@@ -3,7 +3,17 @@
  */
 
 import OpenAI from 'openai';
-import { AIProvider, ChatParams, ChatResponse, AIModel, ContentBlock } from './types';
+import { AIProvider, ChatParams, ChatResponse, AIModel, AIMessage, ContentBlock, ToolCall } from './types';
+
+/** `tool_calls[].function.arguments` is a JSON string models don't always emit validly. */
+function safeJsonParse(text: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
 
 export class OpenAIProvider implements AIProvider {
   id = 'openai';
@@ -92,31 +102,100 @@ export class OpenAIProvider implements AIProvider {
     });
   }
 
+  /**
+   * OpenAI's tool-calling shape doesn't map 1:1 from our AIMessage/ContentBlock
+   * model the way Anthropic's does: tool calls live in a separate `tool_calls`
+   * field on the assistant message (not inline content blocks), and each tool
+   * result must become its own subsequent `{role:'tool', tool_call_id, content}`
+   * message rather than a content block. So a single tool_result-bearing
+   * AIMessage fans out into N OpenAI messages here.
+   */
+  private buildOpenAIMessages(messages: AIMessage[]): any[] {
+    const out: any[] = [];
+
+    for (const msg of messages) {
+      const blocks = Array.isArray(msg.content) ? msg.content : null;
+
+      if (blocks?.some(b => b.type === 'tool_result')) {
+        for (const b of blocks) {
+          if (b.type === 'tool_result') {
+            out.push({ role: 'tool', tool_call_id: b.tool_use_id, content: b.content ?? '' });
+          }
+        }
+        continue;
+      }
+
+      if (msg.role === 'assistant' && blocks?.some(b => b.type === 'tool_use')) {
+        const text = blocks.filter(b => b.type === 'text').map(b => b.text ?? '').join('');
+        out.push({
+          role: 'assistant',
+          content: text || null,
+          tool_calls: blocks
+            .filter(b => b.type === 'tool_use')
+            .map(b => ({
+              id: b.id!,
+              type: 'function' as const,
+              function: { name: b.name!, arguments: JSON.stringify(b.input ?? {}) },
+            })),
+        });
+        continue;
+      }
+
+      out.push({ role: msg.role, content: this.convertContent(msg.content) });
+    }
+
+    return out;
+  }
+
   async chat(params: ChatParams): Promise<ChatResponse> {
     if (!this.client) {
       throw new Error('OpenAI provider is not configured. Please set OPENAI_API_KEY.');
     }
 
-    // Convert messages to OpenAI format
-    const openaiMessages = params.messages.map(msg => ({
-      role: msg.role,
-      content: this.convertContent(msg.content),
-    }));
-
-    const response = await this.client.chat.completions.create({
+    const createParams: any = {
       model: params.model,
-      messages: openaiMessages as any,
+      messages: this.buildOpenAIMessages(params.messages),
       max_tokens: params.maxTokens || 4096,
       temperature: params.temperature,
-    });
+    };
+
+    if (params.tools?.length) {
+      createParams.tools = params.tools.map(t => ({
+        type: 'function' as const,
+        function: { name: t.name, description: t.description, parameters: t.inputSchema },
+      }));
+    }
+
+    const response = await this.client.chat.completions.create(createParams);
 
     const choice = response.choices[0];
-    if (!choice || !choice.message.content) {
+    const message = choice?.message;
+
+    const toolCalls: ToolCall[] | undefined = message?.tool_calls?.length
+      ? message.tool_calls
+          .filter((tc: any) => tc.type === 'function')
+          .map((tc: any) => ({
+            id: tc.id,
+            name: tc.function.name,
+            input: safeJsonParse(tc.function.arguments),
+          }))
+      : undefined;
+
+    const contentBlocks: ContentBlock[] | undefined = toolCalls
+      ? [
+          ...(message?.content ? [{ type: 'text' as const, text: message.content }] : []),
+          ...toolCalls.map(c => ({ type: 'tool_use' as const, ...c })),
+        ]
+      : undefined;
+
+    if (!message?.content && !toolCalls) {
       throw new Error('No content received from OpenAI');
     }
 
     return {
-      content: choice.message.content,
+      content: message?.content ?? '',
+      contentBlocks,
+      toolCalls,
       usage: {
         inputTokens: response.usage?.prompt_tokens || 0,
         outputTokens: response.usage?.completion_tokens || 0,
@@ -124,7 +203,7 @@ export class OpenAIProvider implements AIProvider {
       },
       model: params.model,
       provider: this.id,
-      finishReason: choice.finish_reason || undefined,
+      finishReason: choice?.finish_reason || undefined,
     };
   }
 

@@ -11,6 +11,15 @@ export class HttpGetTool implements AgentTool {
   name = 'http.get';
   description = 'Make an HTTP GET request to an API';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      url: { type: 'string', description: 'The URL to request' },
+      headers: { type: 'object', description: 'Optional request headers, as key-value pairs' },
+      query: { type: 'object', description: 'Optional query string parameters, as key-value pairs' },
+    },
+    required: ['url'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.url || typeof params.url !== 'string') {
@@ -92,6 +101,15 @@ export class HttpPostTool implements AgentTool {
   name = 'http.post';
   description = 'Make an HTTP POST request to an API';
   category = 'integration' as const;
+  inputSchema = {
+    type: 'object' as const,
+    properties: {
+      url: { type: 'string', description: 'The URL to request' },
+      body: { type: 'object', description: 'Request body — sent as JSON if an object, or as-is if a string' },
+      headers: { type: 'object', description: 'Optional request headers, as key-value pairs' },
+    },
+    required: ['url'],
+  };
 
   validate(params: any): { valid: boolean; error?: string } {
     if (!params.url || typeof params.url !== 'string') {
