@@ -9,6 +9,12 @@ import { QuickActions } from '@/components/QuickActions';
 import { ConversationSidebar } from '@/components/ConversationSidebar';
 import { useState, useRef, useEffect } from 'react';
 
+interface ToolTraceEntry {
+  tool: string;
+  success: boolean;
+  summary: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -18,6 +24,18 @@ interface Message {
   timestamp: Date;
   tokens?: number;
   credits?: number;
+  toolTrace?: ToolTraceEntry[];
+}
+
+interface PendingApproval {
+  toolName: string;
+  input: Record<string, any>;
+  description: string;
+  resumeMessages: any[];
+  approvedTools: string[];
+  conversationId: string;
+  model: string;
+  isThinkingEnabled: boolean;
 }
 
 interface Template {
@@ -51,6 +69,7 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(true);
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
 
   // Template system state
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
@@ -177,6 +196,74 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
     }
   };
 
+  /**
+   * Shared tail of a /api/chat call: handles either a tool-approval halt
+   * (stores it in `pendingApproval` and stops, without saving an assistant
+   * message yet) or a completed turn (saves + appends the assistant message).
+   * Used both for a fresh send and for approve/deny resumes.
+   */
+  const runChatRequest = async (requestBody: Record<string, any>, conversationId: string) => {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.needsApproval) {
+      setPendingApproval({
+        toolName: result.pendingApproval.toolName,
+        input: result.pendingApproval.input,
+        description: result.pendingApproval.description,
+        resumeMessages: result.resumeMessages,
+        approvedTools: requestBody.approvedTools || [],
+        conversationId,
+        model: requestBody.model,
+        isThinkingEnabled: requestBody.isThinkingEnabled,
+      });
+      return;
+    }
+
+    // Calculate tokens and credits from usage
+    const tokens = result.usage?.totalTokens || 0;
+    const credits = result.usage?.creditsUsed ?? Math.ceil(tokens / 1000);
+    const toolTrace: ToolTraceEntry[] | undefined = result.toolTrace?.length
+      ? result.toolTrace.map((t: any) => ({ tool: t.tool, success: t.success, summary: t.summary }))
+      : undefined;
+
+    // Save assistant message to database
+    const savedAssistantMessage = await saveMessage(
+      conversationId,
+      'assistant',
+      result.response,
+      result.model,
+      tokens,
+      credits
+    );
+
+    if (savedAssistantMessage) {
+      setMessages(prev => [...prev, { ...savedAssistantMessage, toolTrace }]);
+    } else {
+      // Fallback to local message if save fails
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: result.response,
+        model: result.model,
+        timestamp: new Date(result.timestamp),
+        tokens,
+        credits,
+        toolTrace,
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+    }
+  };
+
   const handleSendMessage = async (data: {
     message: string;
     files: any[];
@@ -186,6 +273,7 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
   }) => {
     console.log('Sending message:', data);
     setIsLoading(true);
+    setPendingApproval(null);
 
     try {
       // Create conversation if this is the first message
@@ -221,11 +309,8 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
         setMessages(prev => [...prev, userMessage]);
       }
 
-      // Call the AI API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      await runChatRequest(
+        {
           message: data.message,
           files: data.files,
           pastedContent: data.pastedContent,
@@ -235,44 +320,10 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
             role: msg.role,
             content: msg.content
           })),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      // Calculate tokens and credits from usage
-      const tokens = result.usage?.totalTokens || 0;
-      const credits = Math.ceil(tokens / 1000); // Approximate credit calculation
-
-      // Save assistant message to database
-      const savedAssistantMessage = await saveMessage(
-        conversationId,
-        'assistant',
-        result.response,
-        result.model,
-        tokens,
-        credits
+          approvedTools: [],
+        },
+        conversationId
       );
-
-      if (savedAssistantMessage) {
-        setMessages(prev => [...prev, savedAssistantMessage]);
-      } else {
-        // Fallback to local message if save fails
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: result.response,
-          model: result.model,
-          timestamp: new Date(result.timestamp),
-          tokens,
-          credits,
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-      }
     } catch (error) {
       console.error('Error sending message:', error);
 
@@ -284,6 +335,39 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
         timestamp: new Date(),
       };
 
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleApproval = async (approve: boolean) => {
+    if (!pendingApproval) return;
+
+    const { toolName, resumeMessages, approvedTools, conversationId, model, isThinkingEnabled } = pendingApproval;
+    setPendingApproval(null);
+    setIsLoading(true);
+
+    try {
+      await runChatRequest(
+        {
+          resume: true,
+          resumeMessages,
+          approvedTools: approve ? [...approvedTools, toolName] : approvedTools,
+          deniedTools: approve ? [] : [toolName],
+          model,
+          isThinkingEnabled,
+        },
+        conversationId
+      );
+    } catch (error) {
+      console.error('Error resuming after approval decision:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'Sorry, there was an error processing your message. Please try again.',
+        timestamp: new Date(),
+      };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
@@ -399,6 +483,15 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
                     <div className="text-gray-900 dark:text-white whitespace-pre-wrap">
                       {msg.content}
                     </div>
+                    {msg.toolTrace && msg.toolTrace.length > 0 && (
+                      <div className="text-xs text-gray-400 mt-2">
+                        Used: {msg.toolTrace.map((t, i) => (
+                          <span key={i} className={t.success ? '' : 'text-red-400'}>
+                            {i > 0 && ', '}{t.tool}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {msg.tokens && (
                       <div className="text-xs text-gray-400 mt-2">
                         {msg.tokens} tokens • {msg.credits} credits
@@ -413,6 +506,32 @@ export function ChatInterface({ initialCategoryFilter, onTemplateSelectorOpen }:
                     </div>
                     <div className="flex items-center gap-2 text-gray-500">
                       <div className="animate-pulse">Thinking...</div>
+                    </div>
+                  </div>
+                )}
+                {pendingApproval && (
+                  <div className="p-4 rounded-lg mr-8 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                    <div className="text-xs font-semibold mb-2 text-amber-700 dark:text-amber-400">
+                      Approval needed
+                    </div>
+                    <div className="text-gray-900 dark:text-white text-sm mb-3">
+                      The assistant wants to use <span className="font-mono">{pendingApproval.toolName}</span>: {pendingApproval.description}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApproval(true)}
+                        disabled={isLoading}
+                        className="px-3 py-1.5 text-sm rounded-md bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleApproval(false)}
+                        disabled={isLoading}
+                        className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        Deny
+                      </button>
                     </div>
                   </div>
                 )}
