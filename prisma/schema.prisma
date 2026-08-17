@@ -104,6 +104,9 @@ model User {
   usageRecords        UsageRecord[]
   apiKeys             ApiKey[]
   generatedImages     GeneratedImage[]
+  generatedVideos     GeneratedVideo[]
+  generatedAudios     GeneratedAudio[]
+  videoProjects       VideoProject[]
   imageGenerationJobs ImageGenerationJob[]
   imageShareLinks     ImageShareLink[]
 
@@ -285,6 +288,90 @@ model GeneratedImage {
   @@index([userId, createdAt])
   @@index([userId])
   @@index([jobId])
+}
+
+// Video Generation (Google Veo)
+model GeneratedVideo {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Generation Details
+  prompt          String @db.Text // The prompt used to generate the video
+  model           String @default("veo-3.1-generate-preview") // Veo model used
+  aspectRatio     String @default("16:9")
+  resolution      String @default("720p")
+  durationSeconds Int    @default(8)
+
+  // Video Storage
+  videoUrl String @db.Text // URL to the generated video
+
+  // Credits
+  creditsUsed Int @default(0) // Credits consumed for this generation
+
+  // Metadata
+  metadata Json? // Additional generation metadata
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// Concept-to-video pipeline: script breakdown -> per-scene Veo clip + ElevenLabs
+// voiceover -> ffmpeg stitch into one finished, distributable video.
+model VideoProject {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  concept               String @db.Text
+  status                String @default("queued") // queued, scripting, generating, stitching, completed, failed
+  aspectRatio           String @default("16:9")
+  targetDurationSeconds Int
+
+  // Array of {order, veoPrompt, voiceoverText, durationSeconds, status, clipUrl?, audioUrl?}.
+  // Written only by the pipeline worker, which processes one project at a time -
+  // no read-modify-write race, so no transaction wrapping updates to this field.
+  scenes Json
+
+  finalVideoUrl String? @db.Text
+  creditsUsed   Int     @default(0) // Charged once upfront for the whole project, not per scene
+  error         String? @db.Text
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([userId, createdAt])
+}
+
+// Audio Generation (ElevenLabs text-to-speech)
+model GeneratedAudio {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Generation Details
+  text           String @db.Text // The text that was spoken
+  model          String @default("eleven_multilingual_v2") // ElevenLabs model used
+  voiceId        String // ElevenLabs voice id
+  characterCount Int    @default(0)
+
+  // Audio Storage
+  audioUrl String @db.Text // URL to the generated audio
+
+  // Credits
+  creditsUsed Int @default(0) // Credits consumed for this generation
+
+  // Metadata
+  metadata Json? // Additional generation metadata
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // Image Templates for quick generation
@@ -531,6 +618,20 @@ model Task {
   totalCredits  Int @default(0)
   executionTime Int @default(0) // Milliseconds
 
+  // Per-run budget ceilings (sandbox orchestrator). Null means "no sandbox
+  // lease was ever acquired for this task" (e.g. plain chat), not "unlimited".
+  tokenBudget       Int? // Hard ceiling; the lease force-halts the run at this many tokens.
+  wallClockBudgetMs Int? // Hard ceiling; the lease force-halts the run at this wall-clock duration.
+  haltReason        String? // 'token_ceiling' | 'wallclock_ceiling' | 'heartbeat_missed' | null
+
+  // Failures are free: a run ending in error, timeout, or a user flag is
+  // auto-credited back via refundCredits(). This is the audit trail for that,
+  // separate from the offsetting UsageRecord row refundCredits() writes.
+  refundedAt   DateTime?
+  refundReason String? // 'run_failed' | 'run_timeout' | 'provider_error' | 'user_flagged' | 'admin_adjustment'
+
+  sandboxLeases SandboxLease[]
+
   // Scheduling configuration
   schedule        String? // Cron expression: "0 9 * * *" for daily 9 AM
   scheduleEnabled Boolean   @default(false) // Is scheduling active?
@@ -598,12 +699,113 @@ model Workspace {
   // Organization
   order Int @default(0) // For custom ordering in sidebar
 
+  // Sandbox orchestrator: Workspace is the tenant boundary for compute
+  // isolation (not the billing-only Organization model). At most one sandbox
+  // per workspace — enforced by @unique on WorkspaceSandbox.workspaceId, which
+  // doubles as the row lock keyed on for acquireSandbox()'s advisory lock.
+  sandbox            WorkspaceSandbox?
+  sandboxUsageEvents SandboxUsageEvent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([userId, isDefault])
   @@index([userId, order])
+}
+
+// ============================================
+// SANDBOX ORCHESTRATOR
+// ============================================
+
+// One compute sandbox per workspace (organization). All seats in a workspace
+// share it — this is both what teams want and what makes per-seat pricing
+// profitable. Never shared across workspaces, for any reason.
+model WorkspaceSandbox {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  provider   String // 'vercel' (SandboxProvider adapter key)
+  externalId String? // Provider's sandbox/session id; null while provisioning.
+  status     String  @default("provisioning") // provisioning | running | suspending | suspended | destroyed | failed
+  specHash   String // Hash of the environment definition; a mismatch forces a rebuild rather than reuse.
+
+  // Vercel Sandbox has no live suspend/resume — "suspend" tars the workdir to
+  // Vercel Blob and destroys the VM; "resume" boots a fresh VM and restores
+  // this archive. Null means either never suspended yet, or resumed with
+  // nothing to restore (fresh sandbox).
+  blobStateKey String?
+
+  resumeCount               Int @default(0)
+  cumulativeBillableSeconds Int @default(0) // Active execution seconds only; see SandboxUsageEvent for the phase breakdown.
+
+  createdAt    DateTime  @default(now())
+  lastActiveAt DateTime  @default(now())
+  suspendedAt  DateTime?
+  destroyedAt  DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  leases SandboxLease[]
+
+  @@index([status])
+}
+
+// A run's claim on its workspace's sandbox. Concurrent runs in the same
+// workspace either share the sandbox (plan allows concurrency) or queue —
+// enforced by the orchestrator, not by this table having multiple active rows.
+model SandboxLease {
+  id        String           @id @default(cuid())
+  sandboxId String
+  sandbox   WorkspaceSandbox @relation(fields: [sandboxId], references: [id], onDelete: Cascade)
+
+  taskId String? // The agent run (Task) this lease was acquired for.
+  task   Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  status String @default("active") // active | released | expired
+
+  // Hard ceilings mirrored from Task.tokenBudget / wallClockBudgetMs at
+  // acquisition time, so a later change to the task's config can't retroactively
+  // alter a lease that's already running.
+  wallClockCeilingMs Int
+  tokenCeiling       Int
+  tokensConsumed     Int @default(0)
+
+  acquiredAt    DateTime  @default(now())
+  heartbeatAt   DateTime  @default(now()) // Missed heartbeats past the orchestrator's threshold force-release the lease.
+  releasedAt    DateTime?
+  releaseReason String? // 'completed' | 'error' | 'token_ceiling' | 'wallclock_ceiling' | 'heartbeat_missed'
+
+  @@index([sandboxId, status])
+  @@index([status, heartbeatAt]) // Orphan sweeper: find leases whose heartbeat has gone stale.
+}
+
+// Append-only cost attribution ledger. Never mutate a row; correct with an
+// offsetting row, matching the convention in lib/billing/gate.ts. This is
+// sandbox compute cost specifically — distinct from the credit-spend ledger
+// in UsageRecord, which tracks what the tenant is billed, not raw compute cost.
+model SandboxUsageEvent {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  taskId  String?
+  leaseId String?
+
+  // Billed differently, so tracked separately: idle-before-suspend seconds are
+  // pure waste and worth alerting on if they trend up.
+  phase           String // 'provisioning' | 'active' | 'idle'
+  provider        String
+  instanceSize    String?
+  billableSeconds Int
+  internalCost    Float? // Computed internal cost; never surfaced to the tenant directly.
+
+  idempotencyKey String @unique // Retries and lifecycle-event replays must not double-count.
+
+  createdAt DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([taskId])
 }
 
 // Conversation - Persistent chat threads
