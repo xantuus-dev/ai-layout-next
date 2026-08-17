@@ -21,6 +21,7 @@
  */
 
 import { getAgentWorker, closeAgentWorker } from '../src/lib/queue/agent-worker';
+import { getVideoPipelineWorker, closeVideoPipelineWorker } from '../src/lib/video-pipeline/worker';
 import { getOrchestrator, stopOrchestrator } from '../src/lib/agent/orchestrator';
 import { closeRedisConnection, isRedisAvailable, getRedisHealth } from '../src/lib/queue/redis';
 
@@ -39,8 +40,9 @@ async function shutdown() {
     // Stop orchestrator
     await stopOrchestrator();
 
-    // Close worker
+    // Close workers
     await closeAgentWorker();
+    await closeVideoPipelineWorker();
 
     // Close Redis connection
     await closeRedisConnection();
@@ -82,10 +84,14 @@ async function main() {
 
   console.log('✅ Redis connected\n');
 
-  // Start worker
+  // Start workers
   console.log('👷 Starting agent worker...');
   const worker = getAgentWorker();
   console.log('✅ Worker started\n');
+
+  console.log('🎬 Starting video pipeline worker...');
+  getVideoPipelineWorker();
+  console.log('✅ Video pipeline worker started\n');
 
   // Start orchestrator
   console.log('🎯 Starting orchestrator...');
