@@ -210,4 +210,24 @@ export const RATE_LIMITS = {
     maxRequests: 30,
     windowMs: 5 * 60 * 1000, // 5 minutes
   },
+  // Video generation: 5 requests per hour per user. Veo is the most expensive
+  // call in the app (a single clip can be thousands of credits) and each
+  // generation already takes minutes, so this bounds cost, not just throughput.
+  VIDEO_GENERATION: {
+    maxRequests: 5,
+    windowMs: 60 * 60 * 1000, // 1 hour
+  },
+  // Audio generation (TTS): 30 requests per hour per user.
+  AUDIO_GENERATION: {
+    maxRequests: 30,
+    windowMs: 60 * 60 * 1000, // 1 hour
+  },
+  // Video pipeline (concept -> scenes -> stitched video): 3 projects per day
+  // per user. A single project can run up to 5 Veo calls + 5 TTS calls + one
+  // sandbox stitch, so it can by itself consume most of VIDEO_GENERATION's
+  // hourly budget — this bounds cost at the project level, not just per-call.
+  VIDEO_PIPELINE: {
+    maxRequests: 3,
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  },
 } as const;

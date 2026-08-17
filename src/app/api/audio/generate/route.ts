@@ -1,15 +1,17 @@
 /**
- * POST /api/images/generate
- * Generate an image from a text prompt
- * Requires authentication and sufficient credits
+ * POST /api/audio/generate
+ * Generate speech audio from text via ElevenLabs.
+ * Requires authentication and sufficient credits.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { generateImageForUser } from '@/lib/media/image';
+import { generateAudioForUser } from '@/lib/media/audio';
 import { failureStatus } from '@/lib/media/types';
+
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,17 +30,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { prompt, width = 1024, height = 1024 } = body;
+    const { text, voiceId, modelId } = body;
 
-    if (!prompt || typeof prompt !== 'string') {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+    if (!text || typeof text !== 'string') {
+      return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
 
-    if (typeof width !== 'number' || typeof height !== 'number') {
-      return NextResponse.json({ error: 'Width and height must be numbers' }, { status: 400 });
-    }
-
-    const result = await generateImageForUser({ userId: user.id, prompt, width, height });
+    const result = await generateAudioForUser({ userId: user.id, text, voiceId, modelId });
 
     if (!result.ok) {
       return NextResponse.json(
@@ -52,22 +50,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        image: {
-          id: result.image.id,
-          imageUrl: result.image.imageUrl,
-          prompt: result.image.prompt,
-          dimensions: { width: result.image.width, height: result.image.height },
-          creditsUsed: result.image.creditsUsed,
-          createdAt: result.image.createdAt,
-        },
-      },
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true, audio: result.audio }, { status: 201 });
   } catch (error) {
-    console.error('Image generation error:', error);
+    console.error('Audio generation error:', error);
     return NextResponse.json(
       {
         error: 'Internal server error',

@@ -47,6 +47,63 @@ export function getImageGenerationCost(width: number, height: number): number {
   }
 }
 
+// Video Generation Credit Costs (Google Veo, billed per second of output)
+//
+// These per-second rates are placeholders on the same "1 credit ~= $0.001 of
+// provider cost" scale used everywhere else in this file (see the comment in
+// lib/transcription.ts) — they have NOT been reconciled against live Veo
+// billing. Veo pricing varies by model tier and is still evolving; confirm
+// the real rate at https://ai.google.dev/gemini-api/docs/pricing (or your
+// Vertex AI billing console) before charging paying customers.
+export const VIDEO_GENERATION_CREDITS_PER_SECOND: Record<'720p' | '1080p' | '4k', number> = {
+  '720p': 400, // ~$0.40/sec placeholder
+  '1080p': 600, // ~$0.60/sec placeholder
+  '4k': 1000, // ~$1.00/sec placeholder
+};
+
+export function getVideoGenerationCost(
+  durationSeconds: number,
+  resolution: '720p' | '1080p' | '4k' = '720p'
+): number {
+  const perSecond =
+    VIDEO_GENERATION_CREDITS_PER_SECOND[resolution] ?? VIDEO_GENERATION_CREDITS_PER_SECOND['720p'];
+  return Math.max(1, Math.ceil(durationSeconds * perSecond));
+}
+
+// Audio Generation Credit Costs (ElevenLabs text-to-speech, billed per character)
+//
+// Same caveat as video above: ElevenLabs bills per character at a rate that
+// depends on your subscription tier (Starter/Creator/Pro/...). Verify your
+// plan's actual rate at https://elevenlabs.io/pricing before charging
+// customers — this placeholder assumes ~$0.20 per 1,000 characters.
+export const AUDIO_GENERATION_CREDITS_PER_1K_CHARS = 200;
+
+export function getAudioGenerationCost(characterCount: number): number {
+  return Math.max(1, Math.ceil((characterCount / 1000) * AUDIO_GENERATION_CREDITS_PER_1K_CHARS));
+}
+
+// Video Pipeline Credit Costs (concept -> scenes -> stitched final video)
+//
+// A pipeline run is charged once upfront for the whole project (see
+// src/lib/video-pipeline/worker.ts), not per scene: sum of each scene's Veo
+// cost + each scene's ElevenLabs cost, plus a flat surcharge covering the
+// ffmpeg stitching sandbox's compute time. Same placeholder-rate caveat as
+// the two cost functions above — the surcharge has not been reconciled
+// against real Vercel Sandbox billing.
+export const VIDEO_PIPELINE_STITCHING_SURCHARGE_CREDITS = 150;
+
+export function getVideoPipelineCost(
+  scenes: { durationSeconds: number; resolution?: '720p' | '1080p' | '4k' }[],
+  voiceoverCharCounts: number[]
+): number {
+  const videoCost = scenes.reduce(
+    (sum, scene) => sum + getVideoGenerationCost(scene.durationSeconds, scene.resolution ?? '720p'),
+    0
+  );
+  const audioCost = voiceoverCharCounts.reduce((sum, count) => sum + getAudioGenerationCost(count), 0);
+  return Math.max(1, videoCost + audioCost + VIDEO_PIPELINE_STITCHING_SURCHARGE_CREDITS);
+}
+
 // AI Browser Feature Credit Costs
 export const BROWSER_FEATURE_CREDITS = {
   // Browser Sessions
@@ -380,6 +437,37 @@ export function estimateTurnCredits(creditsPerThousandTokens: number): number {
     : 1;
 
   return Math.max(1, Math.ceil((ESTIMATED_TOKENS_PER_TURN / 1000) * perThousand));
+}
+
+/** Extra tokens assumed per tool-calling round-trip in an agentic turn. */
+export const ESTIMATED_TOKENS_PER_TOOL_ITERATION = 1500;
+
+/**
+ * Flat pad, on top of the token-based estimate, for the tools' own credit
+ * cost. Each tool call is separately capped by guards.ts's
+ * COST_LIMITS.maxCreditsPerStep — this is only a conservative pre-flight
+ * allowance, not a real ceiling.
+ */
+export const AGENTIC_TOOL_CREDIT_ALLOWANCE = 150;
+
+/**
+ * Credits an agentic chat turn should be assumed to cost before it runs.
+ *
+ * `estimateTurnCredits` alone underestimates here: every extra tool
+ * round-trip resends the growing history plus tool schemas plus tool-result
+ * payloads. Like `estimateTurnCredits`, this is only the pre-flight gate —
+ * the real charge is the metered total computed after the loop finishes.
+ */
+export function estimateAgenticTurnCredits(
+  creditsPerThousandTokens: number,
+  maxIterations = 6
+): number {
+  const perThousand = Number.isFinite(creditsPerThousandTokens) && creditsPerThousandTokens > 0
+    ? creditsPerThousandTokens
+    : 1;
+  const tokens = ESTIMATED_TOKENS_PER_TURN + ESTIMATED_TOKENS_PER_TOOL_ITERATION * maxIterations;
+
+  return Math.max(1, Math.ceil((tokens / 1000) * perThousand)) + AGENTIC_TOOL_CREDIT_ALLOWANCE;
 }
 
 /**
