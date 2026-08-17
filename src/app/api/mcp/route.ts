@@ -18,7 +18,10 @@ export const dynamic = 'force-dynamic';
 const handler = createMcpHandler(registerXantuusTools, {
   serverInfo: { name: 'xantuus-ai', version: '1.0.0' },
   instructions:
-    'Tools for the Xantuus AI account that owns the presented API key: credit and usage reporting, the prompt template library, and workspace projects and tasks.',
+    'Tools for the Xantuus AI account that owns the presented API key: credit and usage reporting, ' +
+    'the prompt template library, workspace projects and tasks, and media generation (generate_image, ' +
+    'generate_video via Veo, generate_audio via ElevenLabs, list_voices). Media generation tools spend ' +
+    'this account\'s credits.',
   verboseLogs: process.env.NODE_ENV === 'development',
 });
 

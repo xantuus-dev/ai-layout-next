@@ -11,6 +11,11 @@ import type { McpServer, ServerContext } from '@modelcontextprotocol/server';
 import { prisma } from '@/lib/prisma';
 import { getCreditStatus } from '@/lib/credits';
 import { userIdFromAuthInfo } from '@/lib/mcp/auth';
+import { generateImageForUser } from '@/lib/media/image';
+import { generateVideoForUser } from '@/lib/media/video';
+import { generateAudioForUser } from '@/lib/media/audio';
+import { elevenLabsAudioService } from '@/lib/audio-generation';
+import { VEO_MODELS } from '@/lib/video-generation';
 
 /** Serialises a tool result as the JSON text block MCP clients expect. */
 function json(data: unknown) {
@@ -322,6 +327,94 @@ export function registerXantuusTools(server: McpServer): void {
       });
 
       return json(task);
+    }
+  );
+
+  server.registerTool(
+    'generate_image',
+    {
+      title: 'Generate image',
+      description:
+        'Generate an image from a text prompt via Gemini. Billed to this account\'s credits; costs 5/15/30 credits for small/medium/large.',
+      inputSchema: z.object({
+        prompt: z.string().min(10).max(1000),
+        width: z.union([z.literal(512), z.literal(1024), z.literal(1536)]).default(1024),
+        height: z.union([z.literal(512), z.literal(1024), z.literal(1536)]).default(1024),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async ({ prompt, width, height }, ctx) => {
+      const result = await generateImageForUser({ userId: requireUserId(ctx), prompt, width, height });
+      return result.ok ? json(result.image) : failure(result.message);
+    }
+  );
+
+  server.registerTool(
+    'generate_video',
+    {
+      title: 'Generate video',
+      description:
+        `Generate a short video from a text prompt via Google Veo (${VEO_MODELS[0]}). ` +
+        'Billed to this account\'s credits based on resolution and duration; a single clip can cost ' +
+        'thousands of credits, and generation can take several minutes.',
+      inputSchema: z.object({
+        prompt: z.string().min(10).max(2000),
+        aspectRatio: z.enum(['16:9', '9:16']).default('16:9'),
+        resolution: z.enum(['720p', '1080p', '4k']).default('720p'),
+        durationSeconds: z.enum(['4', '6', '8']).default('8'),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async ({ prompt, aspectRatio, resolution, durationSeconds }, ctx) => {
+      const result = await generateVideoForUser({
+        userId: requireUserId(ctx),
+        prompt,
+        aspectRatio,
+        resolution,
+        durationSeconds,
+      });
+      return result.ok ? json(result.video) : failure(result.message);
+    }
+  );
+
+  server.registerTool(
+    'generate_audio',
+    {
+      title: 'Generate audio (text-to-speech)',
+      description:
+        'Generate spoken audio from text via ElevenLabs. Billed to this account\'s credits by character ' +
+        'count. Call list_voices first to get a voiceId, unless a default voice is configured.',
+      inputSchema: z.object({
+        text: z.string().min(1).max(5000),
+        voiceId: z.string().optional().describe('ElevenLabs voice id from list_voices. Falls back to the account default if unset.'),
+        modelId: z.string().optional().describe('ElevenLabs model id. Defaults to eleven_multilingual_v2.'),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async ({ text, voiceId, modelId }, ctx) => {
+      const result = await generateAudioForUser({ userId: requireUserId(ctx), text, voiceId, modelId });
+      return result.ok ? json(result.audio) : failure(result.message);
+    }
+  );
+
+  server.registerTool(
+    'list_voices',
+    {
+      title: 'List ElevenLabs voices',
+      description: 'List voices available for generate_audio, including any cloned voices on this ElevenLabs account.',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true },
+    },
+    async (_args, ctx) => {
+      requireUserId(ctx);
+      if (!elevenLabsAudioService.isConfigured()) {
+        return failure('Audio generation is not configured (ELEVENLABS_API_KEY missing).');
+      }
+      try {
+        return json(await elevenLabsAudioService.listVoices());
+      } catch (error) {
+        return failure(error instanceof Error ? error.message : 'Failed to list voices');
+      }
     }
   );
 }
