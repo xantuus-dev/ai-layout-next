@@ -1,7 +1,15 @@
 /**
  * POST /api/cron/data-retention
  *
- * Scheduled enforcement of per-user retention windows (GDPR minimization).
+ * Scheduled enforcement of per-user retention windows (GDPR minimization),
+ * plus the sandbox orphan sweep (see lib/sandbox/sweeper.ts) piggybacked onto
+ * the same daily run. That sweep belongs on its own 5-minute schedule and has
+ * its own route (/api/cron/sandbox-sweep) for exactly that — but this
+ * project's Vercel plan caps crons at 2 total with a once-daily minimum, and
+ * both existing slots were already spoken for. Folding it in here means an
+ * orphaned sandbox is caught within 24h instead of 5min; move it back to its
+ * own cron entry in vercel.json once the plan allows more/faster crons.
+ *
  * Guarded by CRON_SECRET exactly like the other cron endpoints — Vercel Cron
  * sends `Authorization: Bearer $CRON_SECRET` automatically.
  *
@@ -12,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { purgeExpiredData } from '@/lib/data-retention';
+import { runSandboxSweep } from '@/lib/sandbox/sweeper';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,5 +49,19 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await purgeExpiredData();
-  return NextResponse.json({ success: true, ...result });
+
+  // Independent of retention purge above: a sweep failure must not be
+  // mistaken for (or mask) a retention failure, and vice versa.
+  let sandboxSweep: Awaited<ReturnType<typeof runSandboxSweep>> | { error: string };
+  try {
+    sandboxSweep = await runSandboxSweep();
+    if (sandboxSweep.errors.length > 0) {
+      console.error('[data-retention] Sandbox sweep completed with errors:', sandboxSweep.errors);
+    }
+  } catch (err) {
+    console.error('[data-retention] Sandbox sweep threw:', err);
+    sandboxSweep = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  return NextResponse.json({ success: true, ...result, sandboxSweep });
 }
