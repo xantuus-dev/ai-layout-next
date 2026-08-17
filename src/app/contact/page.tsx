@@ -1,5 +1,6 @@
 import MiniCard from '@/components/ui/MiniCard';
 import { SOLUTIONS } from '@/lib/solutions';
+import { MarketingHeader, MarketingFooter } from '@/components/MarketingChrome';
 
 interface ContactPageProps {
   searchParams: { prompt?: string };
@@ -9,7 +10,10 @@ export default function ContactPage({ searchParams }: ContactPageProps) {
   const prompt = searchParams.prompt;
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <MarketingHeader />
+
+      <main className="p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
           Get in Touch
@@ -126,6 +130,9 @@ export default function ContactPage({ searchParams }: ContactPageProps) {
           </form>
         </div>
       </div>
-    </main>
+      </main>
+
+      <MarketingFooter />
+    </div>
   );
 }
