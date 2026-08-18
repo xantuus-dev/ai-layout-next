@@ -9,9 +9,16 @@
  * private rendering surface (no user-controlled navigation), so the
  * prompt-injection/XSS scanning that file does for scraped content doesn't
  * apply, but the sandboxing flags still matter for serverless stability.
+ *
+ * `puppeteer` is dynamically imported inside getBrowser() rather than at
+ * module scope, matching the convention in tools/documents.ts: this module
+ * is reachable from the tool registry, which is imported by nearly every
+ * agent API route, so a static import here would pull puppeteer's large
+ * dependency tree into every one of those routes' serverless bundles. A
+ * first production deploy with a static import here OOM-killed the build.
  */
 
-import puppeteer, { Browser, Page } from 'puppeteer';
+import type { Browser, Page } from 'puppeteer';
 
 const LAUNCH_ARGS = [
   '--no-sandbox',
@@ -36,11 +43,13 @@ let browserPromise: Promise<Browser> | null = null;
 
 async function getBrowser(): Promise<Browser> {
   if (!browserPromise) {
-    browserPromise = puppeteer.launch({
-      headless: true,
-      args: LAUNCH_ARGS,
-      timeout: 30000,
-    });
+    browserPromise = import('puppeteer').then(({ default: puppeteer }) =>
+      puppeteer.launch({
+        headless: true,
+        args: LAUNCH_ARGS,
+        timeout: 30000,
+      })
+    );
 
     // If launch fails, clear the cached promise so the next call retries
     // instead of permanently caching a rejection.
