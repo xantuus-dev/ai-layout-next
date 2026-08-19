@@ -36,6 +36,15 @@ const nextConfig = {
   },
 }
 
+// Without SENTRY_AUTH_TOKEN, the plugin can never upload a release or source
+// maps — but widenClientFileUpload/reactComponentAnnotation/hideSourceMaps
+// still pay the full memory cost of generating and processing them for
+// every file before discovering there's nothing to do with them. That
+// generation work is what was pushing production builds past Vercel's 8 GB
+// build machine and getting SIGKILL'd. Skip it entirely when there's no
+// token to upload with; it re-enables itself automatically once one is set.
+const hasSentryAuthToken = !!process.env.SENTRY_AUTH_TOKEN;
+
 // Sentry configuration options
 const sentryWebpackPluginOptions = {
   // For all available options, see:
@@ -50,12 +59,16 @@ const sentryWebpackPluginOptions = {
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
 
+  sourcemaps: {
+    disable: !hasSentryAuthToken,
+  },
+
   // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
+  widenClientFileUpload: hasSentryAuthToken,
 
   // Automatically annotate React components to show their full name in breadcrumbs and session replay
   reactComponentAnnotation: {
-    enabled: true,
+    enabled: hasSentryAuthToken,
   },
 
   // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
@@ -64,7 +77,7 @@ const sentryWebpackPluginOptions = {
   tunnelRoute: '/monitoring',
 
   // Hides source maps from generated client bundles
-  hideSourceMaps: true,
+  hideSourceMaps: hasSentryAuthToken,
 
   // Automatically tree-shake Sentry logger statements to reduce bundle size
   disableLogger: true,
