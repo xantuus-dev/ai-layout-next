@@ -9,6 +9,8 @@ import TerminalDemo from './TerminalDemo';
 import { ShinyButton } from './ui/shiny-button';
 import ShowcaseGallery from './ShowcaseGallery';
 import CapabilitiesSection from './CapabilitiesSection';
+import AudienceSection from './AudienceSection';
+import ComparisonSection from './ComparisonSection';
 import CodeWindow from './CodeWindow';
 import {
   Sparkles,
@@ -216,6 +218,9 @@ export default function LandingPage() {
       {/* Capabilities — what Xantuus actually does */}
       <CapabilitiesSection />
 
+      {/* Audience — who Xantuus is built for */}
+      <AudienceSection />
+
       {/* Features */}
       <section id="features" className="max-w-6xl mx-auto px-4 md:px-8 py-16 border-t border-border">
         <div className="text-center mb-12">
@@ -239,6 +244,9 @@ export default function LandingPage() {
           })}
         </div>
       </section>
+
+      {/* Comparison — why not just use a single chatbot */}
+      <ComparisonSection />
 
       {/* How it works */}
       <section className="max-w-6xl mx-auto px-4 md:px-8 py-16 border-t border-border">
