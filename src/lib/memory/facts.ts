@@ -14,6 +14,12 @@
 import { prisma } from '@/lib/prisma';
 import { aiRouter } from '@/lib/ai-providers';
 import { DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai-providers/catalog';
+import { planMeetsMinTier } from '@/lib/plans';
+import { checkAndResetCredits, ESTIMATED_TOKENS_PER_TURN } from '@/lib/credits';
+import { assertCanSpend, spendCredits, InsufficientCreditsError } from '@/lib/billing/gate';
+
+/** Memory (both retrieval and extraction) is a Pro+ feature. */
+export const MEMORY_MIN_PLAN_TIER = 'pro' as const;
 
 /** Fact categories the extractor is allowed to emit. */
 export const FACT_TYPES = [
@@ -207,6 +213,9 @@ export async function getMemoryContext(
   options: { limit?: number } = {}
 ): Promise<string | null> {
   try {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
+    if (!planMeetsMinTier(user?.plan, MEMORY_MIN_PLAN_TIER)) return null;
+
     const facts = await retrieveRelevantFacts(userId, message, options);
     if (facts.length === 0) return null;
 
@@ -369,6 +378,9 @@ export async function extractAndStoreFacts(params: {
   if (messages.length < MIN_MESSAGES_TO_EXTRACT) return 0;
 
   try {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
+    if (!planMeetsMinTier(user?.plan, MEMORY_MIN_PLAN_TIER)) return 0;
+
     // aiRouter.chat throws on an id it cannot route, and this function
     // swallows its own errors — so a bad id would mean extraction silently
     // never runs. Fall back rather than lose the turn's facts.
@@ -389,6 +401,15 @@ export async function extractAndStoreFacts(params: {
 
     if (!transcript) return 0;
 
+    // This call was previously unmetered — it ran on every Nth turn for
+    // every user, at the business's cost, uncounted against anyone's credit
+    // balance. Gate and bill it the same way every other model call in this
+    // app is: pre-flight estimate, then bill the real usage afterwards.
+    await checkAndResetCredits(userId);
+    const estimatedCredits = aiRouter.estimateCredits(routableModel, ESTIMATED_TOKENS_PER_TURN);
+    const decision = await assertCanSpend(userId, estimatedCredits);
+    if (!decision.allowed) return 0; // fail-open: skip this turn's extraction, don't block or warn
+
     const response = await aiRouter.chat(routableModel, {
       messages: [
         { role: 'system', content: EXTRACTION_PROMPT },
@@ -396,6 +417,22 @@ export async function extractAndStoreFacts(params: {
       ],
       maxTokens: 1024,
     });
+
+    const actualCredits = aiRouter.estimateCredits(routableModel, response.usage.totalTokens);
+    try {
+      await spendCredits(userId, actualCredits, {
+        type: 'memory-extraction',
+        model: routableModel,
+        tokens: response.usage.totalTokens,
+        description: 'Fact extraction from conversation',
+      });
+    } catch (spendError) {
+      // Balance dropped between the pre-flight check and now (concurrent
+      // spend elsewhere) — the extraction already ran, but skip storing
+      // its results rather than charge past the limit.
+      if (spendError instanceof InsufficientCreditsError) return 0;
+      throw spendError;
+    }
 
     const extracted = parseExtractedFacts(response.content).filter(
       (fact) => fact.confidenceScore >= MIN_CONFIDENCE_TO_STORE

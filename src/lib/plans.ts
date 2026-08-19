@@ -118,3 +118,15 @@ export const PLANS = {
 } as const;
 
 export type PlanType = keyof typeof PLANS;
+
+const TIER_ORDER: Record<PlanId, number> = { free: 0, pro: 1, enterprise: 2 };
+
+/**
+ * Whether a user on `planId` meets at least `minTier`. For gating a *feature*
+ * to a plan tier (e.g. persistent cross-conversation memory is Pro+) —
+ * unrelated to credit spend, which is metered separately.
+ */
+export function planMeetsMinTier(planId: string | null | undefined, minTier: PlanId): boolean {
+  const tier = (planId || 'free').toLowerCase() as PlanId;
+  return (TIER_ORDER[tier] ?? 0) >= TIER_ORDER[minTier];
+}

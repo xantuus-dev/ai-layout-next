@@ -30,7 +30,8 @@
     "orchestrator": "tsx --env-file=.env.local scripts/start-orchestrator.ts",
     "setup-memory-db": "tsx scripts/setup-memory-db.ts",
     "verify-memory-setup": "tsx scripts/verify-memory-setup.ts",
-    "seed-templates": "tsx scripts/seed-templates.ts"
+    "seed-templates": "tsx scripts/seed-templates.ts",
+    "seed-smb-templates": "tsx --env-file=.env.local scripts/seed-smb-templates.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
