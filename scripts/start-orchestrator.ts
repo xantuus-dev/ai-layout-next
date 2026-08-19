@@ -8,7 +8,14 @@
  * Usage:
  *   npm run orchestrator
  *   or
- *   tsx scripts/start-orchestrator.ts
+ *   tsx --env-file=.env.local scripts/start-orchestrator.ts
+ *
+ * The --env-file flag matters: tsx runs this as a real ESM module, where all
+ * of this file's imports (agent-worker -> ai-providers -> the AI Router
+ * singleton, which reads ANTHROPIC_API_KEY etc. at import time) are fully
+ * evaluated before any of this file's own top-level code runs — including
+ * the dotenv load below. Without --env-file, the AI Router initializes with
+ * zero providers regardless of what .env.local contains.
  *
  * Requirements:
  *   - Redis running on localhost:6379 (or configured via REDIS_HOST/REDIS_PORT)
@@ -19,6 +26,19 @@
  *   - Queue tasks for execution
  *   - Process tasks using the worker
  */
+
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { config } from 'dotenv';
+
+// Unlike Next.js, tsx does not auto-load .env.local — without this, every
+// module below sees an empty process.env (no ANTHROPIC_API_KEY, no
+// REDIS_HOST override, etc.), so this must run before any of those imports.
+const envPath = join(__dirname, '..', '.env.local');
+if (existsSync(envPath)) {
+  config({ path: envPath });
+  console.log('✅ Loaded environment from .env.local\n');
+}
 
 import { getAgentWorker, closeAgentWorker } from '../src/lib/queue/agent-worker';
 import { getVideoPipelineWorker, closeVideoPipelineWorker } from '../src/lib/video-pipeline/worker';

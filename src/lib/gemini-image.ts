@@ -3,7 +3,6 @@
  * Uses the Gemini 2.0 Flash model to generate images from text prompts
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { uploadMedia } from './storage';
 
 export interface GenerateImageParams {
@@ -21,27 +20,39 @@ export interface GenerateImageResponse {
   height: number;
 }
 
-class GeminiImageService {
-  private client: GoogleGenerativeAI | null = null;
-  private modelId = 'gemini-2.0-flash-exp';
+/** Supported aspect ratios for imageConfig.aspectRatio on gemini-2.5-flash-image. */
+const ASPECT_RATIOS: { ratio: string; value: number }[] = [
+  { ratio: '9:16', value: 9 / 16 },
+  { ratio: '3:4', value: 3 / 4 },
+  { ratio: '1:1', value: 1 },
+  { ratio: '4:3', value: 4 / 3 },
+  { ratio: '16:9', value: 16 / 9 },
+];
 
-  constructor() {
-    if (this.isConfigured()) {
-      this.client = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!);
-    }
-  }
+function nearestAspectRatio(width: number, height: number): string {
+  const target = width / height;
+  return ASPECT_RATIOS.reduce((best, candidate) =>
+    Math.abs(candidate.value - target) < Math.abs(best.value - target) ? candidate : best
+  ).ratio;
+}
+
+class GeminiImageService {
+  // gemini-2.5-flash-image ("nano banana") is the current image-capable Gemini
+  // model — image output comes back as an inlineData part on generateContent,
+  // there is no separate :generateImage endpoint.
+  readonly modelId = 'gemini-2.5-flash-image';
+
+  constructor() {}
 
   isConfigured(): boolean {
     return !!process.env.GOOGLE_AI_API_KEY;
   }
 
   /**
-   * Generate an image from a text prompt
-   * Note: Gemini currently supports image generation through the Files API
-   * This implementation will work once image generation is available in the SDK
+   * Generate an image from a text prompt via Gemini's generateContent endpoint.
    */
   async generateImage(params: GenerateImageParams): Promise<GenerateImageResponse> {
-    if (!this.client) {
+    if (!this.isConfigured()) {
       throw new Error('Gemini API not configured');
     }
 
@@ -63,23 +74,7 @@ class GeminiImageService {
     }
 
     try {
-      // Call Gemini API to generate image
-      // Using the multimodal capabilities with image generation prompt
-      const model = this.client.getGenerativeModel({
-        model: this.modelId,
-        generationConfig: {
-          temperature: 0.7,
-          topP: 0.95,
-        },
-      });
-
-      // Note: This is a placeholder implementation
-      // The actual Gemini API image generation endpoint will be:
-      // POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateImage
-      // Response will include a base64-encoded image which needs to be uploaded to Cloud Storage
-
-      // For now, we'll use a direct API call to the generateImage endpoint
-      const response = await this.callGenerateImageAPI(prompt, width, height, userId);
+      const response = await this.callGenerateContentAPI(prompt, width, height, userId);
 
       return {
         imageUrl: response.imageUrl,
@@ -96,10 +91,10 @@ class GeminiImageService {
   }
 
   /**
-   * Call the Gemini generateImage REST API endpoint
-   * This bypasses the SDK to use the image generation endpoint directly
+   * Call the Gemini generateContent REST API and request an IMAGE-modality
+   * response. https://ai.google.dev/gemini-api/docs/image-generation
    */
-  private async callGenerateImageAPI(
+  private async callGenerateContentAPI(
     prompt: string,
     width: number,
     height: number,
@@ -110,7 +105,7 @@ class GeminiImageService {
       throw new Error('GOOGLE_AI_API_KEY not configured');
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelId}:generateImage`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelId}:generateContent`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -119,12 +114,11 @@ class GeminiImageService {
         'x-goog-api-key': apiKey,
       },
       body: JSON.stringify({
-        prompt,
-        number_of_images: 1,
-        height,
-        width,
-        safety_filter_level: 'block_only_high', // Google's content policy
-        person_generation: 'dont_allow', // Don't generate faces
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseModalities: ['IMAGE'],
+          imageConfig: { aspectRatio: nearestAspectRatio(width, height) },
+        },
       }),
     });
 
@@ -137,16 +131,18 @@ class GeminiImageService {
 
     const data = await response.json();
 
-    // Parse response - the API returns base64-encoded images in the response
-    if (!data.images || !data.images[0]) {
+    const parts = data?.candidates?.[0]?.content?.parts ?? [];
+    const imagePart = parts.find((part: { inlineData?: { data?: string } }) => part.inlineData?.data);
+
+    if (!imagePart) {
       throw new Error('No image generated in API response');
     }
 
-    const imageData = data.images[0].image;
-
-    // Upload base64 image to Cloud Storage and return URL
-    // For MVP, we can use a data URI or upload to Firebase Storage
-    const imageUrl = await this.uploadImageToStorage(imageData, userId);
+    const imageUrl = await this.uploadImageToStorage(
+      imagePart.inlineData.data,
+      imagePart.inlineData.mimeType || 'image/png',
+      userId
+    );
 
     return { imageUrl };
   }
@@ -156,12 +152,13 @@ class GeminiImageService {
    * Uploads to Vercel Blob when configured; lib/storage.ts degrades to a data
    * URI (with a warning) when it is not, so local dev still works.
    */
-  private async uploadImageToStorage(base64Data: string, userId?: string): Promise<string> {
+  private async uploadImageToStorage(base64Data: string, mimeType: string, userId?: string): Promise<string> {
+    const extension = mimeType.split('/')[1] || 'png';
     const { url } = await uploadMedia(base64Data, {
       kind: 'image',
       userId: userId || 'anonymous',
-      extension: 'jpg',
-      contentType: 'image/jpeg',
+      extension,
+      contentType: mimeType,
       base64: true,
     });
     return url;

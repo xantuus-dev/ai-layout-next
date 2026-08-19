@@ -25,7 +25,7 @@ export interface GeneratedImageResult {
   };
 }
 
-const MODEL = 'gemini-2.0-flash-exp';
+const MODEL = geminiImageService.modelId;
 
 export async function generateImageForUser(
   input: GenerateImageInput

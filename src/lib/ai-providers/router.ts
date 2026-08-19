@@ -6,6 +6,7 @@
 import { AnthropicProvider } from './anthropic';
 import { OpenAIProvider } from './openai';
 import { GoogleProvider } from './google';
+import { MistralProvider } from './mistral';
 import { AIProvider, AIModel, ChatParams, ChatResponse, AIRouterOptions, StreamEvent } from './types';
 
 class AIRouter {
@@ -22,6 +23,7 @@ class AIRouter {
     const anthropic = new AnthropicProvider();
     const openai = new OpenAIProvider();
     const google = new GoogleProvider();
+    const mistral = new MistralProvider();
 
     // Register configured providers
     if (anthropic.isConfigured()) {
@@ -43,6 +45,13 @@ class AIRouter {
       console.log('✅ Google provider registered');
     } else {
       console.warn('⚠️  Google provider not configured (missing GOOGLE_AI_API_KEY)');
+    }
+
+    if (mistral.isConfigured()) {
+      this.registerProvider(mistral);
+      console.log('✅ Mistral provider registered');
+    } else {
+      console.warn('⚠️  Mistral provider not configured (missing MISTRAL_API_KEY)');
     }
 
     console.log(`🤖 AI Router initialized with ${this.providers.size} provider(s) and ${this.allModels.length} model(s)`);

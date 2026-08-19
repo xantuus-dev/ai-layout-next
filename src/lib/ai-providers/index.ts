@@ -8,3 +8,4 @@ export * from './router';
 export { AnthropicProvider } from './anthropic';
 export { OpenAIProvider } from './openai';
 export { GoogleProvider } from './google';
+export { MistralProvider } from './mistral';
