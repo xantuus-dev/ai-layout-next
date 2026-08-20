@@ -1,21 +1,37 @@
 /**
- * One-off script: generate cinematic showcase images for the landing page
+ * One-off script: generate the cinematic showcase assets for the landing page
  * ShowcaseGallery and save them into public/showcase/, replacing the
  * hand-drawn placeholder SVGs.
  *
- * Usage:
- *   OPENAI_API_KEY=sk-... npx tsx scripts/generate-showcase-images.ts
+ * Stills come from OpenAI gpt-image-1. The two `video` items additionally get a
+ * real Veo clip, and their still doubles as the <video> poster frame so the card
+ * has something sharp to show before the clip loads.
  *
- * Uses OpenAI gpt-image-1. Swap PROVIDER to 'gemini' to use
- * gemini-2.5-flash-image instead (requires a valid GOOGLE_AI_API_KEY).
+ * Usage:
+ *   npx tsx --env-file=.env.local scripts/generate-showcase-images.ts
+ *   npx tsx --env-file=.env.local scripts/generate-showcase-images.ts --only=smoothie
+ *   npx tsx --env-file=.env.local scripts/generate-showcase-images.ts --force
+ *
+ * Needs OPENAI_API_KEY for stills and GOOGLE_AI_API_KEY for clips. Existing
+ * files are skipped unless --force, so a re-run after one item fails does not
+ * re-buy the items that already succeeded.
  */
-import { writeFile } from 'fs/promises';
+import { writeFile, access } from 'fs/promises';
 import path from 'path';
 import OpenAI from 'openai';
+import { veoVideoService } from '../src/lib/video-generation';
 
-const PROVIDER: 'openai' | 'gemini' = 'openai';
+type Item = {
+  id: string;
+  kind: 'image' | 'video';
+  caption: string;
+  prompt: string;
+  /** Motion prompt for Veo. Required on `video` items — the still prompt above
+   *  describes a frozen instant, which makes for a static, lifeless clip. */
+  videoPrompt?: string;
+};
 
-const ITEMS: { id: string; kind: 'image' | 'video'; prompt: string; caption: string }[] = [
+const ITEMS: Item[] = [
   {
     id: 'jellyfish',
     kind: 'image',
@@ -33,6 +49,11 @@ const ITEMS: { id: string; kind: 'image' | 'video'; prompt: string; caption: str
       'Ultra high-speed studio product photograph of a vivid mixed-berry smoothie pouring into a tall glass, ' +
       'mid-splash droplets frozen in motion, condensation on the glass, dramatic three-point studio lighting on a ' +
       'reflective black surface, saturated magenta and orange gradient background, commercial beverage advertising, 8k',
+    videoPrompt:
+      'Slow-motion commercial beverage shot: a vivid mixed-berry smoothie pours in a thick ribbon into a tall glass ' +
+      'on a reflective black surface, droplets arcing and splashing at the rim, condensation beading down the glass. ' +
+      'Dramatic three-point studio lighting, saturated magenta and orange gradient backdrop, slow push-in on a macro ' +
+      'lens, shallow depth of field, glossy premium advertising look.',
   },
   {
     id: 'mountains',
@@ -60,6 +81,10 @@ const ITEMS: { id: string; kind: 'image' | 'video'; prompt: string; caption: str
       'Abstract macro photograph of vividly colored liquid paint mid-swirl — teal, emerald, and violet ink diffusing ' +
       'through clear water, frozen at peak turbulence, studio backlight, extreme close-up, glossy high-contrast ' +
       'commercial motion-graphics still, 8k',
+    videoPrompt:
+      'Extreme macro of teal, emerald, and violet ink blooming and diffusing through clear water, tendrils unfurling ' +
+      'and folding into each other, slowly resolving toward a clean symmetric swirl. Studio backlight, glossy ' +
+      'high-contrast motion-graphics look, smooth continuous camera drift, no text, no logos.',
   },
   {
     id: 'matcha',
@@ -72,35 +97,133 @@ const ITEMS: { id: string; kind: 'image' | 'video'; prompt: string; caption: str
   },
 ];
 
-async function generateWithOpenAI(prompt: string): Promise<Buffer> {
+/** Veo caps clips at 4, 6 or 8 seconds; 8 is the longest loop we can get. */
+const VIDEO_DURATION_SECONDS = '8' as const;
+const VIDEO_RESOLUTION = '720p' as const;
+const VIDEO_ASPECT_RATIO = '16:9' as const;
+
+const OUT_DIR = path.join(process.cwd(), 'public', 'showcase');
+
+async function exists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ask gpt-image-1 for WebP directly rather than the default PNG. A high-quality
+ * 1536x1024 PNG lands around 2MB, which is a lot to commit and a lot to ship for
+ * a card that renders a few hundred pixels wide; WebP at this quality is roughly
+ * a tenth of that with no visible difference at card size, and saves adding
+ * sharp purely to re-encode afterwards.
+ */
+async function generateStill(prompt: string): Promise<Buffer> {
   const client = new OpenAI();
   const result = await client.images.generate({
     model: 'gpt-image-1',
     prompt,
     size: '1536x1024',
     quality: 'high',
+    output_format: 'webp',
+    output_compression: 82,
   });
   const b64 = result.data?.[0]?.b64_json;
   if (!b64) throw new Error('No image returned');
   return Buffer.from(b64, 'base64');
 }
 
+/**
+ * Render a clip with Veo and pull the bytes back down.
+ *
+ * veoVideoService uploads to Vercel Blob and hands back a URL. Landing-page art
+ * is better served as a static file — it rides the deployment CDN instead of
+ * billing Blob egress on every visit — so the Blob copy is just a staging step.
+ */
+async function generateClip(prompt: string): Promise<Buffer> {
+  const { videoUrl } = await veoVideoService.generateVideo({
+    prompt,
+    aspectRatio: VIDEO_ASPECT_RATIO,
+    resolution: VIDEO_RESOLUTION,
+    durationSeconds: VIDEO_DURATION_SECONDS,
+    userId: 'showcase',
+  });
+
+  const response = await fetch(videoUrl);
+  if (!response.ok) {
+    throw new Error(`Could not download clip from ${videoUrl}: ${response.status}`);
+  }
+  return Buffer.from(await response.arrayBuffer());
+}
+
+function kb(buffer: Buffer): string {
+  return `${(buffer.byteLength / 1024).toFixed(0)}KB`;
+}
+
 async function main() {
-  if (PROVIDER === 'openai' && !process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY is not set');
+  const args = process.argv.slice(2);
+  const force = args.includes('--force');
+  const onlyArg = args.find((a) => a.startsWith('--only='));
+  const only = onlyArg ? onlyArg.slice('--only='.length).split(',') : null;
+
+  const items = only ? ITEMS.filter((i) => only.includes(i.id)) : ITEMS;
+  if (items.length === 0) {
+    throw new Error(`No items matched --only. Valid ids: ${ITEMS.map((i) => i.id).join(', ')}`);
   }
 
-  const outDir = path.join(process.cwd(), 'public', 'showcase');
-
-  for (const item of ITEMS) {
-    console.log(`Generating ${item.id}...`);
-    const buffer = await generateWithOpenAI(item.prompt);
-    const outPath = path.join(outDir, `${item.id}.png`);
-    await writeFile(outPath, buffer);
-    console.log(`  -> ${outPath} (${(buffer.byteLength / 1024).toFixed(0)}KB)`);
+  const needsVideo = items.some((i) => i.kind === 'video');
+  if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not set');
+  if (needsVideo && !veoVideoService.isConfigured()) {
+    throw new Error('GOOGLE_AI_API_KEY is not set — required for the video items');
   }
 
-  console.log('Done. Update SHOWCASE_ITEMS in src/components/ShowcaseGallery.tsx to point at the .png files.');
+  const failures: string[] = [];
+
+  for (const item of items) {
+    const stillPath = path.join(OUT_DIR, `${item.id}.webp`);
+
+    if (!force && (await exists(stillPath))) {
+      console.log(`${item.id}: still exists, skipping (use --force to redo)`);
+    } else {
+      try {
+        console.log(`${item.id}: generating still...`);
+        const buffer = await generateStill(item.prompt);
+        await writeFile(stillPath, buffer);
+        console.log(`  -> ${path.relative(process.cwd(), stillPath)} (${kb(buffer)})`);
+      } catch (error) {
+        console.error(`  !! still failed: ${error instanceof Error ? error.message : error}`);
+        failures.push(`${item.id} (still)`);
+      }
+    }
+
+    if (item.kind !== 'video') continue;
+
+    const clipPath = path.join(OUT_DIR, `${item.id}.mp4`);
+    if (!force && (await exists(clipPath))) {
+      console.log(`${item.id}: clip exists, skipping (use --force to redo)`);
+      continue;
+    }
+
+    try {
+      console.log(`${item.id}: generating ${VIDEO_DURATION_SECONDS}s clip (Veo takes minutes)...`);
+      const buffer = await generateClip(item.videoPrompt!);
+      await writeFile(clipPath, buffer);
+      console.log(`  -> ${path.relative(process.cwd(), clipPath)} (${kb(buffer)})`);
+    } catch (error) {
+      console.error(`  !! clip failed: ${error instanceof Error ? error.message : error}`);
+      failures.push(`${item.id} (clip)`);
+    }
+  }
+
+  if (failures.length > 0) {
+    console.error(`\nFailed: ${failures.join(', ')}`);
+    console.error('Re-run to retry only the missing pieces — finished files are skipped.');
+    process.exit(1);
+  }
+
+  console.log('\nDone. ShowcaseGallery reads .webp/.mp4 from public/showcase by id.');
 }
 
 main().catch((err) => {
