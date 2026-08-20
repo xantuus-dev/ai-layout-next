@@ -127,7 +127,7 @@ const ITEMS: Item[] = [
 ];
 
 /** Veo caps clips at 4, 6 or 8 seconds; 8 is the longest loop we can get. */
-const VIDEO_DURATION_SECONDS = '8' as const;
+const VIDEO_DURATION_SECONDS = 8;
 const VIDEO_RESOLUTION = '720p' as const;
 const VIDEO_ASPECT_RATIO = '16:9' as const;
 

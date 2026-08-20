@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import { veoVideoService, type VeoAspectRatio, type VeoResolution, type VeoDurationSeconds } from '@/lib/video-generation';
+import { getVideoProviderForModel } from '@/lib/video-providers';
+import type { VeoAspectRatio, VeoResolution, VeoDurationSeconds } from '@/lib/video-providers';
 import { getVideoGenerationCost, checkAndResetCredits } from '@/lib/credits';
 import { assertCanSpend, spendCredits, InsufficientCreditsError } from '@/lib/billing/gate';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
@@ -11,6 +12,8 @@ export interface GenerateVideoInput {
   aspectRatio?: VeoAspectRatio;
   resolution?: VeoResolution;
   durationSeconds?: VeoDurationSeconds;
+  /** Defaults to the first configured provider's default model. */
+  model?: string;
 }
 
 export interface GeneratedVideoResult {
@@ -27,15 +30,20 @@ export interface GeneratedVideoResult {
   };
 }
 
-const MODEL = 'veo-3.1-generate-preview';
-
 export async function generateVideoForUser(
   input: GenerateVideoInput
 ): Promise<GeneratedVideoResult | MediaGenerationFailure> {
-  const { userId, prompt, aspectRatio = '16:9', resolution = '720p', durationSeconds = '8' } = input;
+  const { userId, prompt, aspectRatio = '16:9', resolution = '720p', durationSeconds = '8', model } = input;
 
-  if (!veoVideoService.isConfigured()) {
-    return { ok: false, reason: 'not_configured', message: 'Video generation is not configured (GOOGLE_AI_API_KEY missing).' };
+  const provider = getVideoProviderForModel(model);
+  if (!provider) {
+    return {
+      ok: false,
+      reason: 'not_configured',
+      message: model
+        ? `No configured video provider serves the model "${model}".`
+        : 'Video generation is not configured (no video provider has credentials).',
+    };
   }
 
   const rateLimitResult = await checkRateLimit(`video-generation:${userId}`, RATE_LIMITS.VIDEO_GENERATION);
@@ -66,15 +74,18 @@ export async function generateVideoForUser(
   }
 
   let videoUrl: string;
+  let usedModel: string;
   try {
-    const result = await veoVideoService.generateVideo({
+    const result = await provider.generateVideo({
       prompt,
       aspectRatio,
       resolution,
-      durationSeconds,
+      durationSeconds: Number(durationSeconds),
+      model,
       userId,
     });
     videoUrl = result.videoUrl;
+    usedModel = result.model;
   } catch (error) {
     return {
       ok: false,
@@ -87,7 +98,7 @@ export async function generateVideoForUser(
     data: {
       userId,
       prompt,
-      model: MODEL,
+      model: usedModel,
       aspectRatio,
       resolution,
       durationSeconds: Number(durationSeconds),
@@ -99,7 +110,7 @@ export async function generateVideoForUser(
   try {
     await spendCredits(userId, creditsNeeded, {
       type: 'video-generation',
-      model: MODEL,
+      model: usedModel,
       description: `Video generation: ${prompt.substring(0, 50)}...`,
     });
   } catch (error) {

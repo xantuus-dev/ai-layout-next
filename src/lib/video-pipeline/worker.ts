@@ -84,7 +84,9 @@ export async function processVideoPipelineJob(
         veoVideoService.generateVideo({
           prompt: scenes[i].veoPrompt,
           aspectRatio: project.aspectRatio as VeoAspectRatio,
-          durationSeconds: scenes[i].durationSeconds,
+          // SceneSpec still carries Veo's string enum; the provider interface
+          // takes seconds as a number so longer-form models can use it too.
+          durationSeconds: Number(scenes[i].durationSeconds),
           userId,
         }),
         elevenLabsAudioService.generateSpeech({ text: scenes[i].voiceoverText, userId }),

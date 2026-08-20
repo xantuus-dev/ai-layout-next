@@ -168,7 +168,9 @@ async function generateScene(
     veoVideoService.generateVideo({
       prompt: scene.veoPrompt,
       aspectRatio: aspectRatio as VeoAspectRatio,
-      durationSeconds: scene.durationSeconds,
+      // SceneSpec still carries Veo's string enum; the provider interface
+      // takes seconds as a number so longer-form models can use it too.
+      durationSeconds: Number(scene.durationSeconds),
       userId,
     }),
     elevenLabsAudioService.generateSpeech({
