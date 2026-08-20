@@ -5,23 +5,26 @@ import { Play, ImageIcon, Clapperboard } from 'lucide-react';
    to refresh the art; the prompts here are the captions shown on the card, and
    the real generation prompts live in the script alongside them.
 
+   Each card is tagged with the product surface it demonstrates rather than a
+   generic "AI image / AI video" label, so the grid doubles as a tour of what
+   the studio actually does: generate stills, cut viral ad shorts, shoot
+   original-series footage, and turn a product into a UGC testimonial.
+
    `clip` is set only on items whose .mp4 has actually been rendered. Without it
    a video card shows its still under the play badge, so the section degrades to
    exactly what it was before rather than to a broken <video>. */
 const SHOWCASE_ITEMS: {
   kind: 'image' | 'video';
+  /** Which product surface this card is showing off — rendered as the eyebrow. */
+  pillar: string;
   prompt: string;
   duration?: string;
   art: string;
   clip?: string;
 }[] = [
   {
-    kind: 'image',
-    prompt: 'Neon jellyfish drifting through a deep indigo ocean, cinematic light',
-    art: '/showcase/jellyfish.webp',
-  },
-  {
     kind: 'video',
+    pillar: 'Viral shorts',
     prompt: 'Product launch teaser — smoothie pour in slow motion, studio lighting',
     duration: '0:08',
     art: '/showcase/smoothie.webp',
@@ -29,25 +32,39 @@ const SHOWCASE_ITEMS: {
   },
   {
     kind: 'image',
-    prompt: 'Golden-hour mountain ridge above a sea of clouds, ultra wide',
-    art: '/showcase/mountains.webp',
-  },
-  {
-    kind: 'image',
-    prompt: 'Isometric cyberpunk street market at night, rain reflections',
-    art: '/showcase/cyberpunk.webp',
+    pillar: 'Creator studio',
+    prompt: 'Neon jellyfish drifting through a deep indigo ocean, cinematic light',
+    art: '/showcase/jellyfish.webp',
   },
   {
     kind: 'video',
+    pillar: 'Original series',
+    prompt: 'Opening shot of an original series — neon rooftop, anamorphic',
+    duration: '0:08',
+    art: '/showcase/cinematic.webp',
+    clip: '/showcase/cinematic.mp4',
+  },
+  {
+    kind: 'video',
+    pillar: 'UGC marketing',
+    prompt: 'UGC ad in one click — creator testimonial, shot-on-phone look',
+    duration: '0:08',
+    art: '/showcase/ugc-creator.webp',
+    clip: '/showcase/ugc-creator.mp4',
+  },
+  {
+    kind: 'image',
+    pillar: 'Marketing studio',
+    prompt: 'Minimal product shot — matcha jar on emerald silk, soft shadows',
+    art: '/showcase/matcha.webp',
+  },
+  {
+    kind: 'video',
+    pillar: 'Creator studio',
     prompt: 'Animated brand story — logo morphing through liquid color',
     duration: '0:08',
     art: '/showcase/brandstory.webp',
     clip: '/showcase/brandstory.mp4',
-  },
-  {
-    kind: 'image',
-    prompt: 'Minimal product shot — matcha jar on emerald silk, soft shadows',
-    art: '/showcase/matcha.webp',
   },
 ];
 
@@ -59,15 +76,15 @@ export default function ShowcaseGallery() {
           Images. Video. <span className="text-gradient">Made from a sentence.</span>
         </h2>
         <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-          Type what you want and get on-brand visuals back — no design tools, no stock-photo
-          subscriptions, no video editor.
+          One studio for stills, ad shorts, original-series footage, and UGC testimonials —
+          no design tools, no stock-photo subscriptions, no video editor.
         </p>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {SHOWCASE_ITEMS.map((item) => (
           <figure
-            key={item.prompt}
+            key={item.art}
             className="group relative rounded-2xl overflow-hidden border border-border shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all"
           >
             {item.clip ? (
@@ -114,7 +131,7 @@ export default function ShowcaseGallery() {
                 ) : (
                   <ImageIcon className="w-3.5 h-3.5" />
                 )}
-                {item.kind === 'video' ? 'AI video' : 'AI image'}
+                {item.pillar}
               </span>
               <span className="block text-sm text-white/90 font-mono leading-snug">
                 “{item.prompt}”

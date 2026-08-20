@@ -95,6 +95,35 @@ const ITEMS: Item[] = [
       'soft directional studio light, subtle long shadow, muted sage-green background, a few loose tea leaves ' +
       'scattered nearby, shallow depth of field, premium skincare-ad aesthetic, 8k',
   },
+  {
+    id: 'cinematic',
+    kind: 'video',
+    caption: 'Opening shot of an original series — neon rooftop, anamorphic',
+    prompt:
+      'Cinematic anamorphic film still from a prestige science-fiction drama series: a lone figure in a long coat ' +
+      'stands on a rain-swept rooftop overlooking a neon-lit futuristic city at dusk, shallow depth of field, ' +
+      'anamorphic lens flare, teal and amber color grade, wide 2.39:1 framing, 35mm film grain, dramatic key light, 8k',
+    videoPrompt:
+      'Cinematic anamorphic shot from a prestige drama series: a lone figure in a long coat stands on a rain-swept ' +
+      'rooftop overlooking a neon-lit futuristic city at dusk. Rain streaks through the light, the coat moves in the ' +
+      'wind, traffic lights drift far below. Slow deliberate dolly push toward the figure, shallow depth of field, ' +
+      'anamorphic lens flare, teal and amber film grade, 35mm grain, no text, no logos.',
+  },
+  {
+    id: 'ugc-creator',
+    kind: 'video',
+    caption: 'UGC ad in one click — creator testimonial, shot-on-phone look',
+    prompt:
+      'Authentic user-generated-content style photograph shot on a phone: a smiling creator holds a matte skincare ' +
+      'bottle up toward the camera at arm’s length in a sunlit kitchen, natural window light, slightly handheld ' +
+      'framing, warm homey background with houseplants, shallow phone-camera depth of field, unpolished ' +
+      'influencer-testimonial aesthetic, high detail',
+    videoPrompt:
+      'User-generated-content style selfie video: a smiling creator holds a matte skincare bottle up close to a ' +
+      'handheld phone camera in a sunlit kitchen, turning it to show the label while talking to camera and ' +
+      'gesturing. Natural window light, gentle handheld motion, warm homey background with houseplants, unpolished ' +
+      'authentic influencer-testimonial look, no text overlays, no logos.',
+  },
 ];
 
 /** Veo caps clips at 4, 6 or 8 seconds; 8 is the longest loop we can get. */
