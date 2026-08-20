@@ -25,6 +25,7 @@ const SHOWCASE_ITEMS: {
     prompt: 'Product launch teaser — smoothie pour in slow motion, studio lighting',
     duration: '0:08',
     art: '/showcase/smoothie.webp',
+    clip: '/showcase/smoothie.mp4',
   },
   {
     kind: 'image',
@@ -41,6 +42,7 @@ const SHOWCASE_ITEMS: {
     prompt: 'Animated brand story — logo morphing through liquid color',
     duration: '0:08',
     art: '/showcase/brandstory.webp',
+    clip: '/showcase/brandstory.mp4',
   },
   {
     kind: 'image',
