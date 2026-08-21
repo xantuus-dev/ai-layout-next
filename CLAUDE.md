@@ -297,6 +297,13 @@ Both Stripe and RevenueCat webhooks verify signatures to ensure authenticity:
 - Development: Use `npx prisma db push` for quick iterations
 - Production: Use `npx prisma migrate dev` to create migrations, then `npx prisma migrate deploy` in production
 
+**Deploying does not apply migrations.** `vercel.json`'s `buildCommand` is
+`prisma generate && next build` — it deliberately does not run `migrate deploy`.
+Apply migrations separately via `.github/workflows/database-migrations.yml`
+(Actions → Database Migrations → Run workflow). See
+`prisma/migrations/README.md` for why, and for the one-time baselining steps a
+database created with `db push` needs before `migrate deploy` will work on it.
+
 ## Troubleshooting
 
 ### Prisma Client Issues

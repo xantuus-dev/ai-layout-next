@@ -12,6 +12,8 @@ import CapabilitiesSection from './CapabilitiesSection';
 import AudienceSection from './AudienceSection';
 import ComparisonSection from './ComparisonSection';
 import CodeWindow from './CodeWindow';
+import { Footer } from './ui/footer';
+import AuroraBackground from './ui/aurora-background';
 import {
   Sparkles,
   Workflow,
@@ -171,19 +173,13 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden max-w-full text-center">
-        {/* Vibrant glow field behind the hero — decorative only */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-32 left-1/2 -translate-x-[80%] w-[36rem] h-[36rem] rounded-full bg-teal-500/25 blur-3xl" />
-          <div className="absolute top-24 right-[8%] w-[28rem] h-[28rem] rounded-full bg-emerald-500/20 blur-3xl" />
-          <div className="absolute bottom-0 left-[10%] w-[24rem] h-[24rem] rounded-full bg-violet-500/15 blur-3xl" />
-        </div>
-
-        <div className="relative max-w-5xl mx-auto px-4 md:px-8 pt-20 pb-16">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-accent/50 text-xs font-medium text-muted-foreground mb-6">
-          <Sparkles className="w-3.5 h-3.5 text-primary" />
-          Multi-model AI, built for small business
-        </div>
+      <section className="max-w-full text-center">
+        {/* Aurora field behind the hero — decorative only. Replaces the three
+            static blur circles that used to sit here: same teal/emerald/violet
+            composition, but drifting, with a starfield, and fading into the
+            page background so the hero no longer ends on a visible edge. */}
+        <AuroraBackground pulseDuration={9} starCount={80}>
+        <div className="max-w-5xl mx-auto px-4 md:px-8 pt-20 pb-16">
         <h1 className="text-4xl md:text-7xl font-bold tracking-tight text-foreground mb-6">
           Run your business tasks on <span className="text-gradient">every leading AI model</span> — one credit balance
         </h1>
@@ -210,6 +206,7 @@ export default function LandingPage() {
 
         <TerminalDemo />
         </div>
+        </AuroraBackground>
       </section>
 
       {/* Showcase — AI images & video */}
@@ -345,33 +342,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Same wordmark as the header, one step smaller — the footer is
-              secondary, but it should still be the brand rather than a 24px glyph. */}
-          <div className="flex items-center min-w-0">
-            <img
-              src="/xantuus-wordmark-dark.png"
-              alt="Xantuus AI"
-              className="w-[112px] max-w-full h-auto object-contain object-left dark:hidden"
-            />
-            <img
-              src="/xantuus-wordmark-white.png"
-              alt="Xantuus AI"
-              className="w-[112px] max-w-full h-auto object-contain object-left hidden dark:block"
-            />
-          </div>
-          <nav className="flex items-center gap-6 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground transition-colors">Features</a>
-            <Link href="/solutions" className="hover:text-foreground transition-colors">Solutions</Link>
-            <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
-            <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
-            <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
-          </nav>
-          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Xantuus AI</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

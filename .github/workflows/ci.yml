@@ -190,11 +190,33 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+      # DATABASE_URL and DIRECT_URL are flagged Sensitive in Vercel, which makes
+      # them write-only: `vercel pull` above returns them as empty strings, and
+      # no CLI or API call can recover their values. That is not a
+      # misconfiguration to fix here — it is the point of the flag.
+      #
+      # It is also why this step failed on every run for weeks. vercel.json's
+      # buildCommand used to include `DATABASE_URL=$DIRECT_URL prisma migrate
+      # deploy`, which resolved to an empty string in CI and died with P1013.
+      # Remote Vercel builds inject sensitive vars normally, so the same command
+      # succeeded there — only `vercel build` running locally in CI was starved.
+      # The migration has since moved out of the build entirely (see
+      # database-migrations.yml), so nothing in this step touches a database.
+      #
+      # `next build` still constructs a Prisma client while collecting page
+      # data, and Prisma rejects an empty connection string, so it needs a
+      # syntactically valid URL that it never connects to. These placeholders
+      # match the ones lint-and-test already builds with. They cannot leak into
+      # production: Next.js only inlines NEXT_PUBLIC_* at build time, and server
+      # code reads process.env at runtime from the deployment's own environment.
       - name: Build Project Artifacts
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          SKIP_ENV_VALIDATION: true
+          DATABASE_URL: postgresql://placeholder
+          DIRECT_URL: postgresql://placeholder
 
       - name: Deploy to Vercel Production
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'

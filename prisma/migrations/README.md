@@ -50,6 +50,38 @@ Stop using `prisma db push` on any database that holds real data. It remains
 appropriate for throwaway databases only — the CI integration-test job uses it
 deliberately, because that database is discarded after every run.
 
+## Deploying no longer applies migrations
+
+`vercel.json`'s `buildCommand` used to be:
+
+```
+prisma generate && DATABASE_URL=$DIRECT_URL prisma migrate deploy && next build
+```
+
+It is now just `prisma generate && next build`. **A deploy will not touch the
+database.** Applying a migration is a separate, deliberate act: run
+`.github/workflows/database-migrations.yml` (Actions → Database Migrations →
+Run workflow), or `npx prisma migrate deploy` against the target directly.
+
+Two reasons the coupling had to go:
+
+1. **It broke CI.** `DATABASE_URL` and `DIRECT_URL` are flagged Sensitive in
+   Vercel, which makes them write-only — `vercel pull` returns empty strings and
+   no CLI or API call can recover the real values. Remote Vercel builds inject
+   them normally, but `vercel build` running locally in a CI runner does not get
+   them, so `$DIRECT_URL` resolved to `""` and every run died with P1013
+   ("the provided database string is invalid"). The deploy job failed on twelve
+   consecutive runs for exactly this reason.
+
+2. **Build-time migration is the wrong shape anyway.** The migration ran before
+   the new code was live, could run on builds that were then discarded, and
+   rolling back a deployment did not roll back the schema. Ship
+   backward-compatible schema changes first, then the code that uses them
+   (expand/contract).
+
+The practical consequence: after merging a migration, remember to run it.
+Nothing else will.
+
 ## Why DIRECT_URL
 
 Migrations issue DDL, which does not work reliably through a connection pooler.

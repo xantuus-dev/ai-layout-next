@@ -10,6 +10,7 @@ import { checkAndResetCredits, getCreditStatus, estimateAgenticTurnCredits } fro
 import { assertCanSpend, spendCredits } from '@/lib/billing/gate';
 import { buildSystemPrompt } from '@/lib/personalization';
 import { getMemoryContext, extractAndStoreFacts, shouldExtractFacts } from '@/lib/memory/facts';
+import { getStyleContext, maybeRebuildStyleProfile } from '@/lib/style/profile';
 import { runChatLoop } from '@/lib/agent/chat-loop';
 
 export async function POST(request: NextRequest) {
@@ -210,9 +211,15 @@ export async function POST(request: NextRequest) {
       // Returns null (never throws) when memory is empty or unavailable.
       const memoryContext = message ? await getMemoryContext(user.id, message) : null;
 
-      // Personalization + memory in one system message. The personalization
-      // fields had a settings page and an API but were never sent to a model.
-      const systemPrompt = buildSystemPrompt(user, memoryContext);
+      // The user's learned writing voice, so replies are drafted in their
+      // register rather than the model's default. Returns null (never throws)
+      // when the profile is absent, switched off, or below the plan tier.
+      const styleContext = await getStyleContext(user.id);
+
+      // Personalization + memory + learned voice in one system message. The
+      // personalization fields had a settings page and an API but were never
+      // sent to a model.
+      const systemPrompt = buildSystemPrompt(user, memoryContext, styleContext);
 
       loopMessages = [
         { role: 'system', content: systemPrompt },
@@ -295,6 +302,24 @@ export async function POST(request: NextRequest) {
           })),
           { role: 'user', content: message },
           { role: 'assistant', content: loopResult.content },
+        ],
+      });
+    }
+
+    // Rebuild the user's voice profile once enough new writing has accumulated.
+    // Runs on a much slower cadence than fact extraction (a voice barely moves
+    // between messages). maybeRebuildStyleProfile owns its own staleness read
+    // and cannot throw, so nothing here can cost the user a reply they have
+    // already been charged for.
+    if (message) {
+      await maybeRebuildStyleProfile({
+        userId: user.id,
+        messages: [
+          ...historyMessages.map((msg) => ({
+            role: String(msg.role),
+            content: String(msg.content),
+          })),
+          { role: 'user', content: message },
         ],
       });
     }

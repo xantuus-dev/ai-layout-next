@@ -106,6 +106,8 @@ model User {
   generatedImages     GeneratedImage[]
   generatedVideos     GeneratedVideo[]
   generatedAudios     GeneratedAudio[]
+  generatedMusic      GeneratedMusic[]
+  styleProfile        UserStyleProfile?
   videoProjects       VideoProject[]
   imageGenerationJobs ImageGenerationJob[]
   imageShareLinks     ImageShareLink[]
@@ -365,6 +367,38 @@ model GeneratedAudio {
 
   // Credits
   creditsUsed Int @default(0) // Credits consumed for this generation
+
+  // Metadata
+  metadata Json? // Additional generation metadata
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// GeneratedMusic - Tracks composed via ElevenLabs Music
+//
+// Separate from GeneratedAudio rather than a `kind` column on it: that model's
+// required columns (text, voiceId, characterCount) are all meaningless for a
+// composed track, and making them nullable to share one table would remove the
+// constraints that keep speech rows honest.
+model GeneratedMusic {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Generation Details
+  prompt       String  @db.Text // Description the track was composed from
+  model        String  @default("music_v2") // ElevenLabs music model used
+  lengthMs     Int // Actual composed length, after clamping to provider limits
+  instrumental Boolean @default(false)
+
+  // Audio Storage
+  audioUrl String @db.Text // URL to the generated track
+
+  // Credits
+  creditsUsed Int @default(0)
 
   // Metadata
   metadata Json? // Additional generation metadata
@@ -1943,4 +1977,37 @@ model Organization {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// UserStyleProfile - The user's own writing voice, learned from what they write
+//
+// One row per user, rebuilt periodically rather than appended to: unlike
+// MemoryFact (where each fact is independently true and worth keeping), a
+// style profile is a single current description that supersedes the last one.
+//
+// `enabled` is stored rather than inferred so a user can switch voice matching
+// off without losing the learned profile — turning it back on should not mean
+// starting over.
+model UserStyleProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  enabled Boolean @default(true)
+
+  // Learned traits, shaped by StyleTraits in src/lib/style/profile.ts
+  traits Json
+
+  // How many of the user's own messages the current profile was built from.
+  // Surfaced in the UI so "learned from 43 of your messages" is a real number.
+  sampleCount Int @default(0)
+
+  // Message count at last rebuild, used to decide when the profile is stale.
+  lastBuiltAtMessageCount Int      @default(0)
+  lastBuiltAt             DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }

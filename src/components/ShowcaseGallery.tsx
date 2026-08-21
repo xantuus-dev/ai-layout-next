@@ -12,7 +12,13 @@ import { Play, ImageIcon, Clapperboard } from 'lucide-react';
 
    `clip` is set only on items whose .mp4 has actually been rendered. Without it
    a video card shows its still under the play badge, so the section degrades to
-   exactly what it was before rather than to a broken <video>. */
+   exactly what it was before rather than to a broken <video>.
+
+   `portrait` marks the cards whose asset is 9:16, because the pillar they
+   demonstrate is a vertical format. The card frame stays 4:3 so the grid keeps
+   its rhythm; the vertical asset is letterboxed inside it against a blurred
+   copy of itself, which shows the real delivery shape instead of centre-
+   cropping it away. */
 const SHOWCASE_ITEMS: {
   kind: 'image' | 'video';
   /** Which product surface this card is showing off — rendered as the eyebrow. */
@@ -21,6 +27,8 @@ const SHOWCASE_ITEMS: {
   duration?: string;
   art: string;
   clip?: string;
+  /** Asset is 9:16 rather than 16:9 — see scripts/generate-showcase-images.ts. */
+  portrait?: boolean;
 }[] = [
   {
     kind: 'video',
@@ -29,6 +37,7 @@ const SHOWCASE_ITEMS: {
     duration: '0:08',
     art: '/showcase/smoothie.webp',
     clip: '/showcase/smoothie.mp4',
+    portrait: true,
   },
   {
     kind: 'image',
@@ -51,6 +60,7 @@ const SHOWCASE_ITEMS: {
     duration: '0:08',
     art: '/showcase/ugc-creator.webp',
     clip: '/showcase/ugc-creator.mp4',
+    portrait: true,
   },
   {
     kind: 'image',
@@ -87,25 +97,47 @@ export default function ShowcaseGallery() {
             key={item.art}
             className="group relative rounded-2xl overflow-hidden border border-border shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all"
           >
-            {item.clip ? (
-              <video
-                src={item.clip}
-                poster={item.art}
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-                aria-label={item.prompt}
-                className="aspect-[4/3] w-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-            ) : (
-              <img
-                src={item.art}
-                alt={item.prompt}
-                className="aspect-[4/3] w-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-            )}
+            <div className="relative aspect-[4/3] w-full overflow-hidden bg-black flex items-center justify-center">
+              {/* A 9:16 asset in a 4:3 frame would lose the top and bottom of the
+                  shot to object-cover. Contain it instead, and fill the gutters
+                  with a blurred copy so the letterboxing reads as framing. */}
+              {item.portrait && (
+                <img
+                  src={item.art}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 h-full w-full object-cover scale-125 blur-2xl opacity-50"
+                />
+              )}
+
+              {item.clip ? (
+                <video
+                  src={item.clip}
+                  poster={item.art}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  aria-label={item.prompt}
+                  className={
+                    item.portrait
+                      ? 'relative max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500'
+                      : 'h-full w-full object-cover group-hover:scale-105 transition-transform duration-500'
+                  }
+                />
+              ) : (
+                <img
+                  src={item.art}
+                  alt={item.prompt}
+                  className={
+                    item.portrait
+                      ? 'relative max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500'
+                      : 'h-full w-full object-cover group-hover:scale-105 transition-transform duration-500'
+                  }
+                />
+              )}
+            </div>
 
             {item.kind === 'video' && (
               <>

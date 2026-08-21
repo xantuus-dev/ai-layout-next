@@ -222,6 +222,14 @@ export const RATE_LIMITS = {
     maxRequests: 30,
     windowMs: 60 * 60 * 1000, // 1 hour
   },
+  // Music generation: 10 tracks per hour per user. A track is priced per
+  // minute of output rather than per request, so the ceiling here sits between
+  // TTS and Veo — high enough to iterate on a prompt, low enough that a stuck
+  // client cannot run up ten minutes of billed audio a minute.
+  MUSIC_GENERATION: {
+    maxRequests: 10,
+    windowMs: 60 * 60 * 1000, // 1 hour
+  },
   // Video pipeline (concept -> scenes -> stitched video): 3 projects per day
   // per user. A single project can run up to 5 Veo calls + 5 TTS calls + one
   // sandbox stitch, so it can by itself consume most of VIDEO_GENERATION's

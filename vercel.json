@@ -1,5 +1,5 @@
 {
-  "buildCommand": "prisma generate && DATABASE_URL=$DIRECT_URL prisma migrate deploy && next build",
+  "buildCommand": "prisma generate && next build",
   "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["iad1"],

@@ -4,7 +4,9 @@ import {
   getVideoProviderById,
   getVideoProviderForModel,
   listVideoProviders,
+  seedanceVideoService,
   veoVideoService,
+  SEEDANCE_MODELS,
   VEO_MODELS,
 } from '@/lib/video-providers';
 
@@ -29,6 +31,23 @@ describe('video provider registry', () => {
   it('gives every registered provider a distinct id', () => {
     const ids = listVideoProviders().map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('claims no model for two providers at once', () => {
+    const models = listVideoProviders().flatMap((p) => [...p.models]);
+    expect(new Set(models).size).toBe(models.length);
+  });
+
+  it('routes a Seedance model to the Seedance provider', () => {
+    // Registered regardless of credentials; resolution is gated on FAL_KEY.
+    expect(getVideoProviderById('seedance')?.models).toEqual(SEEDANCE_MODELS);
+  });
+
+  it('will not resolve a provider whose credentials are missing', () => {
+    // Guards the failure mode where an unconfigured provider is handed a
+    // request and only fails once generation is already under way.
+    const resolved = getVideoProviderForModel('seedance-2.5');
+    expect(resolved).toBe(seedanceVideoService.isConfigured() ? seedanceVideoService : undefined);
   });
 });
 
@@ -56,5 +75,22 @@ describe('assertSupported', () => {
 
   it('ignores fields the caller left unset', () => {
     expect(() => assertSupported(veoVideoService, request)).not.toThrow();
+  });
+
+  it('accepts on Seedance exactly what Veo rejects', () => {
+    // The whole point of per-provider capabilities: 30s and 480p are real for
+    // Seedance and impossible for Veo.
+    expect(() =>
+      assertSupported(seedanceVideoService, { ...request, durationSeconds: 30, resolution: '480p' })
+    ).not.toThrow();
+    expect(() => assertSupported(veoVideoService, { ...request, durationSeconds: 30 })).toThrow();
+  });
+
+  it('still rejects durations past the Seedance ceiling', () => {
+    expect(() => assertSupported(seedanceVideoService, { ...request, durationSeconds: 31 })).toThrow(/31s/);
+  });
+
+  it('rejects 4k on Seedance, which offers it only as a separate upscale', () => {
+    expect(() => assertSupported(seedanceVideoService, { ...request, resolution: '4k' })).toThrow(/resolution/i);
   });
 });

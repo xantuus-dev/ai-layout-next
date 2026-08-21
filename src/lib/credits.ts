@@ -82,6 +82,22 @@ export function getAudioGenerationCost(characterCount: number): number {
   return Math.max(1, Math.ceil((characterCount / 1000) * AUDIO_GENERATION_CREDITS_PER_1K_CHARS));
 }
 
+// Music Generation Credit Costs (ElevenLabs Music, billed per second of output)
+//
+// Priced per minute rather than per character because that is the axis the
+// provider bills on for music — a 30-second track costs the same whether the
+// prompt was five words or five hundred.
+//
+// Same caveat as the speech and video rates above: this is a placeholder that
+// assumes roughly $1.00 per minute of generated audio. Reconcile it against
+// your actual ElevenLabs plan at https://elevenlabs.io/pricing before charging
+// customers.
+export const MUSIC_GENERATION_CREDITS_PER_MINUTE = 1000;
+
+export function getMusicGenerationCost(lengthMs: number): number {
+  return Math.max(1, Math.ceil((lengthMs / 60_000) * MUSIC_GENERATION_CREDITS_PER_MINUTE));
+}
+
 // Video Pipeline Credit Costs (concept -> scenes -> stitched final video)
 //
 // A pipeline run is charged once upfront for the whole project (see

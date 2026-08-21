@@ -19,7 +19,7 @@
 import { writeFile, access } from 'fs/promises';
 import path from 'path';
 import OpenAI from 'openai';
-import { veoVideoService } from '../src/lib/video-generation';
+import { veoVideoService, type VeoAspectRatio } from '../src/lib/video-generation';
 
 type Item = {
   id: string;
@@ -27,8 +27,16 @@ type Item = {
   caption: string;
   prompt: string;
   /** Motion prompt for Veo. Required on `video` items — the still prompt above
-   *  describes a frozen instant, which makes for a static, lifeless clip. */
+   *  describes a frozen instant, which makes for a static, lifeless clip.
+   *
+   *  It must describe the SAME moment as `prompt`, because the still is used as
+   *  the clip's poster frame. If the still shows a full glass and the clip opens
+   *  on an empty one, the card visibly jump-cuts the instant the video loads. */
   videoPrompt?: string;
+  /** Delivery format this card is demonstrating. Vertical pillars (viral shorts,
+   *  UGC) must render 9:16 — a landscape clip contradicts the claim the card is
+   *  making. Defaults to 16:9. */
+  aspectRatio?: VeoAspectRatio;
 };
 
 const ITEMS: Item[] = [
@@ -45,15 +53,31 @@ const ITEMS: Item[] = [
     id: 'smoothie',
     kind: 'video',
     caption: 'Product launch teaser — smoothie pour in slow motion, studio lighting',
+    aspectRatio: '9:16',
+    // Both prompts below pin the same three things, because Veo will otherwise
+    // default to a stemless wine glass full of a thin translucent red liquid —
+    // which reads as a wine pour, not a smoothie:
+    //   1. glass geometry  — tall, straight-sided, no stem, no curved bowl
+    //   2. liquid opacity  — thick, opaque, matte, seed-flecked (not translucent)
+    //   3. the same moment — glass already two-thirds full, pour still running
     prompt:
-      'Ultra high-speed studio product photograph of a vivid mixed-berry smoothie pouring into a tall glass, ' +
-      'mid-splash droplets frozen in motion, condensation on the glass, dramatic three-point studio lighting on a ' +
-      'reflective black surface, saturated magenta and orange gradient background, commercial beverage advertising, 8k',
+      'Ultra high-speed vertical studio product photograph of a vivid opaque mixed-berry smoothie pouring into a ' +
+      'TALL STRAIGHT-SIDED highball glass — a tall cylindrical tumbler with flat vertical sides, no stem and no ' +
+      'curved bowl. The glass is already two-thirds full of thick opaque bright magenta-pink blended smoothie with ' +
+      'visible berry seeds and a matte non-transparent surface; a thick ribbon of the same smoothie pours in from ' +
+      'above and throws a splash crown of droplets at the rim, frozen in motion. Condensation beads on the glass, ' +
+      'reflective black surface, dramatic three-point studio lighting, saturated magenta-to-orange gradient ' +
+      'background, commercial beverage advertising, 8k. Not a wine glass, not a stemless glass, not a transparent ' +
+      'liquid, not wine or juice.',
     videoPrompt:
-      'Slow-motion commercial beverage shot: a vivid mixed-berry smoothie pours in a thick ribbon into a tall glass ' +
-      'on a reflective black surface, droplets arcing and splashing at the rim, condensation beading down the glass. ' +
-      'Dramatic three-point studio lighting, saturated magenta and orange gradient backdrop, slow push-in on a macro ' +
-      'lens, shallow depth of field, glossy premium advertising look.',
+      'Vertical slow-motion commercial beverage shot. A TALL STRAIGHT-SIDED highball glass — a tall cylindrical ' +
+      'tumbler with flat vertical sides, no stem, no curved bowl — stands on a reflective black surface, already ' +
+      'two-thirds full of thick opaque bright magenta-pink mixed-berry smoothie. A heavy ribbon of the same thick ' +
+      'opaque smoothie keeps pouring in from above, the level rising toward the rim, droplets arcing and splashing ' +
+      'off the surface, condensation beading down the glass. The smoothie is completely non-transparent with a ' +
+      'matte blended texture and visible berry seeds. Dramatic three-point studio lighting, saturated magenta-to-' +
+      'orange gradient backdrop, slow push-in, shallow depth of field, glossy premium advertising look. ' +
+      'Not a wine glass, not a stemless glass, not a thin translucent liquid, not wine, no text, no logos.',
   },
   {
     id: 'mountains',
@@ -113,8 +137,12 @@ const ITEMS: Item[] = [
     id: 'ugc-creator',
     kind: 'video',
     caption: 'UGC ad in one click — creator testimonial, shot-on-phone look',
+    // Same defect as `smoothie`: a selfie held at arm's length is a vertical
+    // gesture, and UGC is delivered vertically. Rendering it 16:9 contradicts
+    // the "shot-on-phone" claim the card makes.
+    aspectRatio: '9:16',
     prompt:
-      'Authentic user-generated-content style photograph shot on a phone: a smiling creator holds a matte skincare ' +
+      'Authentic vertical user-generated-content style photograph shot on a phone: a smiling creator holds a matte skincare ' +
       'bottle up toward the camera at arm’s length in a sunlit kitchen, natural window light, slightly handheld ' +
       'framing, warm homey background with houseplants, shallow phone-camera depth of field, unpolished ' +
       'influencer-testimonial aesthetic, high detail',
@@ -129,7 +157,16 @@ const ITEMS: Item[] = [
 /** Veo caps clips at 4, 6 or 8 seconds; 8 is the longest loop we can get. */
 const VIDEO_DURATION_SECONDS = 8;
 const VIDEO_RESOLUTION = '720p' as const;
-const VIDEO_ASPECT_RATIO = '16:9' as const;
+/** Fallback for items that don't declare one — landscape suits the cinematic
+ *  and abstract cards. Vertical pillars set `aspectRatio` on the item instead. */
+const DEFAULT_ASPECT_RATIO: VeoAspectRatio = '16:9';
+
+/** gpt-image-1 sizes, matched to the clip orientation so the poster frame and
+ *  the clip it sits in front of are not different shapes. */
+const STILL_SIZE: Record<VeoAspectRatio, '1536x1024' | '1024x1536'> = {
+  '16:9': '1536x1024',
+  '9:16': '1024x1536',
+};
 
 const OUT_DIR = path.join(process.cwd(), 'public', 'showcase');
 
@@ -149,12 +186,12 @@ async function exists(filePath: string): Promise<boolean> {
  * a tenth of that with no visible difference at card size, and saves adding
  * sharp purely to re-encode afterwards.
  */
-async function generateStill(prompt: string): Promise<Buffer> {
+async function generateStill(prompt: string, aspectRatio: VeoAspectRatio): Promise<Buffer> {
   const client = new OpenAI();
   const result = await client.images.generate({
     model: 'gpt-image-1',
     prompt,
-    size: '1536x1024',
+    size: STILL_SIZE[aspectRatio],
     quality: 'high',
     output_format: 'webp',
     output_compression: 82,
@@ -171,10 +208,10 @@ async function generateStill(prompt: string): Promise<Buffer> {
  * is better served as a static file — it rides the deployment CDN instead of
  * billing Blob egress on every visit — so the Blob copy is just a staging step.
  */
-async function generateClip(prompt: string): Promise<Buffer> {
+async function generateClip(prompt: string, aspectRatio: VeoAspectRatio): Promise<Buffer> {
   const { videoUrl } = await veoVideoService.generateVideo({
     prompt,
-    aspectRatio: VIDEO_ASPECT_RATIO,
+    aspectRatio,
     resolution: VIDEO_RESOLUTION,
     durationSeconds: VIDEO_DURATION_SECONDS,
     userId: 'showcase',
@@ -211,14 +248,15 @@ async function main() {
   const failures: string[] = [];
 
   for (const item of items) {
+    const aspectRatio = item.aspectRatio ?? DEFAULT_ASPECT_RATIO;
     const stillPath = path.join(OUT_DIR, `${item.id}.webp`);
 
     if (!force && (await exists(stillPath))) {
       console.log(`${item.id}: still exists, skipping (use --force to redo)`);
     } else {
       try {
-        console.log(`${item.id}: generating still...`);
-        const buffer = await generateStill(item.prompt);
+        console.log(`${item.id}: generating ${aspectRatio} still...`);
+        const buffer = await generateStill(item.prompt, aspectRatio);
         await writeFile(stillPath, buffer);
         console.log(`  -> ${path.relative(process.cwd(), stillPath)} (${kb(buffer)})`);
       } catch (error) {
@@ -236,8 +274,10 @@ async function main() {
     }
 
     try {
-      console.log(`${item.id}: generating ${VIDEO_DURATION_SECONDS}s clip (Veo takes minutes)...`);
-      const buffer = await generateClip(item.videoPrompt!);
+      console.log(
+        `${item.id}: generating ${VIDEO_DURATION_SECONDS}s ${aspectRatio} clip (Veo takes minutes)...`
+      );
+      const buffer = await generateClip(item.videoPrompt!, aspectRatio);
       await writeFile(clipPath, buffer);
       console.log(`  -> ${path.relative(process.cwd(), clipPath)} (${kb(buffer)})`);
     } catch (error) {

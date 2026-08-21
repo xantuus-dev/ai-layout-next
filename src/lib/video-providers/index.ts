@@ -10,14 +10,16 @@
  */
 
 import { veoVideoService } from './veo';
+import { seedanceVideoService } from './seedance';
 import type { VideoProvider } from './types';
 
 export * from './types';
 export { veoVideoService, VEO_MODELS } from './veo';
 export type { VeoAspectRatio, VeoResolution, VeoDurationSeconds } from './veo';
+export { seedanceVideoService, SEEDANCE_MODELS } from './seedance';
 
 /** Registration order is preference order: the first configured one is the default. */
-const PROVIDERS: readonly VideoProvider[] = [veoVideoService];
+const PROVIDERS: readonly VideoProvider[] = [veoVideoService, seedanceVideoService];
 
 export function listVideoProviders(): readonly VideoProvider[] {
   return PROVIDERS;

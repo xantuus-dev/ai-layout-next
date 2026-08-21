@@ -423,3 +423,128 @@
     animation: none;
   }
 }
+/* ── Aurora background ────────────────────────────────────────────────────
+   Backdrop for the landing hero (components/ui/aurora-background.tsx).
+
+   Colours are tokens rather than literals so the field follows the theme
+   toggle. The palette is the brand teal/emerald pair from the gradient
+   utilities above, plus a violet third field for depth — deliberately NOT
+   the indigo/violet of the upstream demo, which fights the teal wordmark.
+
+   Star colour flips per theme: near-white specks read as stars on the dark
+   near-black background, but on the #FAFAFA light background the same specks
+   read as dust, so light mode gets a low-opacity teal sparkle instead. */
+@layer base {
+  :root {
+    --aurora-color1: rgba(20, 184, 166, 0.26);   /* Teal 500 */
+    --aurora-color2: rgba(16, 185, 129, 0.20);   /* Emerald 500 */
+    --aurora-color3: rgba(139, 92, 246, 0.12);   /* Violet 500 */
+    --aurora-star: 173 80% 45%;
+    --aurora-star-opacity: 0.30;
+  }
+
+  .dark {
+    --aurora-color1: rgba(20, 184, 166, 0.30);
+    --aurora-color2: rgba(16, 185, 129, 0.24);
+    --aurora-color3: rgba(139, 92, 246, 0.20);
+    --aurora-star: 0 0% 100%;
+    --aurora-star-opacity: 0.85;
+  }
+}
+
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(72px);
+  will-change: transform, opacity;
+  animation-timing-function: var(--ease-silk);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+/* Each field gets its own size, anchor and cycle length. Equal durations make
+   the three read as one object pulsing; offsetting them keeps it ambient. */
+.aurora-blob-1 {
+  top: -8rem;
+  left: 50%;
+  width: 36rem;
+  height: 36rem;
+  margin-left: -28rem;
+  background: var(--aurora-c1, var(--aurora-color1));
+  animation-name: aurora-drift-a;
+  animation-duration: var(--aurora-duration, 8s);
+}
+
+.aurora-blob-2 {
+  top: 4rem;
+  right: 4%;
+  width: 30rem;
+  height: 30rem;
+  background: var(--aurora-c2, var(--aurora-color2));
+  animation-name: aurora-drift-b;
+  animation-duration: calc(var(--aurora-duration, 8s) * 1.45);
+}
+
+.aurora-blob-3 {
+  bottom: -6rem;
+  left: 6%;
+  width: 26rem;
+  height: 26rem;
+  background: var(--aurora-c3, var(--aurora-color3));
+  animation-name: aurora-drift-c;
+  animation-duration: calc(var(--aurora-duration, 8s) * 1.9);
+}
+
+.aurora-star {
+  position: absolute;
+  border-radius: 9999px;
+  background: hsl(var(--aurora-star));
+  opacity: 0;
+  will-change: opacity, transform;
+  animation: aurora-twinkle var(--twinkle-duration, 4s) ease-in-out infinite;
+  animation-delay: var(--twinkle-delay, 0s);
+}
+
+/* Feathers the field into the page background so the hero doesn't end on a
+   visible edge where the next section begins. */
+.aurora-vignette {
+  background: radial-gradient(
+    ellipse 120% 90% at 50% 25%,
+    transparent 40%,
+    hsl(var(--background) / 0.55) 75%,
+    hsl(var(--background)) 100%
+  );
+}
+
+@keyframes aurora-drift-a {
+  from { transform: translate3d(-5%, -3%, 0) scale(1);    opacity: 0.85; }
+  to   { transform: translate3d(6%, 4%, 0)   scale(1.15); opacity: 1; }
+}
+
+@keyframes aurora-drift-b {
+  from { transform: translate3d(4%, 5%, 0)   scale(1.1);  opacity: 0.7; }
+  to   { transform: translate3d(-5%, -6%, 0) scale(0.95); opacity: 1; }
+}
+
+@keyframes aurora-drift-c {
+  from { transform: translate3d(0, 4%, 0)    scale(0.95); opacity: 0.5; }
+  to   { transform: translate3d(-4%, -5%, 0) scale(1.2);  opacity: 0.9; }
+}
+
+@keyframes aurora-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.6); }
+  50%      { opacity: var(--aurora-star-opacity, 0.8); transform: scale(1); }
+}
+
+/* The field is decorative — hold it still rather than removing it, so the
+   composition is unchanged for anyone who asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-blob {
+    animation: none;
+  }
+
+  .aurora-star {
+    animation: none;
+    opacity: calc(var(--aurora-star-opacity, 0.8) * 0.7);
+  }
+}

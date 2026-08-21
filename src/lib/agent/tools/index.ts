@@ -35,6 +35,9 @@ import { ChartRenderTool } from './charts';
 // Image generation tool
 import { ImageGenerateTool } from './image-generate';
 
+// Music generation tool
+import { MusicGenerateTool } from './music-generate';
+
 // Google Drive tools
 import {
   DriveUploadTool,
@@ -121,6 +124,9 @@ export function initializeTools(): void {
 
   // Image generation
   toolRegistry.register(new ImageGenerateTool());
+
+  // Music generation
+  toolRegistry.register(new MusicGenerateTool());
 
   console.log(`[Agent] Initialized ${toolRegistry.getAllTools().length} tools`);
 }

@@ -29,6 +29,37 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # This workflow is now the ONLY path that applies migrations. It used to
+      # be a backstop, because vercel.json's buildCommand ran `prisma migrate
+      # deploy` on every production build; that coupling is gone, so a
+      # migration reaches the database if and only if someone runs this.
+      #
+      # It fails closed on missing secrets rather than letting Prisma report
+      # P1013 ("the provided database string is invalid") several steps later.
+      # That error is what an unset secret looks like, and it reads like a
+      # malformed URL rather than an absent one — worth naming explicitly,
+      # because DATABASE_URL and DIRECT_URL are Sensitive in Vercel and cannot
+      # be pulled from there. They have to be copied from the Supabase
+      # dashboard (Settings -> Database -> Connection string, session mode).
+      - name: Verify migration secrets are present
+        env:
+          PROD_DB: ${{ secrets.DATABASE_URL }}
+          PROD_DIRECT: ${{ secrets.DIRECT_URL }}
+          STAGING_DB: ${{ secrets.STAGING_DATABASE_URL }}
+          DEV_DB: ${{ secrets.DEV_DATABASE_URL }}
+        run: |
+          case "${{ github.event.inputs.environment }}" in
+            production) NEEDED_DB="$PROD_DB"; NEEDED_DIRECT="$PROD_DIRECT"; NAMES="DATABASE_URL / DIRECT_URL" ;;
+            staging)    NEEDED_DB="$STAGING_DB"; NEEDED_DIRECT="$STAGING_DB"; NAMES="STAGING_DATABASE_URL / STAGING_DIRECT_URL" ;;
+            *)          NEEDED_DB="$DEV_DB"; NEEDED_DIRECT="$DEV_DB"; NAMES="DEV_DATABASE_URL / DEV_DIRECT_URL" ;;
+          esac
+          if [ -z "$NEEDED_DB" ] || [ -z "$NEEDED_DIRECT" ]; then
+            echo "::error::Missing repository secrets for '${{ github.event.inputs.environment }}': $NAMES"
+            echo "::error::Set them with: gh secret set DATABASE_URL   (value from the Supabase dashboard)"
+            exit 1
+          fi
+          echo "Secrets present for ${{ github.event.inputs.environment }}."
+
       - name: Run Prisma migrations (Production)
         if: github.event.inputs.environment == 'production'
         run: npx prisma migrate deploy

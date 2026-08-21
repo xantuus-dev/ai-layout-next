@@ -50,7 +50,8 @@ function clean(value: string | null | undefined, limit: number): string | null {
  */
 export function buildSystemPrompt(
   personalization: Personalization | null | undefined,
-  memoryContext?: string | null
+  memoryContext?: string | null,
+  styleContext?: string | null
 ): string {
   const sections: string[] = [BASE_PROMPT];
 
@@ -70,6 +71,14 @@ export function buildSystemPrompt(
 
   if (memoryContext) {
     sections.push(memoryContext);
+  }
+
+  // Learned voice sits before custom instructions deliberately: the profile is
+  // inferred from how the user writes, whereas custom instructions are what
+  // they explicitly asked for. When the two disagree, the explicit request is
+  // the one that should win, so it comes last.
+  if (styleContext) {
+    sections.push(styleContext);
   }
 
   if (instructions) {
