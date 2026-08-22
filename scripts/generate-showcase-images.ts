@@ -54,6 +54,11 @@ const ITEMS: Item[] = [
     kind: 'video',
     caption: 'Product launch teaser — smoothie pour in slow motion, studio lighting',
     aspectRatio: '9:16',
+    // Splash/drip language was deliberately removed from both prompts: asking for
+    // "droplets arcing and splashing" and "condensation beading down the glass"
+    // made Veo run smoothie down the OUTSIDE of the glass and pool it on the
+    // surface, which reads as a spill rather than a product shot.
+    //
     // Both prompts below pin the same three things, because Veo will otherwise
     // default to a stemless wine glass full of a thin translucent red liquid —
     // which reads as a wine pour, not a smoothie:
@@ -64,20 +69,25 @@ const ITEMS: Item[] = [
       'Ultra high-speed vertical studio product photograph of a vivid opaque mixed-berry smoothie pouring into a ' +
       'TALL STRAIGHT-SIDED highball glass — a tall cylindrical tumbler with flat vertical sides, no stem and no ' +
       'curved bowl. The glass is already two-thirds full of thick opaque bright magenta-pink blended smoothie with ' +
-      'visible berry seeds and a matte non-transparent surface; a thick ribbon of the same smoothie pours in from ' +
-      'above and throws a splash crown of droplets at the rim, frozen in motion. Condensation beads on the glass, ' +
-      'reflective black surface, dramatic three-point studio lighting, saturated magenta-to-orange gradient ' +
-      'background, commercial beverage advertising, 8k. Not a wine glass, not a stemless glass, not a transparent ' +
-      'liquid, not wine or juice.',
+      'visible berry seeds and a matte non-transparent surface; a smooth thick ribbon of the same smoothie pours ' +
+      'straight down into the centre from above and sinks cleanly into the surface. The pour is fully contained: ' +
+      'the outside of the glass is spotless and dry, and the reflective black surface around the base is clean and ' +
+      'dry. Dramatic three-point studio lighting, saturated magenta-to-orange gradient background, commercial ' +
+      'beverage advertising, 8k. Not a wine glass, not a stemless glass, not a transparent liquid, not wine or ' +
+      'juice. No splashing, no spills, no drips running down the outside of the glass, no puddles or scattered ' +
+      'droplets on the surface.',
     videoPrompt:
       'Vertical slow-motion commercial beverage shot. A TALL STRAIGHT-SIDED highball glass — a tall cylindrical ' +
-      'tumbler with flat vertical sides, no stem, no curved bowl — stands on a reflective black surface, already ' +
-      'two-thirds full of thick opaque bright magenta-pink mixed-berry smoothie. A heavy ribbon of the same thick ' +
-      'opaque smoothie keeps pouring in from above, the level rising toward the rim, droplets arcing and splashing ' +
-      'off the surface, condensation beading down the glass. The smoothie is completely non-transparent with a ' +
-      'matte blended texture and visible berry seeds. Dramatic three-point studio lighting, saturated magenta-to-' +
-      'orange gradient backdrop, slow push-in, shallow depth of field, glossy premium advertising look. ' +
-      'Not a wine glass, not a stemless glass, not a thin translucent liquid, not wine, no text, no logos.',
+      'tumbler with flat vertical sides, no stem, no curved bowl — stands on a clean dry reflective black surface, ' +
+      'already two-thirds full of thick opaque bright magenta-pink mixed-berry smoothie. A heavy ribbon of the same ' +
+      'thick opaque smoothie pours straight down into the centre of the glass, the level rising smoothly and ' +
+      'settling just below the rim. The pour is clean and completely contained — the liquid stays inside the glass, ' +
+      'the outside of the glass stays spotless and dry, and the surface around the base stays clean. The smoothie ' +
+      'is completely non-transparent with a matte blended texture and visible berry seeds. Dramatic three-point ' +
+      'studio lighting, saturated magenta-to-orange gradient backdrop, slow push-in, shallow depth of field, ' +
+      'glossy premium advertising look. Not a wine glass, not a stemless glass, not a thin translucent liquid, ' +
+      'not wine. Nothing splashes over the rim, nothing runs down the outside of the glass, no spills, no puddles ' +
+      'or scattered droplets on the surface, no text, no logos.',
   },
   {
     id: 'mountains',
