@@ -6,7 +6,6 @@ import { QuickActionButtons } from './QuickActionButtons';
 import { TemplateSelector } from './TemplateSelector';
 import { TemplateVariableForm } from './TemplateVariableForm';
 import { TemplateUpgradeBanner } from './TemplateUpgradeBanner';
-import { MainPageTemplates } from '../MainPageTemplates';
 import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { Loader2 } from 'lucide-react';
@@ -237,23 +236,6 @@ export default function PromptCard() {
     setSelectedTemplate(null);
   };
 
-  const handleMainTemplateSelect = (templateText: string) => {
-    // Check if user is authenticated before allowing template access
-    if (!isAuthenticated) {
-      setPendingAction(() => () => setDraftMessage(templateText));
-      setShowAuthModal(true);
-      return;
-    }
-    // Populate the chat input with the template text
-    setDraftMessage(templateText);
-
-    // Scroll the chatbox to center of screen and focus the input
-    setTimeout(() => {
-      if (chatInputRef.current?.focusAndHighlight) {
-        chatInputRef.current.focusAndHighlight();
-      }
-    }, 100);
-  };
 
   return (
     <div className="w-full">
@@ -265,9 +247,14 @@ export default function PromptCard() {
       />
 
       <div className="w-full space-y-6">
-        <div className="w-full rounded-2xl border border-gray-200 bg-white/80 shadow-lg dark:border-gray-700 dark:bg-gray-800/80 overflow-hidden">
+        {/* Single flat surface, as in Claude / ChatGPT / Gemini. This was three
+            stacked colours — a translucent card shell, an opaque header panel
+            inside it, and tinted sections below — each with its own border. The
+            composite chrome is gone; content now sits directly on the page
+            background and the input is the only raised element. */}
+        <div className="w-full">
         {/* Header Section */}
-        <div className="p-6 bg-white dark:bg-gray-800">
+        <div className="px-1 py-2">
           <h2 className="mb-4 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
             What do you want to build?
           </h2>
@@ -292,7 +279,10 @@ export default function PromptCard() {
               <button
                 key={chip.id}
                 onClick={() => handleChipClick(chip.fill)}
-                className="rounded-full border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700 transition-colors hover:border-blue-200 hover:bg-blue-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-200 dark:hover:border-blue-500 dark:hover:bg-blue-500"
+                /* Design tokens rather than hardcoded greys and blues: the hover
+                   was blue — and a solid blue fill in dark mode — on a
+                   teal-branded product. Now a light teal tint in both themes. */
+                className="rounded-full border border-border bg-muted/60 px-3 py-2 text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
               >
                 {chip.text}
               </button>
@@ -303,18 +293,16 @@ export default function PromptCard() {
           <QuickActionButtons onCategorySelect={handleCategorySelect} />
         </div>
 
-        {/* Template Cards - Show only when no messages */}
-        {messages.length === 0 && (
-          <div className="px-6 py-6 bg-gray-50/50 dark:bg-gray-900/20 border-t border-gray-200 dark:border-gray-700">
-            <MainPageTemplates onTemplateSelect={handleMainTemplateSelect} />
-          </div>
-        )}
+        {/* The template grid that used to sit here has been removed from the
+            landing surface: the same templates are reachable from the Templates
+            nav item, and from the category buttons above (which open the
+            template selector), so nothing became unreachable. */}
 
         {/* Messages Display - Scrollable */}
         {messages.length > 0 && (
           <div
             ref={messagesContainerRef}
-            className="max-h-[500px] overflow-y-auto px-6 py-4 space-y-4 bg-gray-50/50 dark:bg-gray-900/20 border-t border-gray-200 dark:border-gray-700"
+            className="max-h-[500px] overflow-y-auto px-1 py-4 space-y-4"
             style={{ scrollBehavior: 'smooth' }}
           >
             {messages.map((msg) => (

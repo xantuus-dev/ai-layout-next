@@ -110,17 +110,31 @@ export default function Home() {
 
       <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="px-4 md:px-8 py-4 flex justify-between items-center ml-16 lg:ml-0">
-          <div className="lg:hidden">
+          {/* Mobile brand. Uses the same horizontal wordmark the desktop
+              sidebar shows, not the stacked xantuus-logo lockup.
+
+              The stacked lockup is 3281x1875 (aspect 1.75), so h-12 rendered it
+              only 84px wide — and the "XANTUUS AI" text is a small fraction of
+              that box, which is why it read as tiny on a phone. The wordmark is
+              2255x685 (aspect 3.29): the text fills most of its height, so the
+              same vertical space buys far more legible type.
+
+              Sized by WIDTH for the same reason the sidebar is — a height
+              constraint on these assets under-renders the text. 116px wide is
+              ~35px tall, and leaves room for the theme toggle, credits and
+              avatar on a 390px iPhone viewport once the 64px menu gutter is
+              accounted for. */}
+          <div className="lg:hidden min-w-0">
             <a href="/" className="flex items-center">
               <img
-                src="/xantuus-logo-dark.png"
+                src="/xantuus-wordmark-dark.png"
                 alt="Xantuus AI"
-                className="h-12 w-auto object-contain dark:hidden"
+                className="w-[116px] sm:w-[140px] max-w-full h-auto object-contain object-left dark:hidden"
               />
               <img
-                src="/xantuus-logo-white.png"
+                src="/xantuus-wordmark-white.png"
                 alt="Xantuus AI"
-                className="h-12 w-auto object-contain hidden dark:block"
+                className="w-[116px] sm:w-[140px] max-w-full h-auto object-contain object-left hidden dark:block"
               />
             </a>
           </div>

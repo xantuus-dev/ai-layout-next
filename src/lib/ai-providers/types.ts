@@ -41,6 +41,18 @@ export interface ChatResponse {
   finishReason?: string;
 }
 
+/**
+ * How a model accepts extended thinking. The request shape is not portable
+ * across generations, so it is recorded per model rather than assumed:
+ *
+ * - 'adaptive' — Claude 4.6 and later. `{type: 'adaptive'}`; the model decides
+ *   depth. Sending `budget_tokens` to these returns a 400.
+ * - 'budget'   — Claude 4.5 and earlier. `{type: 'enabled', budget_tokens: N}`.
+ *   These do not accept `{type: 'adaptive'}`.
+ * - 'none'     — no extended thinking.
+ */
+export type ThinkingStyle = 'adaptive' | 'budget' | 'none';
+
 export interface AIModel {
   id: string;
   name: string;
@@ -52,6 +64,17 @@ export interface AIModel {
   contextWindow: number;
   capabilities: string[];
   badge?: string;
+  /** Defaults to 'none' when omitted. */
+  thinkingStyle?: ThinkingStyle;
+  /**
+   * Whether the model accepts temperature/top_p/top_k. Claude 4.7 and later
+   * reject them outright, so they must be withheld rather than passed blindly.
+   * Defaults to true when omitted (correct for older models and non-Claude
+   * providers).
+   */
+  supportsSampling?: boolean;
+  /** True when the model is superseded but kept so old conversations still resolve. */
+  legacy?: boolean;
 }
 
 /**

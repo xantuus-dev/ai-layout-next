@@ -17,6 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai-providers/catalog';
 
 interface Message {
   id: string;
@@ -261,7 +262,7 @@ export default function WorkspacePage() {
       message,
       files: files || [],
       pastedContent: options?.pastedContent ?? null,
-      model: options?.model || conversation.model || 'claude-sonnet-4-5-20250929',
+      model: options?.model || conversation.model || DEFAULT_ANTHROPIC_MODEL,
       isThinkingEnabled: options?.isThinkingEnabled ?? false,
     });
   };

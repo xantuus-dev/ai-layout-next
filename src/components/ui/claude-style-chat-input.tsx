@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Plus, ChevronDown, ArrowUp, X, FileText, Loader2, Check, Archive, Wand2 } from "lucide-react";
+import { ANTHROPIC_MODELS, DEFAULT_ANTHROPIC_MODEL } from "@/lib/ai-providers/catalog";
 
 /* --- ICONS --- */
 export const Icons = {
@@ -287,7 +288,7 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
     const [files, setFiles] = useState<AttachedFile[]>([]);
     const [pastedContent, setPastedContent] = useState<AttachedFile[]>([]);
     const [isDragging, setIsDragging] = useState(false);
-    const [selectedModel, setSelectedModel] = useState("claude-sonnet-4-5-20250929");
+    const [selectedModel, setSelectedModel] = useState(DEFAULT_ANTHROPIC_MODEL);
     const [isThinkingEnabled, setIsThinkingEnabled] = useState(false);
     const [showFileMenu, setShowFileMenu] = useState(false);
 
@@ -302,12 +303,18 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
     const fileInputRef = useRef<HTMLInputElement>(null);
     const fileMenuRef = useRef<HTMLDivElement>(null);
 
-    // Multi-provider model list
+    // Multi-provider model list.
+    // Anthropic entries are derived from the shared catalog rather than
+    // duplicated here — the previous hardcoded copy had drifted and was still
+    // offering a Claude Haiku id that the API answers with 404.
     const models = [
-        // Anthropic (Claude)
-        { id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5", provider: "Anthropic", description: "Most capable for complex work", badge: "Premium" },
-        { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: "Anthropic", description: "Best for everyday tasks", badge: "" },
-        { id: "claude-haiku-4-5-20250529", name: "Claude Haiku 4.5", provider: "Anthropic", description: "Fastest for quick answers", badge: "Fastest" },
+        ...ANTHROPIC_MODELS.filter(m => !m.legacy).map(m => ({
+            id: m.id,
+            name: m.name,
+            provider: "Anthropic",
+            description: m.description,
+            badge: m.badge ?? "",
+        })),
 
         // OpenAI (GPT)
         { id: "gpt-4-turbo", name: "GPT-4 Turbo", provider: "OpenAI", description: "Best for code and reasoning", badge: "Code Expert" },
@@ -461,12 +468,23 @@ export const ClaudeChatInput = forwardRef<{ setMessage: (msg: string) => void; f
             onDrop={onDrop}
         >
             {/* Main Container - matching the inspected element structure */}
+            {/* Frosted-glass surface. The panel was a flat opaque fill with a
+                black drop shadow; it now sits translucent over the page with a
+                blur behind it, and focus is signalled with the brand teal
+                (--primary / --ring) instead of a heavier grey shadow.
+                supports-[backdrop-filter] drops the extra translucency where
+                backdrop-blur isn't available, so the text never loses contrast. */}
             <div className={`
-                !box-content flex flex-col mx-2 md:mx-0 items-stretch transition-all duration-200 relative z-10 rounded-2xl cursor-text border border-border dark:border-transparent
-                shadow-[0_0_15px_rgba(0,0,0,0.08)] hover:shadow-[0_0_20px_rgba(0,0,0,0.12)]
-                focus-within:shadow-[0_0_25px_rgba(0,0,0,0.15)]
-                bg-white dark:bg-[#30302E] font-sans antialiased
-                ${isHighlighted ? 'ring-2 ring-blue-500 ring-offset-2 animate-pulse-once' : ''}
+                !box-content flex flex-col mx-2 md:mx-0 items-stretch transition-all duration-200 relative z-10 rounded-2xl cursor-text
+                border border-border/80 dark:border-white/10
+                bg-white dark:bg-[#30302E]
+                supports-[backdrop-filter]:bg-white/75 dark:supports-[backdrop-filter]:bg-[#30302E]/70 backdrop-blur-xl
+                shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-10px_rgba(0,0,0,0.20)]
+                hover:border-border dark:hover:border-white/20
+                focus-within:border-primary/50
+                focus-within:shadow-[0_0_0_1px_hsl(var(--primary)/0.25),0_10px_30px_-10px_hsl(var(--primary)/0.35)]
+                font-sans antialiased
+                ${isHighlighted ? 'ring-2 ring-primary ring-offset-2 ring-offset-background animate-pulse-once' : ''}
             `}>
 
                 <div className="flex flex-col px-3 pt-3 pb-2 gap-2">

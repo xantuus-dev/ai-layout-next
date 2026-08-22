@@ -9,19 +9,71 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { postSlackMessage } from '@/lib/slack-oauth';
 import { captureAPIError } from '@/lib/sentry';
 
 export const dynamic = 'force-dynamic';
 
-// Slack sends a signing secret to verify requests
-// We'll implement this for security
+// Reject requests older than this to blunt replay attacks (Slack's own recommendation)
+const SLACK_TIMESTAMP_TOLERANCE_SECONDS = 60 * 5;
+
+/**
+ * Verify a request actually came from Slack.
+ * https://api.slack.com/authentication/verifying-requests-from-slack
+ *
+ * Slack signs the raw request body, so `body` must be the unparsed text.
+ */
 function verifySlackRequest(req: NextRequest, body: string): boolean {
-  // TODO: Implement Slack signature verification
-  // https://api.slack.com/authentication/verifying-requests-from-slack
-  // For now, we'll accept all requests (NOT PRODUCTION READY)
-  return true;
+  const signingSecret = process.env.SLACK_SIGNING_SECRET;
+
+  // In production, the signing secret is REQUIRED
+  if (!signingSecret) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('SLACK_SIGNING_SECRET not configured in production!');
+      return false; // REJECT in production
+    }
+    console.warn('SLACK_SIGNING_SECRET not configured - allowing in development only');
+    return true; // Allow in development only
+  }
+
+  const signature = req.headers.get('x-slack-signature');
+  const timestamp = req.headers.get('x-slack-request-timestamp');
+
+  if (!signature || !timestamp) {
+    console.warn('Slack request missing signature or timestamp header');
+    return false;
+  }
+
+  // Reject stale requests so a captured payload can't be replayed later
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isFinite(timestampSeconds)) {
+    console.warn('Slack request has a non-numeric timestamp header');
+    return false;
+  }
+
+  const ageSeconds = Math.abs(Math.floor(Date.now() / 1000) - timestampSeconds);
+  if (ageSeconds > SLACK_TIMESTAMP_TOLERANCE_SECONDS) {
+    console.warn(`Slack request timestamp outside tolerance (${ageSeconds}s old)`);
+    return false;
+  }
+
+  const expected =
+    'v0=' +
+    crypto
+      .createHmac('sha256', signingSecret)
+      .update(`v0:${timestamp}:${body}`)
+      .digest('hex');
+
+  // timingSafeEqual throws on length mismatch, so check that first
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  const signatureBuffer = Buffer.from(signature, 'utf8');
+  if (expectedBuffer.length !== signatureBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
 }
 
 interface SlackEvent {
@@ -45,6 +97,13 @@ interface SlackEvent {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.text();
+
+    // Verify authenticity before parsing or acting on anything, including the
+    // url_verification handshake — Slack signs that request too
+    if (!verifySlackRequest(req, body)) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+
     const payload: SlackEvent = JSON.parse(body);
 
     // Handle URL verification challenge (Slack's initial setup)
@@ -53,11 +112,6 @@ export async function POST(req: NextRequest) {
         challenge: payload.challenge,
       });
     }
-
-    // Verify request authenticity (TODO: implement)
-    // if (!verifySlackRequest(req, body)) {
-    //   return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-    // }
 
     // Handle event callbacks
     if (payload.type === 'event_callback' && payload.event) {
@@ -167,7 +221,7 @@ async function handleDirectMessage(
       return; // Empty message
     }
 
-    // TODO: Create conversation or add to existing conversation
+    // TODO: Create conversation or add to exi```````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````sting conversation
     // TODO: Send message to AI agent
     // TODO: Get AI response
 

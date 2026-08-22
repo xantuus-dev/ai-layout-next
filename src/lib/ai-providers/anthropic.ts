@@ -4,49 +4,16 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { AIProvider, ChatParams, ChatResponse, AIModel, StreamEvent } from './types';
+import { ANTHROPIC_MODELS } from './catalog';
 
 export class AnthropicProvider implements AIProvider {
   id = 'anthropic';
   name = 'Anthropic';
   private client: Anthropic | null = null;
 
-  models: AIModel[] = [
-    {
-      id: 'claude-opus-4-5-20251101',
-      name: 'Claude Opus 4.5',
-      provider: 'anthropic',
-      description: 'Most capable for complex work',
-      creditsPerThousandTokens: 15,
-      inputCostPer1M: 15,
-      outputCostPer1M: 75,
-      contextWindow: 200000,
-      capabilities: ['vision', 'function-calling', 'thinking', 'long-context'],
-      badge: 'Premium',
-    },
-    {
-      id: 'claude-sonnet-4-5-20250929',
-      name: 'Claude Sonnet 4.5',
-      provider: 'anthropic',
-      description: 'Best for everyday tasks',
-      creditsPerThousandTokens: 3,
-      inputCostPer1M: 3,
-      outputCostPer1M: 15,
-      contextWindow: 200000,
-      capabilities: ['vision', 'function-calling', 'thinking', 'long-context'],
-    },
-    {
-      id: 'claude-haiku-4-5-20250529',
-      name: 'Claude Haiku 4.5',
-      provider: 'anthropic',
-      description: 'Fastest for quick answers',
-      creditsPerThousandTokens: 1,
-      inputCostPer1M: 0.25,
-      outputCostPer1M: 1.25,
-      contextWindow: 200000,
-      capabilities: ['vision', 'function-calling'],
-      badge: 'Fastest',
-    },
-  ];
+  // Catalog lives in ./catalog so the client picker and the credits map can
+  // read the same list without pulling in the Anthropic SDK.
+  models: AIModel[] = ANTHROPIC_MODELS;
 
   constructor() {
     if (this.isConfigured()) {
@@ -76,12 +43,36 @@ export class AnthropicProvider implements AIProvider {
       messages: anthropicMessages,
     };
 
-    if (params.temperature !== undefined) {
+    // The request shape is not portable across model generations: Claude 4.7+
+    // rejects sampling parameters, and the two thinking forms are mutually
+    // exclusive. Sending the wrong one is a 400, not a soft degrade — so the
+    // shape is chosen from the model's own metadata rather than assumed.
+    // An unknown id (e.g. one only present in a stored conversation) falls back
+    // to the permissive older shape, which is what such ids will be.
+    const model = this.models.find(m => m.id === params.model);
+
+    // Two independent reasons to withhold temperature:
+    //  - Claude 4.7+ reject it outright.
+    //  - On every model, enabling thinking restricts it to exactly 1
+    //    ("`temperature` may only be set to 1 when thinking is enabled"),
+    //    so passing a caller's value alongside thinking is a 400.
+    const samplingAllowed = (model?.supportsSampling ?? true) && !params.thinking;
+    if (params.temperature !== undefined && samplingAllowed) {
       apiParams.temperature = params.temperature;
     }
 
     if (params.thinking) {
-      apiParams.thinking = params.thinking;
+      const style = model?.thinkingStyle ?? 'budget';
+
+      if (style === 'adaptive') {
+        // display defaults to "omitted" on these models, which streams thinking
+        // blocks with empty text — the reasoning UI would render a blank block.
+        // Ask for summaries explicitly.
+        apiParams.thinking = { type: 'adaptive', display: 'summarized' };
+      } else if (style === 'budget') {
+        apiParams.thinking = params.thinking;
+      }
+      // style 'none': the model has no extended thinking; omit the field.
     }
 
     return apiParams;

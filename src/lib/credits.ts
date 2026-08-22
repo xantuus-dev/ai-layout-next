@@ -2,16 +2,19 @@ import { prisma } from './prisma';
 import { addMonths, isAfter } from 'date-fns';
 import { PLAN_CREDITS, getCreditsForPlan } from './plans';
 import { aiRouter } from './ai-providers';
+import { ANTHROPIC_MODELS } from './ai-providers/catalog';
 import { sendUsageAlertEmail } from './email';
 
 // Model credit costs (per 1000 tokens) - Multi-Provider Support
 // Note: This is now dynamically managed by the AI Router
 // These are fallback values if the router is unavailable
 export const MODEL_CREDITS_PER_1K: Record<string, number> = {
-  // Anthropic (Claude)
-  'claude-haiku-4-5-20250529': 1,
-  'claude-sonnet-4-5-20250929': 3,
-  'claude-opus-4-5-20251101': 15,
+  // Anthropic entries are derived from the shared catalog so this fallback map
+  // cannot drift from the prices the router actually bills with. It previously
+  // listed a Claude Haiku id that returns 404.
+  ...Object.fromEntries(
+    ANTHROPIC_MODELS.map(m => [m.id, m.creditsPerThousandTokens])
+  ),
 
   // OpenAI (GPT)
   'gpt-3.5-turbo': 0.5,
