@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   assertSupported,
   getVideoProviderById,
@@ -11,6 +11,20 @@ import {
 } from '@/lib/video-providers';
 
 describe('video provider registry', () => {
+  // Resolution is gated on isConfigured(), which reads process.env at call
+  // time. Credential state is therefore set explicitly per test rather than
+  // inherited from the ambient environment: these assertions previously passed
+  // locally, where .env.local supplies real keys, and failed in CI, where it
+  // does not — which blocked the deploy job rather than catching a real bug.
+  beforeEach(() => {
+    vi.stubEnv('GOOGLE_AI_API_KEY', 'test-google-key');
+    vi.stubEnv('FAL_KEY', 'test-fal-key');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('resolves the owning provider from a model id', () => {
     expect(getVideoProviderForModel('veo-3.1-fast-generate-preview')?.id).toBe('veo');
   });
@@ -20,7 +34,8 @@ describe('video provider registry', () => {
   });
 
   it('falls back to the default provider when no model is named', () => {
-    // GOOGLE_AI_API_KEY is present in the test env, so Veo is the default.
+    // Veo is registered first, so with every provider configured it is the
+    // default. Registration order is preference order.
     expect(getVideoProviderForModel()?.id).toBe('veo');
   });
 
@@ -39,15 +54,35 @@ describe('video provider registry', () => {
   });
 
   it('routes a Seedance model to the Seedance provider', () => {
-    // Registered regardless of credentials; resolution is gated on FAL_KEY.
+    expect(getVideoProviderById('seedance')?.models).toEqual(SEEDANCE_MODELS);
+    expect(getVideoProviderForModel('seedance-2.5')).toBe(seedanceVideoService);
+  });
+
+  it('lists a provider even when it has no credentials', () => {
+    // Registration is unconditional; only resolution is gated. The picker needs
+    // the full catalogue to explain why a model is unavailable.
+    vi.stubEnv('FAL_KEY', '');
+    expect(listVideoProviders().map((p) => p.id)).toContain('seedance');
     expect(getVideoProviderById('seedance')?.models).toEqual(SEEDANCE_MODELS);
   });
 
   it('will not resolve a provider whose credentials are missing', () => {
     // Guards the failure mode where an unconfigured provider is handed a
     // request and only fails once generation is already under way.
-    const resolved = getVideoProviderForModel('seedance-2.5');
-    expect(resolved).toBe(seedanceVideoService.isConfigured() ? seedanceVideoService : undefined);
+    vi.stubEnv('FAL_KEY', '');
+    expect(getVideoProviderForModel('seedance-2.5')).toBeUndefined();
+  });
+
+  it('falls through to the next configured provider when the preferred one is unconfigured', () => {
+    vi.stubEnv('GOOGLE_AI_API_KEY', '');
+    expect(getVideoProviderForModel()?.id).toBe('seedance');
+  });
+
+  it('resolves nothing at all when no provider has credentials', () => {
+    vi.stubEnv('GOOGLE_AI_API_KEY', '');
+    vi.stubEnv('FAL_KEY', '');
+    expect(getVideoProviderForModel()).toBeUndefined();
+    expect(getVideoProviderForModel('veo-3.1-fast-generate-preview')).toBeUndefined();
   });
 });
 
