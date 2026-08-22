@@ -43,22 +43,42 @@ jobs:
       # dashboard (Settings -> Database -> Connection string, session mode).
       - name: Verify migration secrets are present
         env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
           PROD_DB: ${{ secrets.DATABASE_URL }}
           PROD_DIRECT: ${{ secrets.DIRECT_URL }}
           STAGING_DB: ${{ secrets.STAGING_DATABASE_URL }}
+          STAGING_DIRECT: ${{ secrets.STAGING_DIRECT_URL }}
           DEV_DB: ${{ secrets.DEV_DATABASE_URL }}
+          DEV_DIRECT: ${{ secrets.DEV_DIRECT_URL }}
         run: |
-          case "${{ github.event.inputs.environment }}" in
-            production) NEEDED_DB="$PROD_DB"; NEEDED_DIRECT="$PROD_DIRECT"; NAMES="DATABASE_URL / DIRECT_URL" ;;
-            staging)    NEEDED_DB="$STAGING_DB"; NEEDED_DIRECT="$STAGING_DB"; NAMES="STAGING_DATABASE_URL / STAGING_DIRECT_URL" ;;
-            *)          NEEDED_DB="$DEV_DB"; NEEDED_DIRECT="$DEV_DB"; NAMES="DEV_DATABASE_URL / DEV_DIRECT_URL" ;;
+          # Each environment is checked against the two secrets the matching
+          # migration step below actually consumes. Previously staging and dev
+          # assigned NEEDED_DIRECT from the *database* secret, so their
+          # DIRECT_URL was never validated at all — the guard passed and Prisma
+          # then failed on the empty variable, which is the exact failure this
+          # step exists to prevent.
+          case "$ENVIRONMENT" in
+            production) DB="$PROD_DB";    DIRECT="$PROD_DIRECT";    DB_NAME=DATABASE_URL;         DIRECT_NAME=DIRECT_URL ;;
+            staging)    DB="$STAGING_DB"; DIRECT="$STAGING_DIRECT"; DB_NAME=STAGING_DATABASE_URL; DIRECT_NAME=STAGING_DIRECT_URL ;;
+            *)          DB="$DEV_DB";     DIRECT="$DEV_DIRECT";     DB_NAME=DEV_DATABASE_URL;     DIRECT_NAME=DEV_DIRECT_URL ;;
           esac
-          if [ -z "$NEEDED_DB" ] || [ -z "$NEEDED_DIRECT" ]; then
-            echo "::error::Missing repository secrets for '${{ github.event.inputs.environment }}': $NAMES"
-            echo "::error::Set them with: gh secret set DATABASE_URL   (value from the Supabase dashboard)"
+
+          # Report the variable that is actually empty. Naming both on any
+          # failure sends you to re-set a secret that was already fine.
+          missing=""
+          [ -n "$DB" ]     || missing="$missing $DB_NAME"
+          [ -n "$DIRECT" ] || missing="$missing $DIRECT_NAME"
+
+          if [ -n "$missing" ]; then
+            for name in $missing; do
+              echo "::error::Secret '$name' is empty or not set for environment '$ENVIRONMENT'"
+            done
+            echo "::error::Note: a secret can appear in 'gh secret list' while holding an empty value — being listed is not proof it has content."
+            echo "::error::Set each with: gh secret set <NAME>   (Supabase dashboard -> Database -> Connection string -> Session pooler, port 5432)"
             exit 1
           fi
-          echo "Secrets present for ${{ github.event.inputs.environment }}."
+
+          echo "Secrets present for '$ENVIRONMENT': $DB_NAME, $DIRECT_NAME"
 
       - name: Run Prisma migrations (Production)
         if: github.event.inputs.environment == 'production'
