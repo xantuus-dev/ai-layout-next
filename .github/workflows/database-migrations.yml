@@ -82,7 +82,19 @@ jobs:
           DIRECT_URL: ${{ secrets.DEV_DIRECT_URL }}
 
       - name: Generate Prisma Client
+        # `prisma generate` never connects to a database, but prisma.config.ts
+        # calls env("DATABASE_URL") eagerly, so it exits with
+        # PrismaConfigEnvError when the variable is absent. This step was the
+        # only one without an env block, which failed every run *after* the
+        # migration had already applied cleanly — and took the Migration Status
+        # check down with it, so a successful migration reported as a failure.
+        #
+        # Which database it points at does not matter here (nothing is
+        # connected to); it just has to be present. The seed step below is why
+        # the client is generated at all, so this cannot simply be dropped.
         run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL || secrets.STAGING_DATABASE_URL || secrets.DEV_DATABASE_URL }}
 
       - name: Seed database (if requested)
         if: github.event.inputs.environment != 'production'
