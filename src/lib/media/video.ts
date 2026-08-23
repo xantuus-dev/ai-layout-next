@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import { getVideoProviderForModel } from '@/lib/video-providers';
-import type { VeoAspectRatio, VeoResolution, VeoDurationSeconds } from '@/lib/video-providers';
 import { getVideoGenerationCost, checkAndResetCredits } from '@/lib/credits';
 import { assertCanSpend, spendCredits, InsufficientCreditsError } from '@/lib/billing/gate';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
@@ -9,9 +8,13 @@ import type { MediaGenerationFailure } from './types';
 export interface GenerateVideoInput {
   userId: string;
   prompt: string;
-  aspectRatio?: VeoAspectRatio;
-  resolution?: VeoResolution;
-  durationSeconds?: VeoDurationSeconds;
+  /* Provider vocabulary, not a shared enum — Seedance accepts 1:1 and 21:9,
+     which Veo's types exclude. Each provider validates its own request via
+     assertSupported(), so narrowing here would only reject valid input before
+     the provider ever sees it. See src/lib/video-providers/types.ts. */
+  aspectRatio?: string;
+  resolution?: string;
+  durationSeconds?: number | string;
   /** Defaults to the first configured provider's default model. */
   model?: string;
 }
@@ -58,7 +61,7 @@ export async function generateVideoForUser(
 
   await checkAndResetCredits(userId);
 
-  const creditsNeeded = getVideoGenerationCost(Number(durationSeconds), resolution);
+  const creditsNeeded = getVideoGenerationCost(Number(durationSeconds), resolution, provider.id);
   const decision = await assertCanSpend(userId, creditsNeeded);
   if (!decision.allowed) {
     return {

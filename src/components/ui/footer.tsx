@@ -62,6 +62,8 @@ interface FooterProps extends React.HTMLAttributes<HTMLElement> {
   companyLinks?: FooterLink[];
   socialLinks?: { label: string; href: string; icon: ReactNode }[];
   location?: string;
+  /** Optional. Deliberately has no default — ai.xantuus.com does not publish a
+   *  phone number. Pass one to render the contact line. */
   phone?: string;
   email?: string;
   legalLinks?: FooterLink[];
@@ -104,7 +106,7 @@ export const Footer: FC<FooterProps> = ({
     { label: 'Instagram', href: 'https://instagram.com/xantuus', icon: <Instagram className="h-5 w-5" /> },
   ],
   location = 'Charlotte, North Carolina',
-  phone = '+1-704-905-4343',
+  phone,
   email = 'hello@xantuus.com',
   legalLinks = [
     { label: 'Privacy Policy', href: '/privacy' },
@@ -185,13 +187,15 @@ export const Footer: FC<FooterProps> = ({
                 <MapPin className="h-4 w-4 shrink-0" />
                 <span>{location}</span>
               </div>
-              <a
-                href={`tel:${phone.replace(/[^+\d]/g, '')}`}
-                className="flex items-center gap-2 text-gray-400 transition-colors hover:text-white"
-              >
-                <Phone className="h-4 w-4 shrink-0" />
-                <span>{phone}</span>
-              </a>
+              {phone && (
+                <a
+                  href={`tel:${phone.replace(/[^+\d]/g, '')}`}
+                  className="flex items-center gap-2 text-gray-400 transition-colors hover:text-white"
+                >
+                  <Phone className="h-4 w-4 shrink-0" />
+                  <span>{phone}</span>
+                </a>
+              )}
               <a
                 href={`mailto:${email}`}
                 className="flex items-center gap-2 text-gray-400 transition-colors hover:text-white"

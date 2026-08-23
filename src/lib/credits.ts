@@ -47,26 +47,81 @@ export function getImageGenerationCost(width: number, height: number): number {
   }
 }
 
-// Video Generation Credit Costs (Google Veo, billed per second of output)
+// Video Generation Credit Costs — per provider, per resolution.
 //
-// These per-second rates are placeholders on the same "1 credit ~= $0.001 of
-// provider cost" scale used everywhere else in this file (see the comment in
-// lib/transcription.ts) — they have NOT been reconciled against live Veo
-// billing. Veo pricing varies by model tier and is still evolving; confirm
-// the real rate at https://ai.google.dev/gemini-api/docs/pricing (or your
-// Vertex AI billing console) before charging paying customers.
-export const VIDEO_GENERATION_CREDITS_PER_SECOND: Record<'720p' | '1080p' | '4k', number> = {
-  '720p': 400, // ~$0.40/sec placeholder
-  '1080p': 600, // ~$0.60/sec placeholder
-  '4k': 1000, // ~$1.00/sec placeholder
+// Rates are on the same "1 credit ~= $0.001 of provider cost" scale used
+// everywhere else in this file, so 473 credits/sec means ~$0.473/sec of real
+// spend. Credits retail at ~$0.005 each (see CREDIT_TIER_PRICES), giving a ~5x
+// gross markup at these rates.
+//
+// Keyed by provider because the same clip costs very different amounts
+// depending on who generates it — an 8s 720p clip is ~$3.78 on Seedance and a
+// guessed ~$3.20 on Veo. A resolution-only table silently billed both the same,
+// which made every margin figure in the app wrong once a second provider
+// existed.
+type VideoRateTable = Record<string, number>;
+
+/**
+ * ByteDance Seedance 2.5 via fal — REAL published rates, checked 2026-08-23.
+ * https://fal.ai/models/bytedance/seedance-2.5/text-to-video
+ *
+ * fal bills by token, and calls that formula authoritative:
+ *   tokens = (height * width * duration_seconds * 24) / 1024, at $0.0214/1000
+ * The per-second figures below are fal's own approximations for 16:9. Other
+ * aspect ratios have different pixel counts and therefore different real costs,
+ * so a 1:1 or 21:9 clip is priced approximately here — see the note below.
+ */
+const SEEDANCE_CREDITS_PER_SECOND: VideoRateTable = {
+  '480p': 221, // ~$0.2205/sec (fal, 16:9)
+  '720p': 473, // ~$0.4730/sec (fal, 16:9)
+  // fal does not publish a 1080p per-second figure. Derived from the token
+  // formula at 1920x1080 (48,600 tokens/sec) and deliberately rounded UP to the
+  // higher of the two token rates seen quoted ($0.0234/1000), so we over-charge
+  // rather than under-charge on an unverified number. Confirm before relying
+  // on it.
+  '1080p': 1137, // ~$1.137/sec DERIVED, unverified
 };
 
+/**
+ * Google Veo — still placeholders. These were never reconciled against live
+ * billing and are retained only so a Veo deployment does not bill at zero.
+ * Confirm at https://ai.google.dev/gemini-api/docs/pricing before selling Veo.
+ */
+const VEO_CREDITS_PER_SECOND: VideoRateTable = {
+  '720p': 400, // ~$0.40/sec PLACEHOLDER
+  '1080p': 600, // ~$0.60/sec PLACEHOLDER
+  '4k': 1000, // ~$1.00/sec PLACEHOLDER
+};
+
+const VIDEO_RATES_BY_PROVIDER: Record<string, VideoRateTable> = {
+  seedance: SEEDANCE_CREDITS_PER_SECOND,
+  veo: VEO_CREDITS_PER_SECOND,
+};
+
+/** Used when a caller does not say which provider — the safer, dearer table. */
+const FALLBACK_RATES = SEEDANCE_CREDITS_PER_SECOND;
+
+/**
+ * Retained for callers that predate provider-aware pricing. Prefer
+ * {@link getVideoGenerationCost} with an explicit providerId.
+ * @deprecated Resolution alone cannot price a clip once there are two providers.
+ */
+export const VIDEO_GENERATION_CREDITS_PER_SECOND = VEO_CREDITS_PER_SECOND;
+
+/**
+ * Cost of one generated clip, in credits.
+ *
+ * Unknown provider or resolution falls back to the most expensive comparable
+ * rate rather than the cheapest: mispricing downward loses money silently,
+ * whereas mispricing upward surfaces as a complaint.
+ */
 export function getVideoGenerationCost(
   durationSeconds: number,
-  resolution: '720p' | '1080p' | '4k' = '720p'
+  resolution: string = '720p',
+  providerId?: string
 ): number {
-  const perSecond =
-    VIDEO_GENERATION_CREDITS_PER_SECOND[resolution] ?? VIDEO_GENERATION_CREDITS_PER_SECOND['720p'];
+  const table = (providerId && VIDEO_RATES_BY_PROVIDER[providerId]) || FALLBACK_RATES;
+  const perSecond = table[resolution] ?? Math.max(...Object.values(table));
   return Math.max(1, Math.ceil(durationSeconds * perSecond));
 }
 

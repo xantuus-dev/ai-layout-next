@@ -10,16 +10,18 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateVideoForUser } from '@/lib/media/video';
 import { failureStatus } from '@/lib/media/types';
-import type { VeoAspectRatio, VeoResolution, VeoDurationSeconds } from '@/lib/video-generation';
+import { getVideoProviderForModel } from '@/lib/video-providers';
 
 // Node runtime: uses fs/promises for the Veo file download round-trip.
 export const runtime = 'nodejs';
 // Veo generation is polled synchronously and can take minutes.
 export const maxDuration = 300;
 
-const VALID_ASPECT_RATIOS: VeoAspectRatio[] = ['16:9', '9:16'];
-const VALID_RESOLUTIONS: VeoResolution[] = ['720p', '1080p', '4k'];
-const VALID_DURATIONS: VeoDurationSeconds[] = ['4', '6', '8'];
+/* Accepted values are per-provider, not global: Veo does 16:9 and 9:16 at
+   4/6/8s, Seedance does six aspect ratios at 4-30s. Validation therefore reads
+   the resolved provider's declared capabilities instead of one vendor's enum —
+   the hardcoded Veo lists that used to live here rejected valid Seedance
+   requests before the provider ever saw them. */
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,26 +40,43 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { prompt, aspectRatio = '16:9', resolution = '720p', durationSeconds = '8' } = body;
+    const { prompt, aspectRatio = '16:9', resolution = '720p', durationSeconds = '8', model } = body;
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
-    if (!VALID_ASPECT_RATIOS.includes(aspectRatio)) {
+
+    // Resolve the provider first so an unsupported option is a 400 naming what
+    // IS supported, rather than a 502 surfacing later as a provider error.
+    const provider = getVideoProviderForModel(model);
+    if (!provider) {
       return NextResponse.json(
-        { error: `aspectRatio must be one of: ${VALID_ASPECT_RATIOS.join(', ')}` },
+        {
+          error: model
+            ? `No configured video provider serves the model "${model}".`
+            : 'Video generation is not configured.',
+        },
+        { status: 503 }
+      );
+    }
+
+    const { aspectRatios, resolutions, durationsSeconds } = provider.capabilities;
+
+    if (!aspectRatios.includes(aspectRatio)) {
+      return NextResponse.json(
+        { error: `${provider.label} supports aspect ratios: ${aspectRatios.join(', ')}` },
         { status: 400 }
       );
     }
-    if (!VALID_RESOLUTIONS.includes(resolution)) {
+    if (!resolutions.includes(resolution)) {
       return NextResponse.json(
-        { error: `resolution must be one of: ${VALID_RESOLUTIONS.join(', ')}` },
+        { error: `${provider.label} supports resolutions: ${resolutions.join(', ')}` },
         { status: 400 }
       );
     }
-    if (!VALID_DURATIONS.includes(String(durationSeconds) as VeoDurationSeconds)) {
+    if (!durationsSeconds.includes(Number(durationSeconds))) {
       return NextResponse.json(
-        { error: `durationSeconds must be one of: ${VALID_DURATIONS.join(', ')}` },
+        { error: `${provider.label} supports clip lengths (seconds): ${durationsSeconds.join(', ')}` },
         { status: 400 }
       );
     }
@@ -67,7 +86,8 @@ export async function POST(request: NextRequest) {
       prompt,
       aspectRatio,
       resolution,
-      durationSeconds: String(durationSeconds) as VeoDurationSeconds,
+      durationSeconds: Number(durationSeconds),
+      model,
     });
 
     if (!result.ok) {
