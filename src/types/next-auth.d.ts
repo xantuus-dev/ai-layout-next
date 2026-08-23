@@ -14,6 +14,7 @@ declare module "next-auth" {
       stripeSubscriptionId?: string | null
       stripeCurrentPeriodEnd?: Date | null
       paymentFailed?: boolean
+      hasUsedTrial?: boolean
     }
   }
 }

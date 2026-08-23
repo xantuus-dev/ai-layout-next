@@ -73,7 +73,10 @@ export function CreditsCard() {
   const planName = currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1);
   const nextPlan = getNextPlan();
   const totalCredits = creditInfo?.creditsRemaining || 0;
-  const dailyRefresh = 500; // Daily refresh credits
+  // Comes from the plan via /api/usage/credits. Was hardcoded to 500 while
+  // nothing granted a daily refresh at all; 0 means this plan refreshes
+  // monthly, so the daily block below is hidden entirely.
+  const dailyRefresh = creditInfo?.dailyRefreshCredits ?? 0;
   const freeCredits = creditInfo?.freeCredits || 0;
 
   return (
@@ -157,24 +160,26 @@ export function CreditsCard() {
                 </span>
               </div>
 
-              {/* Daily Refresh Credits */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-gray-400" />
-                    <span className="text-white font-semibold">Daily refresh credits</span>
-                    <button className="text-gray-400 hover:text-gray-300">
-                      <HelpCircle className="w-4 h-4" />
-                    </button>
+              {/* Daily Refresh Credits — only for plans that actually refresh daily */}
+              {dailyRefresh > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-gray-400" />
+                      <span className="text-white font-semibold">Daily refresh credits</span>
+                      <button className="text-gray-400 hover:text-gray-300">
+                        <HelpCircle className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <span className="text-white text-xl font-bold">
+                      {dailyRefresh.toLocaleString()}
+                    </span>
                   </div>
-                  <span className="text-white text-xl font-bold">
-                    {dailyRefresh}
-                  </span>
+                  <p className="text-gray-400 text-sm pl-7">
+                    Refreshes to {dailyRefresh.toLocaleString()} at 00:00 UTC every day. Credits do not roll over.
+                  </p>
                 </div>
-                <p className="text-gray-400 text-sm pl-7">
-                  Refresh to {dailyRefresh} at 00:00 every day
-                </p>
-              </div>
+              )}
             </div>
 
             {/* View Usage Link */}

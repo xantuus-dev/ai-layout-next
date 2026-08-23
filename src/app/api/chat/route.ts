@@ -138,7 +138,14 @@ export async function POST(request: NextRequest) {
           message:
             decision.reason === 'viewer_cannot_spend'
               ? 'Viewers cannot spend the team credit pool. Ask an admin for access.'
-              : 'You have used all your monthly credits. Upgrade your plan or wait for them to reset.',
+              // An account with no plan has no reset coming — telling it to
+              // "wait for credits to reset" would be advice that never pays
+              // off. Trials refresh daily, paid plans monthly.
+              : status?.plan === 'free'
+                ? 'Your trial has ended. Subscribe to keep using Xantuus — your workspaces and history are still here.'
+                : status?.creditPeriod === 'daily'
+                  ? 'You have used today\'s trial credits. They refresh at 00:00 UTC, or subscribe now for your full monthly allowance.'
+                  : 'You have used all your monthly credits. Upgrade your plan or wait for them to reset.',
           creditsNeeded: estimatedCredits,
           creditsRemaining: Math.max(0, decision.remaining),
           creditsResetAt: status?.creditsResetAt ?? null,

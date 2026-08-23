@@ -88,6 +88,7 @@ export const authOptions: NextAuthOptions = {
             stripeSubscriptionId: true,
             stripeCurrentPeriodEnd: true,
             paymentFailed: true,
+            hasUsedTrial: true,
           },
         });
 
@@ -113,6 +114,10 @@ export const authOptions: NextAuthOptions = {
           session.user.stripeSubscriptionId = dbUser.stripeSubscriptionId;
           session.user.stripeCurrentPeriodEnd = dbUser.stripeCurrentPeriodEnd;
           session.user.paymentFailed = paymentFailed;
+          // Drives whether the pricing page offers the intro deal. Keyed off
+          // this rather than the plan label so accounts grandfathered onto a
+          // courtesy trial can still take the real offer.
+          session.user.hasUsedTrial = dbUser.hasUsedTrial;
         } else {
           console.warn('[AUTH] User not found in database:', user.id);
         }

@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import { addMonths, isAfter } from 'date-fns';
-import { PLAN_CREDITS, getCreditsForPlan } from './plans';
+import { PLAN_CREDITS, getCreditsForPlan, getCreditPeriod, PLAN_DEFINITIONS } from './plans';
 import { aiRouter } from './ai-providers';
 import { ANTHROPIC_MODELS } from './ai-providers/catalog';
 import { sendUsageAlertEmail } from './email';
@@ -243,8 +243,40 @@ async function canConsumeCredits(userId: string, billingUserId: string): Promise
   return member?.role !== 'viewer';
 }
 
+/** Midnight UTC following `from`. Deliberately UTC, not server-local: the
+ *  pricing page and CreditsCard both advertise "00:00 UTC", and a
+ *  timezone-dependent grant would make that copy wrong for most users. */
+function nextUtcMidnight(from: Date): Date {
+  const next = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next;
+}
+
+/** How stale a usage-alert flag must be before a daily reset re-arms it. */
+const DAILY_ALERT_REARM_MS = 7 * 24 * 60 * 60 * 1000;
+
 /**
- * Check if user's credits need to be reset and reset them if necessary
+ * Check whether the user's credit balance is due to refresh, and refresh it.
+ *
+ * Two cadences, selected by plan (see getCreditPeriod in plans.ts):
+ * - 'daily'   (free) — zeroed at 00:00 UTC. This is the grant behind the
+ *   "300 refresh credits every day" copy on the pricing page. Before this
+ *   existed the copy advertised a daily refresh that nothing implemented.
+ * - 'monthly' (paid) — zeroed one month after the previous reset, unchanged.
+ *
+ * Two things a reset must NOT do, both learned the hard way:
+ *
+ * 1. It must not wipe purchased credits. grantPurchasedCredits() banks a
+ *    one-time credit-pack purchase as NEGATIVE creditsUsed, so zeroing the
+ *    column outright would delete credits the customer paid for — every
+ *    midnight, for a free user. Hence the clamp to min(creditsUsed, 0):
+ *    spent allowance resets, banked headroom survives.
+ *
+ * 2. It must not re-arm the 80%/100% usage-alert emails every day. Clearing
+ *    those flags is what allows the emails to send again, so on a daily
+ *    cadence an account that maxes out every day would receive two upgrade
+ *    emails a day. Daily resets therefore only re-arm an alert older than
+ *    DAILY_ALERT_REARM_MS; monthly resets clear unconditionally as before.
  */
 export async function checkAndResetCredits(userId: string) {
   const billingUserId = await resolveBillingUserId(userId);
@@ -256,6 +288,9 @@ export async function checkAndResetCredits(userId: string) {
       creditsUsed: true,
       monthlyCredits: true,
       plan: true,
+      trialEndsAt: true,
+      creditAlert80SentAt: true,
+      creditAlert100SentAt: true,
     },
   });
 
@@ -263,33 +298,80 @@ export async function checkAndResetCredits(userId: string) {
 
   const now = new Date();
 
-  // Check if reset is needed
-  if (isAfter(now, user.creditsResetAt)) {
-    // Calculate next reset date (one month from now)
-    const nextResetDate = addMonths(now, 1);
-
-    // Reset credits and let usage alerts fire again next cycle
+  // An elapsed trial stops refreshing and drops to the no-plan state.
+  //
+  // Stripe normally drives this: a card-required trial converts to a paid
+  // subscription on day 15 and the webhook moves the account onto a monthly
+  // plan, so this branch never fires. It exists for the cases Stripe cannot
+  // cover — accounts grandfathered off the old free tier (no subscription at
+  // all), a cancelled trial, and any webhook that is delayed or lost. Without
+  // it a lapsed trial would keep granting credits every midnight forever.
+  if (user.plan === 'trial' && user.trialEndsAt && isAfter(now, user.trialEndsAt)) {
     await prisma.user.update({
       where: { id: billingUserId },
       data: {
-        creditsUsed: 0,
-        creditsResetAt: nextResetDate,
-        creditAlert80SentAt: null,
-        creditAlert100SentAt: null,
+        plan: 'free',
+        monthlyCredits: PLAN_DEFINITIONS.free.credits,
+        // Spent allowance is cleared, but banked credits from a purchased
+        // pack are the customer's property and outlive the trial.
+        creditsUsed: Math.min(user.creditsUsed, 0),
       },
     });
 
     return {
-      reset: true,
-      creditsUsed: 0,
-      creditsResetAt: nextResetDate,
+      reset: false,
+      trialExpired: true,
+      creditsUsed: Math.min(user.creditsUsed, 0),
+      creditsResetAt: user.creditsResetAt,
     };
   }
 
+  const period = getCreditPeriod(user.plan);
+
+  // A stored reset date further out than tomorrow's midnight means the row
+  // is still carrying a MONTHLY schedule — either it predates the daily
+  // free tier, or the account was just downgraded from a paid plan. Treat
+  // that as due now so the account self-heals onto the daily clock on its
+  // next request, instead of waiting out the old monthly date.
+  const carryingStaleMonthlySchedule =
+    period === 'daily' && isAfter(user.creditsResetAt, nextUtcMidnight(now));
+
+  const isDue = isAfter(now, user.creditsResetAt) || carryingStaleMonthlySchedule;
+
+  if (!isDue) {
+    return {
+      reset: false,
+      creditsUsed: user.creditsUsed,
+      creditsResetAt: user.creditsResetAt,
+    };
+  }
+
+  const nextResetDate = period === 'daily' ? nextUtcMidnight(now) : addMonths(now, 1);
+
+  // Preserve banked (negative) headroom from credit-pack purchases and
+  // referral awards; only clear allowance that was actually spent.
+  const nextCreditsUsed = Math.min(user.creditsUsed, 0);
+
+  const rearmAlert = (sentAt: Date | null) => {
+    if (!sentAt) return null;
+    if (period === 'monthly') return null;
+    return now.getTime() - sentAt.getTime() >= DAILY_ALERT_REARM_MS ? null : sentAt;
+  };
+
+  await prisma.user.update({
+    where: { id: billingUserId },
+    data: {
+      creditsUsed: nextCreditsUsed,
+      creditsResetAt: nextResetDate,
+      creditAlert80SentAt: rearmAlert(user.creditAlert80SentAt),
+      creditAlert100SentAt: rearmAlert(user.creditAlert100SentAt),
+    },
+  });
+
   return {
-    reset: false,
-    creditsUsed: user.creditsUsed,
-    creditsResetAt: user.creditsResetAt,
+    reset: true,
+    creditsUsed: nextCreditsUsed,
+    creditsResetAt: nextResetDate,
   };
 }
 
@@ -471,10 +553,14 @@ export async function getCreditStatus(userId: string) {
       monthlyCredits: true,
       creditsUsed: true,
       creditsResetAt: true,
+      trialEndsAt: true,
     },
   });
 
   if (!user) return null;
+
+  const creditPeriod = getCreditPeriod(user.plan);
+  const onTrial = user.plan === 'trial';
 
   return {
     plan: user.plan,
@@ -482,7 +568,20 @@ export async function getCreditStatus(userId: string) {
     creditsUsed: user.creditsUsed,
     creditsRemaining: user.monthlyCredits - user.creditsUsed,
     creditsResetAt: user.creditsResetAt,
-    percentageUsed: (user.creditsUsed / user.monthlyCredits) * 100,
+    percentageUsed: user.monthlyCredits > 0 ? (user.creditsUsed / user.monthlyCredits) * 100 : 0,
+    // 'daily' | 'monthly' — the allowance column is the same either way,
+    // only the refresh cadence differs. Callers should render this rather
+    // than assuming "per month".
+    creditPeriod,
+    // The advertised daily grant, or 0 for plans that refresh monthly.
+    // The UI previously hardcoded 500 here with nothing granting it.
+    dailyRefreshCredits: creditPeriod === 'daily' ? user.monthlyCredits : 0,
+    onTrial,
+    trialEndsAt: onTrial ? user.trialEndsAt : null,
+    trialDaysRemaining:
+      onTrial && user.trialEndsAt
+        ? Math.max(0, Math.ceil((user.trialEndsAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+        : null,
   };
 }
 

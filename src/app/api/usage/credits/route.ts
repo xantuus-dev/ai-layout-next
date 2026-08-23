@@ -97,7 +97,9 @@ export async function GET(request: NextRequest) {
     }));
 
     const creditsRemaining = creditStatus.creditsRemaining;
-    const dailyRefreshCredits = 500; // Daily refresh amount
+    // Real grant from the user's plan, not a hardcoded number: free plans
+    // refresh daily at 00:00 UTC, paid plans refresh monthly and report 0.
+    const dailyRefreshCredits = creditStatus.dailyRefreshCredits;
     const freeCredits = Math.max(0, creditsRemaining);
 
     return NextResponse.json({
@@ -114,6 +116,7 @@ export async function GET(request: NextRequest) {
       monthlyCredits: creditStatus.monthlyCredits,
       creditsRemaining: creditsRemaining,
       plan: creditStatus.plan,
+      creditPeriod: creditStatus.creditPeriod,
       dailyRefreshCredits: dailyRefreshCredits,
       freeCredits: freeCredits,
       nextResetTime: creditStatus.creditsResetAt.toISOString(),

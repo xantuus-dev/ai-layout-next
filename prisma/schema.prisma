@@ -66,13 +66,28 @@ model User {
 
   // Plan & Limits
   plan           String   @default("free") // free, pro, enterprise
-  monthlyCredits Int      @default(1000)
+  // Allowance for the current credit period. Trials refresh this DAILY at
+  // 00:00 UTC (300/day, see TRIAL_DAILY_CREDITS in lib/plans.ts); paid plans
+  // refresh monthly. The column name predates the daily trial — it is the
+  // allowance for whichever period the plan uses. Defaults to 0: a new
+  // account has no allowance until it starts a trial or subscribes.
+  monthlyCredits Int      @default(0)
   creditsUsed    Int      @default(0)
   creditsResetAt DateTime @default(now())
   billingCycle   String? // monthly, yearly
 
   // Usage alert tracking — prevents re-sending the same threshold email on
   // every request once a user is over it. Cleared on each monthly reset.
+  // 14-day Stripe trial (trial_period_days at checkout). trialEndsAt mirrors
+  // the subscription's trial_end so the app can gate without a Stripe round
+  // trip; hasUsedTrial stops a second trial being granted on a later
+  // checkout. See TRIAL_PERIOD_DAYS in lib/plans.ts.
+  trialEndsAt    DateTime?
+  hasUsedTrial   Boolean  @default(false)
+  // Stamped when the "your intro offer is ending" email goes out, so the
+  // daily job cannot re-send it. See lib/billing/trial-notices.ts.
+  trialEndingEmailSentAt DateTime?
+
   creditAlert80SentAt  DateTime?
   creditAlert100SentAt DateTime?
 

@@ -14,8 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
 import {
   CREDIT_TIER_PRICES,
+  ENTRY_TIER_CREDITS,
+  INTRO_TRIAL,
   getAvailableCreditOptions,
   getCreditsFromDisplayName,
   getPriceId,
@@ -144,12 +147,26 @@ export default function PricingPage() {
     return getCostPer1KCredits(credits, currentTierPrice.monthly);
   })();
 
-  // Create dynamic Pro plan features based on selected credits
+  // Create dynamic Pro plan features based on selected credits.
+  // The credits line is features[0]; it moved up when the phantom
+  // "500 refresh credits everyday" line was removed from the plan.
   const getProFeatures = (): string[] => {
     const baseFeatures: string[] = [...PLANS.PRO.features];
-    baseFeatures[1] = selectedCredits; // Replace the credits line with selected value
+    baseFeatures[0] = selectedCredits; // Replace the credits line with selected value
     return baseFeatures;
   };
+
+  // The intro offer checks out against its own 14-day price, not the
+  // monthly tier — the customer is charged $9.95 today and the subscription
+  // schedule moves them onto the monthly price afterwards.
+  const trialPriceId = INTRO_TRIAL.priceId;
+
+  // Whether this account can still take the intro offer. Deliberately NOT
+  // `currentPlan === 'trial'`: users grandfathered off the old free tier sit
+  // on a courtesy trial with hasUsedTrial still false, and gating on the plan
+  // label would grey out the CTA for exactly the cohort we most need to
+  // convert. The checkout route enforces the same rule server-side.
+  const hasUsedIntroOffer = session?.user?.hasUsedTrial === true;
 
   return (
     <div className="min-h-screen bg-background">
@@ -208,35 +225,47 @@ export default function PricingPage() {
 
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {/* Free Plan */}
+          {/* Free trial — replaces the old ongoing free tier */}
           <Card className="relative flex flex-col border-2 border-border hover:border-primary/30 transition-all hover:shadow-lg">
             <CardHeader>
-              <CardTitle className="text-2xl">Free</CardTitle>
-              <CardDescription>Perfect for getting started</CardDescription>
+              <CardTitle className="text-2xl">Try Xantuus</CardTitle>
+              <CardDescription>
+                ${INTRO_TRIAL.price.toFixed(2)} for {INTRO_TRIAL.days} days, then $
+                {CREDIT_TIER_PRICES[String(ENTRY_TIER_CREDITS)].monthlyPrice.toFixed(2)}/month
+              </CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold text-foreground">$0</span>
-                <span className="text-muted-foreground">/month</span>
+                <span className="text-4xl font-bold text-foreground">
+                  ${INTRO_TRIAL.price.toFixed(2)}
+                </span>
+                <span className="text-muted-foreground">for {INTRO_TRIAL.days} days</span>
               </div>
             </CardHeader>
             <CardContent className="flex-grow">
               <ul className="space-y-3">
-                {PLANS.FREE.features.map((feature, i) => (
+                {PLANS.TRIAL.features.map((feature, i) => (
                   <li key={i} className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                     <span className="text-muted-foreground">{feature}</span>
                   </li>
                 ))}
               </ul>
+              <p className="mt-4 text-xs text-muted-foreground">
+                ${INTRO_TRIAL.price.toFixed(2)} is charged today. After {INTRO_TRIAL.days} days
+                it becomes ${CREDIT_TIER_PRICES[String(ENTRY_TIER_CREDITS)].monthlyPrice.toFixed(2)}/month
+                — we&apos;ll email you three days before. Cancel any time.
+              </p>
             </CardContent>
             <CardFooter>
               <button
-                onClick={() => {
-                  router.push('/?auth=signin');
-                }}
-                disabled={currentPlan === 'free'}
+                onClick={() => handleSubscribe(trialPriceId, 'TRIAL', false)}
+                disabled={hasUsedIntroOffer || isLoading === 'TRIAL'}
                 className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-secondary text-foreground hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {currentPlan === 'free' ? 'Current Plan' : 'Get Started'}
+                {hasUsedIntroOffer
+                  ? currentPlan === 'trial' ? 'Offer active' : 'Offer already used'
+                  : isLoading === 'TRIAL'
+                    ? 'Starting…'
+                    : `Start for $${INTRO_TRIAL.price.toFixed(2)}`}
               </button>
             </CardFooter>
           </Card>

@@ -3,8 +3,9 @@ import { headers } from 'next/headers';
 import { stripe, PLANS, isStripeEnabled } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
-import { sendPaymentFailedEmail } from '@/lib/email';
-import { grantPurchasedCredits, updateUserSubscription } from '@/lib/stripe-webhook-handlers';
+import { sendPaymentFailedEmail, sendTrialEndingEmail } from '@/lib/email';
+import { grantPurchasedCredits, updateUserSubscription, ensureIntroTrialConverts } from '@/lib/stripe-webhook-handlers';
+import { getPriceTierByPriceId, getBillingCycleFromPriceId } from '@/lib/pricing-config';
 
 export async function POST(req: NextRequest) {
   if (!isStripeEnabled() || !stripe) {
@@ -84,7 +85,10 @@ export async function POST(req: NextRequest) {
                   stripeSubscriptionId: subscriptionId,
                   stripePriceId: session.metadata.priceId,
                   stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
-                  plan: credits > 4000 ? 'pro' : 'free',
+                  // Mirrors updateUserSubscription's labelling. The old
+                  // `credits > 4000 ? 'pro' : 'free'` test labelled the new
+                  // $29.95 / 4,000 entry tier as a free account.
+                  plan: credits >= PLANS.ENTERPRISE.credits ? 'enterprise' : 'pro',
                   monthlyCredits: credits,
                   billingCycle: billingCycle as string,
                   creditsResetAt: new Date(),
@@ -103,6 +107,13 @@ export async function POST(req: NextRequest) {
               subscription
             );
           }
+
+          // If this was the $9.95 / 14-day intro offer, attach the schedule
+          // that moves it onto the monthly entry tier when the 14 days are
+          // up. No-ops for every other price. Runs after the entitlement
+          // update so a schedule failure cannot cost the customer access to
+          // what they just paid for.
+          await ensureIntroTrialConverts(stripeClient, subscription);
         } else if (session.mode === 'payment' && session.metadata?.productType === 'credits') {
           await grantPurchasedCredits(
             session.metadata.userId,
@@ -144,6 +155,10 @@ export async function POST(req: NextRequest) {
               stripeCurrentPeriodEnd: null,
               plan: 'free',
               monthlyCredits: PLANS.FREE.credits,
+              // The trial is over either way; leaving a stale date here would
+              // make the app-side expiry backstop fire against a fresh
+              // subscription if the customer later resubscribes.
+              trialEndsAt: null,
             },
           });
         } else {
@@ -252,9 +267,32 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        if (user) {
+        if (user?.email) {
+          const trialEndsAt = subscription.trial_end
+            ? new Date(subscription.trial_end * 1000)
+            : null;
+          const item = subscription.items.data[0];
+          const priceTier = item ? getPriceTierByPriceId(item.price.id) : null;
+          const billingCycle = item ? getBillingCycleFromPriceId(item.price.id) : 'monthly';
+          const amount = priceTier
+            ? billingCycle === 'yearly'
+              ? `$${priceTier.yearlyPrice.toFixed(2)}/year`
+              : `$${priceTier.monthlyPrice.toFixed(2)}/month`
+            : 'your selected plan price';
+
+          if (trialEndsAt) {
+            // Fire and forget: a failed email must not make Stripe retry the
+            // webhook, which would re-send the notice on every retry.
+            await sendTrialEndingEmail({
+              to: user.email,
+              name: user.name,
+              trialEndsAt,
+              amount,
+              billingUrl: `${process.env.NEXTAUTH_URL}/settings/billing`,
+            });
+          }
+
           console.log(`Trial ending soon for user ${user.id}, subscription ${subscription.id}`);
-          // TODO: Send email notification about trial ending
         }
         break;
       }

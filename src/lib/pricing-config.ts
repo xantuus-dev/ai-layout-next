@@ -12,6 +12,8 @@
  * 4. Update the CREDIT_TIER_PRICES object below with your price IDs
  */
 
+import { TRIAL_PERIOD_DAYS } from './plans';
+
 export interface PriceTier {
   credits: number;
   displayName: string;
@@ -27,8 +29,68 @@ export interface PriceTier {
 /**
  * All available credit tiers with pricing
  * Yearly pricing is automatically 20% off (monthly * 12 * 0.8)
+ *
+ * The 4,000 tier at $29.95 is the entry plan and the tier a finished trial
+ * converts into — see TRIAL_PERIOD_DAYS in plans.ts and the checkout route.
  */
+export const ENTRY_TIER_CREDITS = 4000;
+
+/**
+ * The $9.95 / 14-day introductory offer — the primary acquisition CTA.
+ *
+ * Deliberately NOT built on Stripe's trial mechanics, for two reasons:
+ *
+ * 1. Stripe's Trial Offer API (the supported way to do a *paid* trial) is
+ *    explicitly unsupported in Checkout and needs the 2026-03-25.preview API
+ *    version plus flexible billing mode. This integration is on 2024-06-20
+ *    Checkout.
+ * 2. The legacy `trial_period_days` route defers the first charge to the end
+ *    of the trial, which is the opposite of what a paid intro offer needs —
+ *    the customer must be charged $9.95 today.
+ *
+ * So the offer is modelled as what it actually is: a real subscription on a
+ * 14-day price, billed immediately at checkout, with a subscription schedule
+ * that transitions it to the monthly entry tier after one cycle. That means
+ * subscription.status is 'active' throughout, never 'trialing' — entitlement
+ * is keyed off the PRICE, via isIntroTrialPriceId(), not the status.
+ *
+ * Create the Stripe price as: $9.95, recurring, interval=day, interval_count=14.
+ */
+export const INTRO_TRIAL = {
+  price: 9.95,
+  // Single source of truth, shared with the plan definitions — the advertised
+  // length and the length the offer actually runs for cannot drift apart.
+  days: TRIAL_PERIOD_DAYS,
+  /** Tier the offer converts into when the 14 days elapse. */
+  convertsToCredits: ENTRY_TIER_CREDITS,
+  priceId: process.env.NEXT_PUBLIC_STRIPE_TRIAL_14D_PRICE_ID || null,
+} as const;
+
+/** Whether a Stripe price id is the introductory 14-day offer. */
+export function isIntroTrialPriceId(priceId: string | null | undefined): boolean {
+  return !!priceId && !!INTRO_TRIAL.priceId && priceId === INTRO_TRIAL.priceId;
+}
+
+/** The recurring price the intro offer transitions into. */
+export function getIntroTrialTargetPriceId(billingCycle: 'monthly' | 'yearly' = 'monthly'): string | null {
+  return getPriceId(ENTRY_TIER_CREDITS, billingCycle);
+}
 export const CREDIT_TIER_PRICES: Record<string, PriceTier> = {
+  // Entry tier. Every 14-day trial converts to this one unless the customer
+  // picks another at checkout, so it is the default landing point for the
+  // whole funnel. Priced above the $0.005/credit rate the larger tiers use
+  // ($0.00749 here) — the entry tier is deliberately the least generous
+  // per credit, which is what makes stepping up to 8,000 worthwhile.
+  '4000': {
+    credits: 4000,
+    displayName: '4,000 credits / month',
+    monthlyPrice: 29.95,
+    yearlyPrice: 287.52, // 29.95 * 12 * 0.8
+    priceIds: {
+      monthly: process.env.NEXT_PUBLIC_STRIPE_4000_MONTHLY_PRICE_ID || null,
+      yearly: process.env.NEXT_PUBLIC_STRIPE_4000_YEARLY_PRICE_ID || null,
+    },
+  },
   '8000': {
     credits: 8000,
     displayName: '8,000 credits / month',

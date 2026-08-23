@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { stripe, isStripeEnabled } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
+import { isIntroTrialPriceId } from '@/lib/pricing-config';
 
 // Guard against a fat-fingered or hostile seat count turning into a very large
 // charge. Teams above this go through sales.
@@ -155,6 +156,23 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // The $9.95 / 14-day intro offer is one per account, ever. Stripe has
+      // no concept of "this person already used their intro offer" across
+      // subscriptions, so the app has to remember: without hasUsedTrial a
+      // customer could cancel on day 13 and re-buy the intro price forever.
+      const wantsIntroTrial = isIntroTrialPriceId(priceId);
+
+      if (wantsIntroTrial && user.hasUsedTrial) {
+        return NextResponse.json(
+          {
+            error: 'Intro offer already used',
+            message: 'You have already used the introductory offer. Choose a monthly plan to continue.',
+            redirect: '/pricing',
+          },
+          { status: 409 }
+        );
+      }
+
       // Create Stripe checkout session for authenticated user
       const checkoutSession = await stripeClient.checkout.sessions.create({
         customer: customerId,
@@ -175,11 +193,17 @@ export async function POST(req: NextRequest) {
           seats: String(requestedSeats),
         },
         subscription_data: {
+          // Deliberately no trial_period_days. The intro offer is a real
+          // 14-day subscription billed immediately, so the customer is
+          // charged $9.95 at checkout; a Stripe trial would defer that
+          // charge to day 15. The transition to the monthly tier is handled
+          // by a subscription schedule — see ensureIntroTrialConverts().
           metadata: {
             userId: user.id,
             billingCycle: billingCycle || 'monthly',
             credits: credits?.toString() || '0',
             seats: String(requestedSeats),
+            introTrial: wantsIntroTrial ? 'true' : 'false',
           },
         },
       });
@@ -224,8 +248,12 @@ export async function POST(req: NextRequest) {
         credits: credits?.toString() || '0',
       },
       subscription_data: {
+        // Same as the authenticated path: billed immediately, converted by a
+        // schedule. A guest is by definition a customer with no account yet,
+        // so there is no prior intro offer to have used.
         metadata: {
           isGuestCheckout: 'true',
+          introTrial: isIntroTrialPriceId(priceId) ? 'true' : 'false',
           priceId,
           billingCycle: billingCycle || 'monthly',
           credits: credits?.toString() || '0',

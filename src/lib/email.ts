@@ -95,6 +95,58 @@ export async function sendPaymentFailedEmail(params: {
 }
 
 /**
+ * Warn a trialling customer before Stripe charges them.
+ *
+ * Fired from the customer.subscription.trial_will_end webhook, which Stripe
+ * emits three days out. Sending it is not optional politeness: the trial is
+ * card-required and converts automatically, so this is the customer's notice
+ * that a charge is coming while they can still cancel.
+ */
+export async function sendTrialEndingEmail(params: {
+  to: string;
+  name: string | null;
+  trialEndsAt: Date;
+  amount: string;
+  billingUrl: string;
+}): Promise<{ sent: boolean }> {
+  if (!resend) {
+    console.warn('⚠️  RESEND_API_KEY not configured — skipping trial-ending email');
+    return { sent: false };
+  }
+
+  const { to, name, trialEndsAt, amount, billingUrl } = params;
+  const endsOn = trialEndsAt.toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+  });
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: `Your Xantuus AI trial ends on ${endsOn}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2>Your free trial is ending</h2>
+          <p>Hi ${name || 'there'},</p>
+          <p>Your 14-day Xantuus AI trial ends on <strong>${endsOn}</strong>. When it does, your subscription starts automatically at <strong>${amount}</strong> and your daily trial credits are replaced by your full monthly allowance.</p>
+          <p>No action is needed if you'd like to continue. If Xantuus isn't for you, you can cancel before then and you won't be charged.</p>
+          <p>
+            <a href="${billingUrl}" style="display: inline-block; padding: 12px 24px; background: #1f7a8c; color: white; text-decoration: none; border-radius: 8px;">
+              Manage your subscription
+            </a>
+          </p>
+          <p style="color: #6b7280; font-size: 14px;">Questions? Just reply to this email.</p>
+        </div>
+      `,
+    });
+    return { sent: true };
+  } catch (error) {
+    console.error('Error sending trial-ending email:', error);
+    return { sent: false };
+  }
+}
+
+/**
  * Send an 80%/100% credit usage alert. Same fire-and-forget semantics —
  * a missing RESEND_API_KEY just means the alert doesn't go out; the
  * threshold-tracking fields on User still prevent duplicate sends once

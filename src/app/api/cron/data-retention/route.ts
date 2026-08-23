@@ -10,6 +10,12 @@
  * orphaned sandbox is caught within 24h instead of 5min; move it back to its
  * own cron entry in vercel.json once the plan allows more/faster crons.
  *
+ * The expiring-intro-offer notice rides along for the same reason. It has no
+ * natural home in a retention job either, but it must run daily: the $9.95
+ * offer is a real subscription, so Stripe never emits trial_will_end for it,
+ * and this is what backs the "we'll email you three days before" promise on
+ * the pricing page.
+ *
  * Guarded by CRON_SECRET exactly like the other cron endpoints — Vercel Cron
  * sends `Authorization: Bearer $CRON_SECRET` automatically.
  *
@@ -21,6 +27,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { purgeExpiredData } from '@/lib/data-retention';
 import { runSandboxSweep } from '@/lib/sandbox/sweeper';
+import { sendExpiringTrialNotices } from '@/lib/billing/trial-notices';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,5 +70,18 @@ export async function POST(request: NextRequest) {
     sandboxSweep = { error: err instanceof Error ? err.message : String(err) };
   }
 
-  return NextResponse.json({ success: true, ...result, sandboxSweep });
+  // Also independent: a mail failure must not mask a retention or sweep
+  // failure. Unstamped accounts are simply retried on tomorrow's run.
+  let trialNotices: Awaited<ReturnType<typeof sendExpiringTrialNotices>> | { error: string };
+  try {
+    trialNotices = await sendExpiringTrialNotices();
+    if (trialNotices.failed > 0) {
+      console.error(`[data-retention] ${trialNotices.failed} intro-offer notice(s) failed to send`);
+    }
+  } catch (err) {
+    console.error('[data-retention] Intro-offer notices threw:', err);
+    trialNotices = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  return NextResponse.json({ success: true, ...result, sandboxSweep, trialNotices });
 }

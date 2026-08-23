@@ -146,21 +146,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create referral record and award credits
+    // Create referral record and award credits.
+    //
+    // Banked as a decrement of creditsUsed (which is allowed to go negative)
+    // rather than an increment of monthlyCredits, matching how one-time
+    // credit-pack purchases are granted in stripe-webhook-handlers.ts.
+    // monthlyCredits is the recurring allowance, so incrementing it turns a
+    // one-time award into a permanent plan upgrade — and on the free tier,
+    // whose allowance now refreshes DAILY, +500 would have meant +500 every
+    // day forever per referral. checkAndResetCredits preserves negative
+    // balances across resets, so the award survives until it is spent.
     await prisma.$transaction([
       // Update referred user
       prisma.user.update({
         where: { id: user.id },
         data: {
           referredBy: referralCode,
-          monthlyCredits: { increment: 500 },
+          creditsUsed: { decrement: 500 },
         },
       }),
       // Update referrer
       prisma.user.update({
         where: { id: referrer.id },
         data: {
-          monthlyCredits: { increment: 500 },
+          creditsUsed: { decrement: 500 },
         },
       }),
       // Create referral record

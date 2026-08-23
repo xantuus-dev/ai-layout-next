@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
           where: { id: user.id },
           data: {
             plan: 'free',
-            monthlyCredits: 1000,
+            monthlyCredits: getCreditsForPlan('free'),
             stripeCurrentPeriodEnd: null,
           },
         });
