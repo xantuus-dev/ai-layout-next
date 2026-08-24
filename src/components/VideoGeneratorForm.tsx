@@ -157,7 +157,7 @@ export function VideoGeneratorForm({
     [providers]
   );
 
-  const cost = getVideoGenerationCost(Number(durationSeconds), resolution, provider?.id);
+  const cost = getVideoGenerationCost(Number(durationSeconds), resolution, provider?.id, provider?.defaultModel);
   const isLongClip = Number(durationSeconds) > INLINE_SAFE_MAX_SECONDS;
 
   const handleSubmit = async (e: React.FormEvent) => {

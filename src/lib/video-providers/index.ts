@@ -11,15 +11,26 @@
 
 import { veoVideoService } from './veo';
 import { seedanceVideoService } from './seedance';
+import { atlasVideoService } from './atlas';
 import type { VideoProvider } from './types';
 
 export * from './types';
 export { veoVideoService, VEO_MODELS } from './veo';
 export type { VeoAspectRatio, VeoResolution, VeoDurationSeconds } from './veo';
 export { seedanceVideoService, SEEDANCE_MODELS } from './seedance';
+export { atlasVideoService, ATLAS_MODELS } from './atlas';
 
-/** Registration order is preference order: the first configured one is the default. */
-const PROVIDERS: readonly VideoProvider[] = [veoVideoService, seedanceVideoService];
+/** Registration order is preference order: the first configured one is the default.
+ *
+ *  Atlas is deliberately NOT first yet. It is the cheapest and the only route
+ *  with SOC 2 / HIPAA / a status page, but its output has not been compared
+ *  against fal's on identical prompts. Promote it once that comparison is done
+ *  — moving this entry is the whole switch. */
+const PROVIDERS: readonly VideoProvider[] = [
+  veoVideoService,
+  seedanceVideoService,
+  atlasVideoService,
+];
 
 export function listVideoProviders(): readonly VideoProvider[] {
   return PROVIDERS;
