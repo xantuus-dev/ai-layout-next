@@ -22,14 +22,17 @@ export { atlasVideoService, ATLAS_MODELS } from './atlas';
 
 /** Registration order is preference order: the first configured one is the default.
  *
- *  Atlas is deliberately NOT first yet. It is the cheapest and the only route
- *  with SOC 2 / HIPAA / a status page, but its output has not been compared
- *  against fal's on identical prompts. Promote it once that comparison is done
- *  — moving this entry is the whole switch. */
+ *  Atlas leads because it is the cheapest route to the Seedance family and the
+ *  only one with SOC 2 / HIPAA / a public status page. fal stays registered
+ *  below it purely as failover — it reaches the same ByteDance models, so it is
+ *  a route-around for an Atlas outage rather than genuine model redundancy.
+ *  Veo is last: it is the only independent model here, and the dearest.
+ *
+ *  Reordering this array is the entire switch — no call site knows the order. */
 const PROVIDERS: readonly VideoProvider[] = [
-  veoVideoService,
-  seedanceVideoService,
   atlasVideoService,
+  seedanceVideoService,
+  veoVideoService,
 ];
 
 export function listVideoProviders(): readonly VideoProvider[] {
