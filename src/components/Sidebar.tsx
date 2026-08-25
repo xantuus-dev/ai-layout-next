@@ -20,7 +20,6 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
-  Home,
   BarChart3,
   Sparkles,
   FolderOpen,
@@ -32,6 +31,7 @@ import {
   FileStack,
   Clapperboard,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 
@@ -63,7 +63,6 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
   const [loadingConversations, setLoadingConversations] = useState(false);
 
   const menuItems: MenuItem[] = [
-    { name: 'Home', icon: Home, href: '/' },
     { name: 'Dashboard', icon: LayoutDashboard, href: '/workspace', requireAuth: true },
     { name: 'Templates', icon: Sparkles, href: '/templates' },
     { name: 'Image Generator', icon: Wand2, href: '/apps/image-generator', requireAuth: true },
@@ -187,26 +186,34 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
               wordmark would be illegible in the narrow rail. The sidebar
               background is dark in both themes, so the white variant is always
               correct here. */}
-          {isCollapsed ? (
-            <img
-              src="/xantuus-icon-white.png"
-              alt="Xantuus AI"
-              className="w-7 h-7 object-contain flex-shrink-0"
-            />
-          ) : (
-            /* Full X + wordmark lockup, grey monochrome variant
-               (xantuus-logo-grey.png = the 3281×1875 lockup trimmed to its
-               content band and recoloured to a light grey, aspect ~3.45).
-               Sized by WIDTH, not height: the art is mostly horizontal, so a
-               height constraint under-renders it. 170px wide keeps the mark +
-               text legible and still leaves room for the toggle. object-left
-               anchors it against the padding. */
-            <img
-              src="/xantuus-logo-grey.png"
-              alt="Xantuus AI"
-              className="w-[170px] max-w-full h-auto object-contain object-left"
-            />
-          )}
+          {/* The lockup is the way home — it replaces the former "Home" menu
+              item, so the mark has to be a real anchor rather than decoration. */}
+          <Link
+            href="/"
+            aria-label="Xantuus AI — home"
+            className="flex items-center min-w-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 hover:opacity-80 transition-opacity duration-200"
+          >
+            {isCollapsed ? (
+              <img
+                src="/xantuus-icon-white.png"
+                alt="Xantuus AI"
+                className="w-7 h-7 object-contain flex-shrink-0"
+              />
+            ) : (
+              /* Full X + wordmark lockup, grey monochrome variant
+                 (xantuus-logo-grey.png = the 3281×1875 lockup trimmed to its
+                 content band and recoloured to a light grey, aspect ~3.45).
+                 Sized by WIDTH, not height: the art is mostly horizontal, so a
+                 height constraint under-renders it. 170px wide keeps the mark +
+                 text legible and still leaves room for the toggle. object-left
+                 anchors it against the padding. */
+              <img
+                src="/xantuus-logo-grey.png"
+                alt="Xantuus AI"
+                className="w-[170px] max-w-full h-auto object-contain object-left"
+              />
+            )}
+          </Link>
 
           {/* Desktop Collapse Button */}
           <button
