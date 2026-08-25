@@ -168,6 +168,12 @@ export default function PricingPage() {
   // convert. The checkout route enforces the same rule server-side.
   const hasUsedIntroOffer = session?.user?.hasUsedTrial === true;
 
+  // The intro price has to exist in Stripe before the offer can be sold. Without
+  // this the CTA rendered enabled and clicking it only reached handleSubscribe's
+  // null guard — an alert reading "not available yet" on the primary
+  // acquisition CTA. Disable it at the source instead, and say so on the button.
+  const introOfferUnavailable = !trialPriceId;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-16 md:py-24">
@@ -255,18 +261,25 @@ export default function PricingPage() {
                 — we&apos;ll email you three days before. Cancel any time.
               </p>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex-col items-stretch">
               <button
                 onClick={() => handleSubscribe(trialPriceId, 'TRIAL', false)}
-                disabled={hasUsedIntroOffer || isLoading === 'TRIAL'}
+                disabled={hasUsedIntroOffer || introOfferUnavailable || isLoading === 'TRIAL'}
                 className="w-full py-3 px-6 rounded-lg font-semibold transition-colors bg-secondary text-foreground hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {hasUsedIntroOffer
-                  ? currentPlan === 'trial' ? 'Offer active' : 'Offer already used'
-                  : isLoading === 'TRIAL'
-                    ? 'Starting…'
-                    : `Start for $${INTRO_TRIAL.price.toFixed(2)}`}
+                {introOfferUnavailable
+                  ? 'Currently unavailable'
+                  : hasUsedIntroOffer
+                    ? currentPlan === 'trial' ? 'Offer active' : 'Offer already used'
+                    : isLoading === 'TRIAL'
+                      ? 'Starting…'
+                      : `Start for $${INTRO_TRIAL.price.toFixed(2)}`}
               </button>
+              {introOfferUnavailable && (
+                <p className="mt-2 text-xs text-muted-foreground text-center">
+                  This offer isn&apos;t open yet — pick a monthly plan below to get started.
+                </p>
+              )}
             </CardFooter>
           </Card>
 
