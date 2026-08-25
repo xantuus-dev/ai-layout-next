@@ -61,7 +61,7 @@ export async function generateVideoForUser(
 
   await checkAndResetCredits(userId);
 
-  const creditsNeeded = getVideoGenerationCost(Number(durationSeconds), resolution, provider.id);
+  const creditsNeeded = getVideoGenerationCost(Number(durationSeconds), resolution, provider.id, model);
   const decision = await assertCanSpend(userId, creditsNeeded);
   if (!decision.allowed) {
     return {

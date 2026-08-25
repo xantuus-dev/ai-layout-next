@@ -11,15 +11,29 @@
 
 import { veoVideoService } from './veo';
 import { seedanceVideoService } from './seedance';
+import { atlasVideoService } from './atlas';
 import type { VideoProvider } from './types';
 
 export * from './types';
 export { veoVideoService, VEO_MODELS } from './veo';
 export type { VeoAspectRatio, VeoResolution, VeoDurationSeconds } from './veo';
 export { seedanceVideoService, SEEDANCE_MODELS } from './seedance';
+export { atlasVideoService, ATLAS_MODELS } from './atlas';
 
-/** Registration order is preference order: the first configured one is the default. */
-const PROVIDERS: readonly VideoProvider[] = [veoVideoService, seedanceVideoService];
+/** Registration order is preference order: the first configured one is the default.
+ *
+ *  Atlas leads because it is the cheapest route to the Seedance family and the
+ *  only one with SOC 2 / HIPAA / a public status page. fal stays registered
+ *  below it purely as failover — it reaches the same ByteDance models, so it is
+ *  a route-around for an Atlas outage rather than genuine model redundancy.
+ *  Veo is last: it is the only independent model here, and the dearest.
+ *
+ *  Reordering this array is the entire switch — no call site knows the order. */
+const PROVIDERS: readonly VideoProvider[] = [
+  atlasVideoService,
+  seedanceVideoService,
+  veoVideoService,
+];
 
 export function listVideoProviders(): readonly VideoProvider[] {
   return PROVIDERS;

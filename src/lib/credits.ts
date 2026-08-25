@@ -93,9 +93,63 @@ const VEO_CREDITS_PER_SECOND: VideoRateTable = {
   '4k': 1000, // ~$1.00/sec PLACEHOLDER
 };
 
+/**
+ * Atlas Cloud, per model — REAL published rates, checked 2026-08-23.
+ * https://www.atlascloud.ai/pricing/models
+ *
+ * Atlas resells the whole Seedance family, and the spread between models is far
+ * larger than the spread between resolutions: 2.0 Mini is ~3.4x cheaper than
+ * 2.5 for the same clip. Pricing therefore has to know the model, not just the
+ * provider — a provider-level rate would either overcharge Mini output or
+ * undercharge 2.5.
+ *
+ * CAVEAT: Atlas publishes a single "start from" price per model rather than a
+ * per-resolution table. The 480p figures below are those published floors; the
+ * 720p figures are derived from their playground quote ($1.514799 for a 5s 720p
+ * Seedance 2.5 run). 1080p is not published at all and is set deliberately high
+ * pending a real run. Confirm all three against actual invoices before selling.
+ */
+const ATLAS_SEEDANCE_25: VideoRateTable = {
+  '480p': 134, // ~$0.134/s published "start from"
+  '720p': 303, // ~$0.303/s derived from the playground quote
+  '1080p': 600, // UNVERIFIED — deliberately high until a real run confirms it
+};
+
+const ATLAS_SEEDANCE_20: VideoRateTable = {
+  '480p': 112, // ~$0.112/s published
+  '720p': 253,
+  '1080p': 500, // UNVERIFIED
+};
+
+const ATLAS_SEEDANCE_20_FAST: VideoRateTable = {
+  '480p': 72, // ~$0.072/s published (20% off)
+  '720p': 163,
+  '1080p': 322, // UNVERIFIED
+};
+
+const ATLAS_SEEDANCE_20_MINI: VideoRateTable = {
+  '480p': 39, // ~$0.039/s published (30% off)
+  '720p': 88,
+  '1080p': 174, // UNVERIFIED
+};
+
+/**
+ * Rates keyed by model id, checked before the provider table. Only models whose
+ * price differs materially from their provider's default need an entry.
+ */
+const VIDEO_RATES_BY_MODEL: Record<string, VideoRateTable> = {
+  'bytedance/seedance-2.5/text-to-video': ATLAS_SEEDANCE_25,
+  'bytedance/seedance-2.0/text-to-video': ATLAS_SEEDANCE_20,
+  'bytedance/seedance-2.0-fast/text-to-video': ATLAS_SEEDANCE_20_FAST,
+  'bytedance/seedance-2.0-mini/text-to-video': ATLAS_SEEDANCE_20_MINI,
+};
+
 const VIDEO_RATES_BY_PROVIDER: Record<string, VideoRateTable> = {
   seedance: SEEDANCE_CREDITS_PER_SECOND,
   veo: VEO_CREDITS_PER_SECOND,
+  // Atlas has no single provider-level rate — its models differ too much. This
+  // is the dearest of them, used only when a caller names no model.
+  atlas: ATLAS_SEEDANCE_25,
 };
 
 /** Used when a caller does not say which provider — the safer, dearer table. */
@@ -118,9 +172,14 @@ export const VIDEO_GENERATION_CREDITS_PER_SECOND = VEO_CREDITS_PER_SECOND;
 export function getVideoGenerationCost(
   durationSeconds: number,
   resolution: string = '720p',
-  providerId?: string
+  providerId?: string,
+  model?: string
 ): number {
-  const table = (providerId && VIDEO_RATES_BY_PROVIDER[providerId]) || FALLBACK_RATES;
+  // Model first: one provider can serve several models at very different rates.
+  const table =
+    (model && VIDEO_RATES_BY_MODEL[model]) ||
+    (providerId && VIDEO_RATES_BY_PROVIDER[providerId]) ||
+    FALLBACK_RATES;
   const perSecond = table[resolution] ?? Math.max(...Object.values(table));
   return Math.max(1, Math.ceil(durationSeconds * perSecond));
 }

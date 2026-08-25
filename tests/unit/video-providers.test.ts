@@ -19,6 +19,7 @@ describe('video provider registry', () => {
   beforeEach(() => {
     vi.stubEnv('GOOGLE_AI_API_KEY', 'test-google-key');
     vi.stubEnv('FAL_KEY', 'test-fal-key');
+    vi.stubEnv('ATLASCLOUD_API_KEY', 'test-atlas-key');
   });
 
   afterEach(() => {
@@ -34,9 +35,9 @@ describe('video provider registry', () => {
   });
 
   it('falls back to the default provider when no model is named', () => {
-    // Veo is registered first, so with every provider configured it is the
+    // Atlas is registered first, so with every provider configured it is the
     // default. Registration order is preference order.
-    expect(getVideoProviderForModel()?.id).toBe('veo');
+    expect(getVideoProviderForModel()?.id).toBe('atlas');
   });
 
   it('exposes every Veo model through the registry', () => {
@@ -74,13 +75,20 @@ describe('video provider registry', () => {
   });
 
   it('falls through to the next configured provider when the preferred one is unconfigured', () => {
-    vi.stubEnv('GOOGLE_AI_API_KEY', '');
+    vi.stubEnv('ATLASCLOUD_API_KEY', '');
     expect(getVideoProviderForModel()?.id).toBe('seedance');
+  });
+
+  it('steps past every unconfigured provider in order', () => {
+    vi.stubEnv('ATLASCLOUD_API_KEY', '');
+    vi.stubEnv('FAL_KEY', '');
+    expect(getVideoProviderForModel()?.id).toBe('veo');
   });
 
   it('resolves nothing at all when no provider has credentials', () => {
     vi.stubEnv('GOOGLE_AI_API_KEY', '');
     vi.stubEnv('FAL_KEY', '');
+    vi.stubEnv('ATLASCLOUD_API_KEY', '');
     expect(getVideoProviderForModel()).toBeUndefined();
     expect(getVideoProviderForModel('veo-3.1-fast-generate-preview')).toBeUndefined();
   });

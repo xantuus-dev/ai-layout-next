@@ -70,7 +70,7 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Sideb
     { name: 'Documents', icon: FileStack, href: '/documents/new', requireAuth: true },
     { name: 'Projects', icon: FolderOpen, href: '/workspace/projects/new', requireAuth: true },
     { name: 'Browser', icon: Link2, href: '/browser', requireAuth: true },
-    { name: 'Analytics', icon: BarChart3, href: '/settings/usage', requireAuth: true },
+    { name: 'Analytics', icon: BarChart3, href: '/analytics', requireAuth: true },
     { name: 'Settings', icon: Settings, href: '/settings/account', requireAuth: true },
   ];
 
