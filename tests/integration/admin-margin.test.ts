@@ -20,7 +20,12 @@ describe('admin margin report', () => {
       data: {
         email: `test-margin-free-${stamp}@example.com`,
         plan: 'free',
-        monthlyCredits: 4000, // matches PLANS.FREE — price $0, so implied rate should be 0
+        // 'free' now means "no active plan" and grants 0 credits — the old
+        // 4,000-credit free allowance became the $29.95 paid entry tier
+        // (ENTRY_TIER_CREDITS). Leaving 4000 here would make getPriceTier()
+        // match that paid tier and report implied revenue for a user who is
+        // paying nothing, which is exactly what this test exists to catch.
+        monthlyCredits: 0,
       },
     });
     const paidUser = await prisma.user.create({

@@ -10,6 +10,28 @@ vi.mock('next/headers', () => ({
   }),
 }));
 
+// lib/stripe builds its client at module load from STRIPE_SECRET_KEY, so with
+// no key in the environment `stripe` is null, isStripeEnabled() is false, and
+// the route returns 503 from its first guard — before it ever reaches the
+// signature check. That made this suite pass through a branch it does not mean
+// to test on any machine without Stripe credentials. Stub the module so the
+// route always gets as far as verification, and let constructEvent reject the
+// way the real SDK does on a bad signature.
+vi.mock('@/lib/stripe', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/stripe')>('@/lib/stripe');
+  return {
+    ...actual,
+    isStripeEnabled: () => true,
+    stripe: {
+      webhooks: {
+        constructEvent: () => {
+          throw new Error('No signatures found matching the expected signature for payload');
+        },
+      },
+    },
+  };
+});
+
 import { POST } from '@/app/api/stripe/webhook/route';
 import { NextRequest } from 'next/server';
 
