@@ -7,10 +7,18 @@
  *
  * USAGE:
  * 1. Set your STRIPE_SECRET_KEY in .env.local
- * 2. Run: npx ts-node scripts/setup-stripe-prices.ts
- * 3. Copy the generated price IDs to your .env.local
+ * 2. Run: npx tsx scripts/setup-stripe-prices.ts --only=4000,intro
+ * 3. Copy the generated price IDs to your .env.local (or vercel env add)
  *
- * NOTE: Run this script ONCE for production and ONCE for test mode
+ * NOTE: Run this script ONCE for production and ONCE for test mode.
+ *
+ * --only=<ids>  Restrict to specific tiers, comma separated, so a re-run does
+ *               not duplicate products that already exist. Stripe has no
+ *               natural key for products, so creating them twice is silent and
+ *               leaves two products competing for the same tier. Use the credit
+ *               count (e.g. 4000) and/or the literal `intro` for the 14-day
+ *               introductory offer. Omitting the flag creates EVERY tier, which
+ *               is almost never what you want against a live account.
  */
 
 import Stripe from 'stripe';
@@ -22,6 +30,12 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 // Credit tiers with pricing (inline to avoid import issues)
 const CREDIT_TIER_PRICES = {
+  '4000': {
+    credits: 4000,
+    displayName: '4,000 credits / month',
+    monthlyPrice: 29.95,
+    yearlyPrice: 287.52,
+  },
   '8000': {
     credits: 8000,
     displayName: '8,000 credits / month',
@@ -118,12 +132,42 @@ const stripe = new Stripe(stripeKey, {
 
 const isTestMode = stripeKey.includes('_test_');
 
+/**
+ * The $9.95 / 14-day introductory offer.
+ *
+ * Modelled as a real recurring subscription on a 14-day interval, NOT a Stripe
+ * trial: the customer is charged today, and a subscription schedule moves them
+ * onto the monthly entry tier after one cycle. See INTRO_TRIAL in
+ * src/lib/pricing-config.ts for why the Trial Offer API is not used here.
+ */
+const INTRO_OFFER = {
+  price: 9.95,
+  days: 14,
+  convertsToCredits: 4000,
+};
+
+/** Money -> integer cents. 29.95 * 100 is 2994.999... in binary floating point. */
+function toCents(amount: number): number {
+  return Math.round(amount * 100);
+}
+
+const onlyArg = process.argv.slice(2).find((a) => a.startsWith('--only='));
+const only = onlyArg ? onlyArg.slice('--only='.length).split(',').map((s) => s.trim()) : null;
+const wants = (id: string) => !only || only.includes(id);
+
 async function createStripeProducts() {
   console.log(`\n🚀 Setting up Stripe products (${isTestMode ? 'TEST' : 'LIVE'} mode)...\n`);
+
+  if (!only) {
+    console.log('⚠️  No --only= filter given: this will create EVERY tier as a NEW product.');
+    console.log('   Against an account that already has them, that silently duplicates them.');
+    console.log('   Pass e.g. --only=4000,intro to create just what is missing.\n');
+  }
 
   const envVars: string[] = [];
 
   for (const [key, tier] of Object.entries(CREDIT_TIER_PRICES)) {
+    if (!wants(key)) continue;
     console.log(`\n📦 Creating product for ${tier.displayName}...`);
 
     // Create product
@@ -141,7 +185,7 @@ async function createStripeProducts() {
     // Create monthly price
     const monthlyPrice = await stripe.prices.create({
       product: product.id,
-      unit_amount: tier.monthlyPrice * 100, // Convert to cents
+      unit_amount: toCents(tier.monthlyPrice),
       currency: 'usd',
       recurring: {
         interval: 'month',
@@ -157,7 +201,7 @@ async function createStripeProducts() {
     // Create yearly price
     const yearlyPrice = await stripe.prices.create({
       product: product.id,
-      unit_amount: tier.yearlyPrice * 100, // Convert to cents
+      unit_amount: toCents(tier.yearlyPrice),
       currency: 'usd',
       recurring: {
         interval: 'year',
@@ -177,6 +221,51 @@ async function createStripeProducts() {
 
     envVars.push(monthlyVar);
     envVars.push(yearlyVar);
+  }
+
+  // The introductory offer: one product, one 14-day recurring price.
+  if (wants('intro')) {
+    console.log(`\n📦 Creating product for the $${INTRO_OFFER.price} / ${INTRO_OFFER.days}-day intro offer...`);
+
+    const introProduct = await stripe.products.create({
+      name: `Xantuus AI — $${INTRO_OFFER.price} for ${INTRO_OFFER.days} days`,
+      description:
+        `Introductory offer: ${INTRO_OFFER.days} days of full access for $${INTRO_OFFER.price}, ` +
+        `then the ${INTRO_OFFER.convertsToCredits.toLocaleString()}-credit monthly plan.`,
+      metadata: {
+        tier: 'intro',
+        days: String(INTRO_OFFER.days),
+        convertsToCredits: String(INTRO_OFFER.convertsToCredits),
+      },
+    });
+
+    console.log(`   ✅ Product created: ${introProduct.id}`);
+
+    // interval=day + interval_count=14 is what makes this a paid intro rather
+    // than a Stripe trial: the charge lands today and the schedule transitions
+    // it to the monthly price after one cycle.
+    const introPrice = await stripe.prices.create({
+      product: introProduct.id,
+      unit_amount: toCents(INTRO_OFFER.price),
+      currency: 'usd',
+      recurring: {
+        interval: 'day',
+        interval_count: INTRO_OFFER.days,
+      },
+      metadata: {
+        tier: 'intro',
+        convertsToCredits: String(INTRO_OFFER.convertsToCredits),
+      },
+    });
+
+    console.log(`   ✅ Intro price created: ${introPrice.id} ($${INTRO_OFFER.price} / ${INTRO_OFFER.days} days)`);
+    envVars.push(`NEXT_PUBLIC_STRIPE_TRIAL_14D_PRICE_ID="${introPrice.id}"`);
+  }
+
+  if (envVars.length === 0) {
+    console.log('\n⚠️  Nothing matched --only=' + (only ?? []).join(',') + ' — no products created.');
+    console.log('   Valid ids: ' + Object.keys(CREDIT_TIER_PRICES).join(', ') + ', intro\n');
+    return;
   }
 
   console.log('\n\n✅ All products and prices created successfully!\n');
