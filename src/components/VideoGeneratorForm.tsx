@@ -66,6 +66,27 @@ function reconcile<T>(current: T, supported: readonly T[], preferred?: T): T {
   return supported[0];
 }
 
+/**
+ * Turn a provider's model id into something a customer can read.
+ *
+ * Ids are vendor routing paths — `bytedance/seedance-2.0-mini/text-to-video`,
+ * `veo-3.1-fast-generate-preview` — which are meaningless in a picker and hide
+ * the thing that matters most here: the cheap models cost a fraction of the
+ * flagship ones.
+ */
+function formatModelLabel(model: string): string {
+  const core = model
+    .replace(/^[^/]+\//, '') // vendor prefix
+    .replace(/\/.*$/, '') // trailing workflow segment
+    .replace(/-(generate-)?preview$/, '')
+    .replace(/-generate$/, '');
+
+  return core
+    .split('-')
+    .map((part) => (/^\d/.test(part) ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join(' ');
+}
+
 export function VideoGeneratorForm({
   onGenerate,
   onLoading,
@@ -74,6 +95,7 @@ export function VideoGeneratorForm({
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [providersLoaded, setProvidersLoaded] = useState(false);
   const [providerId, setProviderId] = useState<string>('');
+  const [model, setModel] = useState<string>('');
 
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState('16:9');
@@ -109,6 +131,7 @@ export function VideoGeneratorForm({
         const first = list.find((p) => p.id === data.defaultProviderId) ?? list[0];
         if (first) {
           setProviderId(first.id);
+          setModel(first.defaultModel);
           setAspectRatio(reconcile('16:9', first.capabilities.aspectRatios));
           setResolution(reconcile('720p', first.capabilities.resolutions));
           setDurationSeconds(String(reconcile(8, first.capabilities.durationsSeconds)));
@@ -146,6 +169,8 @@ export function VideoGeneratorForm({
       const next = providers.find((p) => p.id === nextId);
       if (!next) return;
       setProviderId(nextId);
+      // A model belongs to exactly one provider, so this one cannot carry over.
+      setModel(next.defaultModel);
       // Carry the current selections across where the new provider supports
       // them, so switching to compare models does not reset the whole form.
       setAspectRatio((current) => reconcile(current, next.capabilities.aspectRatios, '16:9'));
@@ -157,7 +182,7 @@ export function VideoGeneratorForm({
     [providers]
   );
 
-  const cost = getVideoGenerationCost(Number(durationSeconds), resolution, provider?.id, provider?.defaultModel);
+  const cost = getVideoGenerationCost(Number(durationSeconds), resolution, provider?.id, model || provider?.defaultModel);
   const isLongClip = Number(durationSeconds) > INLINE_SAFE_MAX_SECONDS;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -192,7 +217,7 @@ export function VideoGeneratorForm({
           durationSeconds,
           // Naming the model is what selects the provider server-side; without
           // it the registry falls back to whichever is registered first.
-          ...(provider ? { model: provider.defaultModel } : {}),
+          ...(model || provider ? { model: model || provider!.defaultModel } : {}),
         }),
       });
 
@@ -261,7 +286,7 @@ export function VideoGeneratorForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       {providers.length > 1 && (
         <div className="space-y-2">
-          <Label htmlFor="video-provider" className="text-sm font-semibold">Model</Label>
+          <Label htmlFor="video-provider" className="text-sm font-semibold">Provider</Label>
           <Select value={providerId} onValueChange={handleProviderChange} disabled={isLoading}>
             <SelectTrigger id="video-provider"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -270,6 +295,40 @@ export function VideoGeneratorForm({
               ))}
             </SelectContent>
           </Select>
+        </div>
+      )}
+
+      {/* Model, priced. Every provider here carries several models at very
+          different rates — Seedance 2.0 Mini is roughly a third the cost of 2.5
+          for the same clip — and before this picker existed the form silently
+          used each provider's default, which is the dearest one. The cost is on
+          each option because that spread is the whole reason to choose. */}
+      {(provider?.models.length ?? 0) > 1 && (
+        <div className="space-y-2">
+          <Label htmlFor="video-model" className="text-sm font-semibold">Model</Label>
+          <Select value={model} onValueChange={setModel} disabled={isLoading}>
+            <SelectTrigger id="video-model"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {(provider?.models ?? []).map((m) => {
+                const modelCost = getVideoGenerationCost(
+                  Number(durationSeconds),
+                  resolution,
+                  provider?.id,
+                  m
+                );
+                return (
+                  <SelectItem key={m} value={m}>
+                    {formatModelLabel(m)} — {modelCost.toLocaleString()} credits
+                    {m === provider?.defaultModel ? ' (default)' : ''}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            Cheaper models trade some fidelity for a much lower credit cost at the same
+            length and resolution.
+          </div>
         </div>
       )}
 
