@@ -781,3 +781,35 @@ export function calculateMonitorCredits(
     BROWSER_FEATURE_CREDITS.MONITOR_CHECK_AI_MAX
   );
 }
+
+/**
+ * What a credit balance actually buys, in units a customer recognises.
+ *
+ * The pricing page used to advertise "$5.00/1K credits". That number is honest
+ * internally and misleading externally: a credit is a private currency, so
+ * $/1K only compares across vendors if a credit buys the same thing everywhere,
+ * and it does not. Ours is a much smaller unit than Runway's, which makes our
+ * rate look cheap while our per-second cost is higher. Publishing the work a
+ * balance does instead is both comparable and harder to misread.
+ *
+ * Derived from the real rate constants above, so it cannot drift from what the
+ * meter actually charges.
+ */
+export function describeCreditValue(credits: number): {
+  images: number;
+  videoSeconds: number;
+  chatTurns: number;
+  speechMinutes: number;
+} {
+  const CHEAPEST_VIDEO_720P = VIDEO_RATES_BY_MODEL['bytedance/seedance-2.0-mini/text-to-video']['720p'];
+  const SONNET_CREDITS_PER_TURN = Math.ceil((ESTIMATED_TOKENS_PER_TURN / 1000) * 3);
+  // ~150 spoken words a minute, ~6 characters a word including spaces.
+  const SPEECH_CHARS_PER_MINUTE = 900;
+
+  return {
+    images: Math.floor(credits / IMAGE_GENERATION_COSTS.medium),
+    videoSeconds: Math.floor(credits / CHEAPEST_VIDEO_720P),
+    chatTurns: Math.floor(credits / SONNET_CREDITS_PER_TURN),
+    speechMinutes: Math.floor(credits / ((SPEECH_CHARS_PER_MINUTE / 1000) * AUDIO_GENERATION_CREDITS_PER_1K_CHARS)),
+  };
+}

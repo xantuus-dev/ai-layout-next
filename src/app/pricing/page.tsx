@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { Check, ChevronDown, AlertCircle } from 'lucide-react';
 import { PLANS } from '@/lib/stripe';
+import { describeCreditValue } from '@/lib/credits';
 import {
   Select,
   SelectContent,
@@ -23,7 +24,6 @@ import {
   getAvailableCreditOptions,
   getCreditsFromDisplayName,
   getPriceId,
-  getCostPer1KCredits,
   isPriceIdConfigured,
   isPricingConfigured,
 } from '@/lib/pricing-config';
@@ -141,11 +141,12 @@ export default function PricingPage() {
   const displayPrice = billingCycle === 'monthly' ? currentTierPrice.monthly : currentTierPrice.yearly;
   const monthlySavings = currentTierPrice.monthly * 12 - currentTierPrice.yearly;
 
-  // Get cost per 1K credits
-  const costPer1K = (() => {
+  // What the selected balance actually buys. This replaces the "$X/1K credits"
+  // line: a credit is our own unit, so a per-1K rate only looks comparable to a
+  // competitor's while actually being a different size of thing entirely.
+  const creditValue = (() => {
     const credits = getCreditsFromDisplayName(selectedCredits);
-    if (!credits) return 0;
-    return getCostPer1KCredits(credits, currentTierPrice.monthly);
+    return credits ? describeCreditValue(credits) : null;
   })();
 
   // Create dynamic Pro plan features based on selected credits.
@@ -320,14 +321,30 @@ export default function PricingPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">
-                  {selectedCredits.split(' ')[0]} credits per month
-                </span>
-                <span className="text-accent font-medium">
-                  ${costPer1K.toFixed(2)}/1K credits
-                </span>
+              <div className="mt-2 text-xs text-muted-foreground">
+                {selectedCredits.split(' ')[0]} credits per month
               </div>
+              {creditValue && (
+                <div className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                  Around{' '}
+                  <span className="text-accent font-medium">
+                    {creditValue.images.toLocaleString()} images
+                  </span>
+                  ,{' '}
+                  <span className="text-accent font-medium">
+                    {creditValue.videoSeconds.toLocaleString()}s of video
+                  </span>
+                  ,{' '}
+                  <span className="text-accent font-medium">
+                    {creditValue.chatTurns.toLocaleString()} chat turns
+                  </span>
+                  , or{' '}
+                  <span className="text-accent font-medium">
+                    {creditValue.speechMinutes.toLocaleString()} min of speech
+                  </span>
+                  {' '}— mix them however you like.
+                </div>
+              )}
             </CardHeader>
             <CardContent className="flex-grow">
               <ul className="space-y-3">
