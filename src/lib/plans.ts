@@ -127,8 +127,12 @@ export const PLAN_DEFINITIONS = {
     priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
     credits: 40000,
     creditPeriod: 'monthly',
+    // Enterprise is quoted, not listed (/pricing shows "Custom"), so the
+    // feature list must not name a credit figure — a fixed "40,000 credits"
+    // line anchors the negotiation to one tier before it starts, which is the
+    // exact thing quoting is meant to avoid.
     features: [
-      '40,000 credits per month',
+      'Volume credit allowance, sized to your usage',
       'In-depth research for everyday tasks',
       'Professional websites for standard output',
       'Insightful slides for regular content',

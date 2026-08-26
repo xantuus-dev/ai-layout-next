@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Check, ChevronDown, AlertCircle } from 'lucide-react';
@@ -354,19 +355,18 @@ export default function PricingPage() {
             <CardHeader>
               <CardTitle className="text-2xl">Enterprise</CardTitle>
               <CardDescription>For large organizations</CardDescription>
+              {/* Quoted, not listed. A published $185 anchored every enterprise
+                  conversation to the 40,000-credit tier before it started — and
+                  organisations at this size are buying seats, security review
+                  and volume terms, none of which that number covers. */}
               <div className="mt-4">
-                <span className="text-4xl font-bold text-foreground">
-                  ${billingCycle === 'monthly' ? '185' : '1,776'}
-                </span>
-                <span className="text-muted-foreground">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+                <span className="text-4xl font-bold text-foreground">Custom</span>
               </div>
-              {billingCycle === 'yearly' && (
-                <div className="mt-2">
-                  <span className="text-sm text-green-600 dark:text-green-400 font-semibold">
-                    Save $444/year
-                  </span>
-                </div>
-              )}
+              <div className="mt-2">
+                <span className="text-sm text-muted-foreground">
+                  Volume credits, annual terms, and onboarding — priced to your usage.
+                </span>
+              </div>
             </CardHeader>
             <CardContent className="flex-grow">
               <ul className="space-y-3">
@@ -379,17 +379,18 @@ export default function PricingPage() {
               </ul>
             </CardContent>
             <CardFooter>
-              <button
-                onClick={() => {
-                  // Enterprise = 40K credits tier
-                  const enterprisePriceId = getPriceId(40000, billingCycle);
-                  handleSubscribe(enterprisePriceId, 'ENTERPRISE', false);
-                }}
-                disabled={isLoading === 'ENTERPRISE' || currentPlan === 'enterprise'}
-                className="w-full py-3 px-6 rounded-lg font-semibold gradient-accent hover:gradient-accent-hover hover:-translate-y-0.5 transition-all text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading === 'ENTERPRISE' ? 'Loading...' : currentPlan === 'enterprise' ? 'Current Plan' : 'Get Started'}
-              </button>
+              {currentPlan === 'enterprise' ? (
+                <div className="w-full py-3 px-6 rounded-lg font-semibold text-center bg-secondary text-foreground">
+                  Current Plan
+                </div>
+              ) : (
+                <Link
+                  href="/contact?plan=enterprise"
+                  className="w-full py-3 px-6 rounded-lg font-semibold gradient-accent hover:gradient-accent-hover hover:-translate-y-0.5 transition-all text-white shadow-lg hover:shadow-xl text-center"
+                >
+                  Contact sales
+                </Link>
+              )}
             </CardFooter>
           </Card>
         </div>
