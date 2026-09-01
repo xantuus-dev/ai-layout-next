@@ -118,9 +118,13 @@ export function UsageSection() {
               </span>
             </div>
 
-            {/* Detailed View Link */}
+            {/* Detailed View Link.
+                Goes to /analytics rather than /settings/usage: this renders
+                inside SettingsModal, which can be opened from anywhere, so the
+                destination should be the standalone analytics page rather than
+                the copy nested in the settings tab bar. */}
             <button
-              onClick={() => router.push('/settings/usage')}
+              onClick={() => router.push('/analytics')}
               className="w-full mt-4 px-4 py-2 bg-[#1a1a1a] border border-gray-700 rounded-lg text-sm text-gray-200 hover:bg-[#2a2a2a] transition-colors"
             >
               View Detailed Usage Analytics
