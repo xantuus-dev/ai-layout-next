@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { geminiImageService } from '@/lib/gemini-image';
 import { getImageGenerationCost, checkAndResetCredits } from '@/lib/credits';
-import { assertCanSpend, spendCredits, InsufficientCreditsError } from '@/lib/billing/gate';
+import { assertCanSpend, spendCredits, refundCredits, InsufficientCreditsError } from '@/lib/billing/gate';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import type { MediaGenerationFailure } from './types';
 
@@ -63,30 +63,16 @@ export async function generateImageForUser(
     };
   }
 
-  let imageUrl: string;
-  try {
-    const result = await geminiImageService.generateImage({ prompt, width, height, userId });
-    imageUrl = result.imageUrl;
-  } catch (error) {
-    return {
-      ok: false,
-      reason: 'provider_error',
-      message: error instanceof Error ? error.message : 'Image generation failed',
-    };
-  }
-
-  const generatedImage = await prisma.generatedImage.create({
-    data: {
-      userId,
-      prompt,
-      width,
-      height,
-      imageUrl,
-      creditsUsed: creditsNeeded,
-      model: MODEL,
-    },
-  });
-
+  // Reserve the credits BEFORE calling the provider, and refund if the work
+  // does not land. Charging afterwards leaks money: assertCanSpend above is
+  // only advisory, so a concurrent request could drain the balance while the
+  // provider call is in flight, leaving us having paid Google for an image the
+  // customer was never billed for — and, worse, still writing the row, so
+  // GeneratedImage.creditsUsed disagreed with the ledger.
+  //
+  // spendCredits guards the decrement in its WHERE clause, so losing that race
+  // fails here instead of overdrawing. This mirrors what the video pipeline
+  // already does (see lib/video-pipeline/worker.ts).
   try {
     await spendCredits(userId, creditsNeeded, {
       type: 'image-generation',
@@ -98,6 +84,54 @@ export async function generateImageForUser(
       return { ok: false, reason: 'insufficient_credits', message: 'Insufficient credits', creditsNeeded };
     }
     throw error;
+  }
+
+  /** Give the credits back. Never throws — a failed refund must not mask the
+   *  original failure, but it does need to be loud in the logs. */
+  const refund = async (description: string) => {
+    try {
+      await refundCredits(userId, creditsNeeded, 'provider_error', { description });
+    } catch (refundError) {
+      console.error(
+        `[media/image] CREDIT LEAK: failed to refund ${creditsNeeded} credits to ${userId}`,
+        refundError
+      );
+    }
+  };
+
+  let imageUrl: string;
+  try {
+    const result = await geminiImageService.generateImage({ prompt, width, height, userId });
+    imageUrl = result.imageUrl;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Image generation failed';
+    await refund(`Image generation failed: ${message.substring(0, 100)}`);
+    return { ok: false, reason: 'provider_error', message };
+  }
+
+  let generatedImage;
+  try {
+    generatedImage = await prisma.generatedImage.create({
+      data: {
+        userId,
+        prompt,
+        width,
+        height,
+        imageUrl,
+        creditsUsed: creditsNeeded,
+        model: MODEL,
+      },
+    });
+  } catch (error) {
+    // The provider succeeded and we paid for it, but the customer has no row
+    // and therefore no way to reach the image. Refunding is the right side to
+    // err on: we eat one generation rather than bill for an invisible result.
+    await refund('Image generated but could not be saved');
+    return {
+      ok: false,
+      reason: 'provider_error',
+      message: error instanceof Error ? error.message : 'Could not save the generated image',
+    };
   }
 
   return {

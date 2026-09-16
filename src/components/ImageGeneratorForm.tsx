@@ -53,11 +53,15 @@ export function ImageGeneratorForm({
   const costPerImage = getImageGenerationCost(parseInt(width), parseInt(height));
   const totalCost = costPerImage * parseInt(quantity);
 
-  // Get cost label
+  // Get cost label.
+  //
+  // Banded on the TOTAL for the batch, not the per-image price: every size now
+  // costs the same, so a per-image band would show one fixed label forever.
+  // What actually varies is how many images the user asked for.
   const getCostLabel = (credits: number) => {
-    if (credits <= 5) return { label: '💚 Budget-friendly', color: 'text-green-600 dark:text-green-400' };
-    if (credits <= 15) return { label: '⚡ Standard', color: 'text-blue-600 dark:text-blue-400' };
-    return { label: '🔥 Premium', color: 'text-orange-600 dark:text-orange-400' };
+    if (credits <= costPerImage) return { label: '💚 Single image', color: 'text-green-600 dark:text-green-400' };
+    if (credits <= costPerImage * 4) return { label: '⚡ Small batch', color: 'text-blue-600 dark:text-blue-400' };
+    return { label: '🔥 Large batch', color: 'text-orange-600 dark:text-orange-400' };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -191,7 +195,7 @@ export function ImageGeneratorForm({
           </SelectContent>
         </Select>
         <div className="text-xs text-gray-500 dark:text-gray-400">
-          Larger images consume more credits
+          Every size costs the same — {costPerImage} credits per image
         </div>
       </div>
 
@@ -221,8 +225,8 @@ export function ImageGeneratorForm({
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getCostLabel(costPerImage).color}`}>
-              {getCostLabel(costPerImage).label}
+            <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getCostLabel(totalCost).color}`}>
+              {getCostLabel(totalCost).label}
             </span>
           </div>
         </div>

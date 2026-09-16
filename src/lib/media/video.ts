@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getVideoProviderForModel } from '@/lib/video-providers';
 import { getVideoGenerationCost, checkAndResetCredits } from '@/lib/credits';
-import { assertCanSpend, spendCredits, InsufficientCreditsError } from '@/lib/billing/gate';
+import { assertCanSpend, spendCredits, refundCredits, InsufficientCreditsError } from '@/lib/billing/gate';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import type { MediaGenerationFailure } from './types';
 
@@ -76,6 +76,40 @@ export async function generateVideoForUser(
     };
   }
 
+  // Reserve before generating, refund if it does not land — same reasoning as
+  // lib/media/image.ts, and it matters more here: one 8s 720p clip is ~1,500
+  // credits, so a single unbilled generation costs roughly what a hundred
+  // unbilled images do. assertCanSpend above is advisory; this is the charge.
+  //
+  // The model is not known until the provider answers, so the reservation is
+  // booked against the requested model and the usage row is corrected below if
+  // the provider served a different one.
+  try {
+    await spendCredits(userId, creditsNeeded, {
+      type: 'video-generation',
+      model: model ?? provider.defaultModel,
+      description: `Video generation: ${prompt.substring(0, 50)}...`,
+    });
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      return { ok: false, reason: 'insufficient_credits', message: 'Insufficient credits', creditsNeeded };
+    }
+    throw error;
+  }
+
+  /** Give the credits back. Never throws — a failed refund must not mask the
+   *  original failure, but it does need to be loud in the logs. */
+  const refund = async (description: string) => {
+    try {
+      await refundCredits(userId, creditsNeeded, 'provider_error', { description });
+    } catch (refundError) {
+      console.error(
+        `[media/video] CREDIT LEAK: failed to refund ${creditsNeeded} credits to ${userId}`,
+        refundError
+      );
+    }
+  };
+
   let videoUrl: string;
   let usedModel: string;
   try {
@@ -90,37 +124,34 @@ export async function generateVideoForUser(
     videoUrl = result.videoUrl;
     usedModel = result.model;
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Video generation failed';
+    await refund(`Video generation failed: ${message.substring(0, 100)}`);
+    return { ok: false, reason: 'provider_error', message };
+  }
+
+  let generatedVideo;
+  try {
+    generatedVideo = await prisma.generatedVideo.create({
+      data: {
+        userId,
+        prompt,
+        model: usedModel,
+        aspectRatio,
+        resolution,
+        durationSeconds: Number(durationSeconds),
+        videoUrl,
+        creditsUsed: creditsNeeded,
+      },
+    });
+  } catch (error) {
+    // Provider billed us and produced a clip the customer cannot reach.
+    // Refund rather than charge for an invisible result.
+    await refund('Video generated but could not be saved');
     return {
       ok: false,
       reason: 'provider_error',
-      message: error instanceof Error ? error.message : 'Video generation failed',
+      message: error instanceof Error ? error.message : 'Could not save the generated video',
     };
-  }
-
-  const generatedVideo = await prisma.generatedVideo.create({
-    data: {
-      userId,
-      prompt,
-      model: usedModel,
-      aspectRatio,
-      resolution,
-      durationSeconds: Number(durationSeconds),
-      videoUrl,
-      creditsUsed: creditsNeeded,
-    },
-  });
-
-  try {
-    await spendCredits(userId, creditsNeeded, {
-      type: 'video-generation',
-      model: usedModel,
-      description: `Video generation: ${prompt.substring(0, 50)}...`,
-    });
-  } catch (error) {
-    if (error instanceof InsufficientCreditsError) {
-      return { ok: false, reason: 'insufficient_credits', message: 'Insufficient credits', creditsNeeded };
-    }
-    throw error;
   }
 
   return {

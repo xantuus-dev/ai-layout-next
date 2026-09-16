@@ -28,23 +28,51 @@ export const MODEL_CREDITS_PER_1K: Record<string, number> = {
   'gemini-1.5-pro': 1.25,
 };
 
-// Image Generation Credit Costs
-// Based on image dimensions - higher resolution = higher cost
-export const IMAGE_GENERATION_COSTS: Record<string, number> = {
-  'small': 5, // 512x512
-  'medium': 15, // 1024x1024
-  'large': 30, // 1536x1536
-};
+/**
+ * What one generated image actually costs us, in USD.
+ *
+ * gemini-2.5-flash-image ("Nano Banana") bills a FLAT 1,290 output tokens per
+ * image at $30/M — $0.039 — for any output up to 1024x1024. It does not get
+ * cheaper at 512x512, which is the whole reason this is a single number rather
+ * than a table keyed by dimensions.
+ *
+ * Source: https://ai.google.dev/gemini-api/docs/pricing (verified 2026-09-16).
+ * Re-check when the model id in lib/gemini-image.ts changes — a new image model
+ * is a new cost basis, and IMAGE_GENERATION_CREDITS must move with it.
+ */
+export const IMAGE_PROVIDER_COST_USD = 0.039;
 
-// Helper function to get image generation cost by dimensions
-export function getImageGenerationCost(width: number, height: number): number {
-  if (width <= 512 && height <= 512) {
-    return IMAGE_GENERATION_COSTS.small;
-  } else if (width <= 1024 && height <= 1024) {
-    return IMAGE_GENERATION_COSTS.medium;
-  } else {
-    return IMAGE_GENERATION_COSTS.large;
-  }
+/**
+ * Credits charged per generated image — flat, regardless of requested size.
+ *
+ * The previous table charged 5 / 15 / 30 credits for 512 / 1024 / 1536, which
+ * modelled a cost curve that does not exist for this provider. Two things were
+ * wrong with it:
+ *
+ *   1. At 5 credits, a 512x512 image sold for $0.025 at the $0.005/credit rate
+ *      most plans pay — BELOW the $0.039 it costs to make. Every small image
+ *      lost money, and "small" is exactly what a cost-conscious user picks.
+ *   2. At 15 credits the default 1024 selection returned ~1.9x, against the ~5x
+ *      this file targets everywhere else (see the video rates below).
+ *
+ * 40 credits holds the margin floor on every plan: 7.7x at the entry tier's
+ * $0.00749/credit, 5.1x at the $0.005 most tiers pay, and still 4.3x at the
+ * 1.2M tier's $0.00417. Verified by tests/unit/media-margin.test.ts.
+ *
+ * If a model with genuinely size-dependent output cost is added later, band
+ * this by the provider's own token count — not by requested pixels.
+ */
+export const IMAGE_GENERATION_CREDITS = 40;
+
+/**
+ * Cost of one generated image, in credits.
+ *
+ * Takes dimensions so existing callers keep working and so a future
+ * size-dependent model has somewhere to hook in, but deliberately ignores them
+ * today: the provider charges the same for every size we offer.
+ */
+export function getImageGenerationCost(_width: number, _height: number): number {
+  return IMAGE_GENERATION_CREDITS;
 }
 
 // Video Generation Credit Costs — per provider, per resolution.
