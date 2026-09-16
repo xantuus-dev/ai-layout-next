@@ -50,10 +50,12 @@ function BillingPageContent() {
       const response = await fetch('/api/stripe/checkout-onetime', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // Only the price travels. How many credits it is worth is resolved
+        // server-side from the catalog, so that a client cannot name its own
+        // amount — sending one here would be ignored and is misleading.
         body: JSON.stringify({
           priceId: pack.priceId,
           productType: 'credits',
-          credits: pack.credits,
         }),
       });
 

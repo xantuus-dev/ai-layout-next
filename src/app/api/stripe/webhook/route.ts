@@ -73,33 +73,35 @@ export async function POST(req: NextRequest) {
             });
 
             if (!user) {
-              // Create new user account
-              const credits = parseInt(session.metadata.credits || '4000');
-              const billingCycle = session.metadata.billingCycle || 'monthly';
-
+              // Create the account with NO entitlement, then let
+              // updateUserSubscription derive plan, credits and billing cycle
+              // from the price Stripe is actually billing.
+              //
+              // This branch used to read `session.metadata.credits`, which
+              // originates in the checkout request body — a guest could name
+              // their own monthly allowance and buy it at the cheapest
+              // configured price. Deriving from the subscription closes that,
+              // and removes a second copy of the tier-labelling rules that had
+              // already drifted from updateUserSubscription once.
+              //
+              // The User defaults (plan "free", monthlyCredits 0) make the
+              // failure direction safe: if the update below never lands, the
+              // customer has no entitlement and contacts support, rather than
+              // silently holding one they did not pay for.
               user = await prisma.user.create({
                 data: {
                   email: session.customer_email,
                   name: session.customer_details?.name || session.customer_email.split('@')[0],
                   stripeCustomerId: session.customer as string,
-                  stripeSubscriptionId: subscriptionId,
-                  stripePriceId: session.metadata.priceId,
-                  stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
-                  // Mirrors updateUserSubscription's labelling. The old
-                  // `credits > 4000 ? 'pro' : 'free'` test labelled the new
-                  // $29.95 / 4,000 entry tier as a free account.
-                  plan: credits >= PLANS.ENTERPRISE.credits ? 'enterprise' : 'pro',
-                  monthlyCredits: credits,
-                  billingCycle: billingCycle as string,
-                  creditsResetAt: new Date(),
                 },
               });
 
-              console.log(`Created new user account for ${session.customer_email} with ${credits} credits`);
-            } else {
-              // User exists, update their subscription
-              await updateUserSubscription(user.id, subscription);
+              console.log(`Created account for guest ${session.customer_email}; applying subscription entitlement`);
             }
+
+            // Same call for a brand-new guest and a returning one: the
+            // subscription is the single source of entitlement either way.
+            await updateUserSubscription(user.id, subscription);
           } else {
             // Regular authenticated checkout
             await updateUserSubscription(
@@ -115,10 +117,18 @@ export async function POST(req: NextRequest) {
           // what they just paid for.
           await ensureIntroTrialConverts(stripeClient, subscription);
         } else if (session.mode === 'payment' && session.metadata?.productType === 'credits') {
-          await grantPurchasedCredits(
-            session.metadata.userId,
-            session.metadata.credits
-          );
+          // Ask Stripe what was actually bought. Line items are not included
+          // on the event payload, so they have to be fetched — but they are
+          // the only trustworthy source: session.metadata.credits came from a
+          // request body, and granting on it let a caller pay for the $8 pack
+          // and claim any number of credits.
+          //
+          // userId is safe by contrast: the checkout route writes it from the
+          // authenticated server session, not from the request.
+          const lineItems = await stripeClient.checkout.sessions.listLineItems(session.id, { limit: 1 });
+          const purchasedPriceId = lineItems.data[0]?.price?.id;
+
+          await grantPurchasedCredits(session.metadata.userId, purchasedPriceId);
         }
         break;
       }

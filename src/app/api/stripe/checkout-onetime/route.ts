@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { stripe, isStripeEnabled } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
+import { getCreditPackByPriceId } from '@/lib/pricing-config';
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,10 +19,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { priceId, productType, credits } = await req.json();
+    const { priceId, productType } = await req.json();
 
     if (!priceId) {
       return NextResponse.json({ error: 'priceId is required' }, { status: 400 });
+    }
+
+    // A credit purchase must name a price from our own catalog. The webhook
+    // resolves the granted amount from this price rather than from anything
+    // the caller sends, so an unknown price would take payment and grant
+    // nothing — better to refuse here, while the customer can still see why.
+    //
+    // `credits` is deliberately NOT read from the body any more: it used to be
+    // copied into session metadata and granted verbatim.
+    if (productType === 'credits' && !getCreditPackByPriceId(priceId)) {
+      return NextResponse.json(
+        { error: 'Unknown credit pack' },
+        { status: 400 }
+      );
     }
 
     const user = await prisma.user.findUnique({
@@ -58,7 +73,8 @@ export async function POST(req: NextRequest) {
       metadata: {
         userId: user.id,
         productType, // 'credits', 'template', 'lifetime', etc.
-        ...(credits ? { credits: String(credits) } : {}), // required when productType === 'credits'
+        // No `credits` key: the webhook reads the purchased price off the
+        // session's line items and resolves the amount from the catalog.
       },
     });
 

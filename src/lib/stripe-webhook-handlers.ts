@@ -5,6 +5,7 @@ import { TRIAL_DAILY_CREDITS } from '@/lib/plans';
 import {
   getPriceTierByPriceId,
   getBillingCycleFromPriceId,
+  getCreditPackByPriceId,
   isIntroTrialPriceId,
   getIntroTrialTargetPriceId,
   INTRO_TRIAL,
@@ -14,6 +15,16 @@ import { syncSeatsFromSubscription } from '@/lib/organization';
 /**
  * Grant a one-time credit pack purchase to a user.
  *
+ * Takes the PRICE the customer actually paid, never a credit count. The
+ * amount is resolved from CREDIT_PACK_PRICES here, server-side, because the
+ * only other source is checkout session metadata — and that metadata
+ * originates in a request body. Trusting it meant anyone could buy the $8 /
+ * 1,000-credit pack while asking for a million credits, and be granted them.
+ *
+ * An unrecognised price grants nothing. Refusing is the safe direction: a
+ * legitimate pack that is missing from the catalog shows up as a support
+ * ticket, whereas guessing an amount hands out free credits silently.
+ *
  * Implemented as a decrement of `creditsUsed` (which can go negative to
  * "bank" headroom) rather than an increment of `monthlyCredits`, because
  * `monthlyCredits` is the recurring plan cap and is never reset — raising
@@ -21,13 +32,23 @@ import { syncSeatsFromSubscription } from '@/lib/organization';
  * Consequence: purchased credits are consumed before the user's next
  * monthly reset (which zeroes `creditsUsed`) and do not roll over.
  */
-export async function grantPurchasedCredits(userId: string | undefined, creditsMeta: string | undefined) {
-  const credits = parseInt(creditsMeta || '0', 10);
-
-  if (!userId || !credits || credits <= 0) {
-    console.error(`Cannot grant credits: missing/invalid userId or credits (userId=${userId}, credits=${creditsMeta})`);
+export async function grantPurchasedCredits(userId: string | undefined, priceId: string | undefined) {
+  if (!userId) {
+    console.error(`Cannot grant credits: missing userId (priceId=${priceId})`);
     return;
   }
+
+  const pack = priceId ? getCreditPackByPriceId(priceId) : null;
+
+  if (!pack) {
+    console.error(
+      `Cannot grant credits to ${userId}: price "${priceId}" is not a configured credit pack. ` +
+      `Nothing was granted. Check CREDIT_PACK_PRICES and the NEXT_PUBLIC_STRIPE_CREDITPACK_* env vars.`
+    );
+    return;
+  }
+
+  const credits = pack.credits;
 
   await prisma.$transaction([
     prisma.user.update({
@@ -39,12 +60,12 @@ export async function grantPurchasedCredits(userId: string | undefined, creditsM
         userId,
         type: 'credit_purchase',
         credits: -credits, // negative = credits added, not consumed
-        metadata: { source: 'stripe_one_time_purchase' },
+        metadata: { source: 'stripe_one_time_purchase', priceId, pack: pack.displayName },
       },
     }),
   ]);
 
-  console.log(`Granted ${credits} purchased credits to user ${userId}`);
+  console.log(`Granted ${credits} purchased credits to user ${userId} (${pack.displayName}, ${priceId})`);
 }
 
 /**
