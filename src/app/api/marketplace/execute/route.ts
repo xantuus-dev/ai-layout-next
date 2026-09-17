@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getSkillExecutor } from '@/lib/skills/skill-executor';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { captureAPIError } from '@/lib/sentry';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +45,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'input must be an object' },
         { status: 400 }
+      );
+    }
+
+    // Bound the loop. Credits are the primary control, but a javascript skill
+    // boots a microVM before any of its work is known to be useful, so a
+    // per-user ceiling caps how fast compute can be spun up regardless.
+    const rateLimit = await checkRateLimit(
+      `skill-exec:${session.user.id}`,
+      RATE_LIMITS.SKILL_EXECUTION
+    );
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        {
+          error: 'Too many skill executions. Try again shortly.',
+          retryAfterSeconds: Math.ceil((rateLimit.reset - Date.now()) / 1000),
+        },
+        { status: 429 }
       );
     }
 

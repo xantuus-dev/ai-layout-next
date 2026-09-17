@@ -238,4 +238,12 @@ export const RATE_LIMITS = {
     maxRequests: 3,
     windowMs: 24 * 60 * 60 * 1000, // 24 hours
   },
+  // Marketplace skill execution: 30 runs per hour per user. A javascript skill
+  // boots a Vercel Sandbox microVM, so each run costs real compute whether or
+  // not the skill does anything useful. The ceiling is generous enough to
+  // iterate on a skill you are building and low enough to bound a loop.
+  SKILL_EXECUTION: {
+    maxRequests: 30,
+    windowMs: 60 * 60 * 1000, // 1 hour
+  },
 } as const;

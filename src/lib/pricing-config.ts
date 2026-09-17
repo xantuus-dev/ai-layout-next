@@ -296,6 +296,28 @@ export function getCreditsFromDisplayName(displayName: string): number | null {
 }
 
 /**
+ * Whether a Stripe price id is one this app is willing to sell on the web.
+ *
+ * Checkout takes a price id from the request body, so without this any price
+ * in the Stripe account could be subscribed to by anyone who learns its id —
+ * including legacy, test, or individually-negotiated prices that were never
+ * meant to be self-serve. STRIPE_PRO_PRICE_ID and STRIPE_ENTERPRISE_PRICE_ID
+ * are deliberately NOT accepted: plans.ts documents that the web checkout does
+ * not sell those fixed tiers, and PLANS.pro bills $29 for the same 12,000
+ * credits the catalog sells at $60.
+ *
+ * It is also what stops a customer paying for a price the webhook cannot
+ * resolve — updateUserSubscription falls back to the free plan and zero
+ * credits for an unknown price, so an unvalidated checkout can take money and
+ * grant nothing.
+ */
+export function isSellablePriceId(priceId: string | null | undefined): boolean {
+  if (!priceId) return false;
+  if (isIntroTrialPriceId(priceId)) return true;
+  return getPriceTierByPriceId(priceId) !== null;
+}
+
+/**
  * Get price tier by Stripe price ID (for webhook processing)
  */
 export function getPriceTierByPriceId(priceId: string): PriceTier | null {

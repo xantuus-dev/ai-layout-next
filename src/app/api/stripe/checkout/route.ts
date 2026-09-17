@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { stripe, isStripeEnabled } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
-import { isIntroTrialPriceId } from '@/lib/pricing-config';
+import { isIntroTrialPriceId, isSellablePriceId } from '@/lib/pricing-config';
 
 // Guard against a fat-fingered or hostile seat count turning into a very large
 // charge. Teams above this go through sales.
@@ -58,6 +58,18 @@ export async function POST(req: NextRequest) {
     if (!priceId) {
       return NextResponse.json(
         { error: 'Price ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // The price must be one we actually sell. Without this, any price in the
+    // Stripe account is purchasable by anyone who learns its id, and a price
+    // the webhook cannot resolve takes the customer's money and grants them
+    // the free plan. Covers both the authenticated and guest paths below.
+    if (!isSellablePriceId(priceId)) {
+      console.error(`Rejected checkout for unsellable price: ${priceId}`);
+      return NextResponse.json(
+        { error: 'That plan is not available' },
         { status: 400 }
       );
     }

@@ -6,6 +6,12 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import {
+  assertCanSpend,
+  spendCredits,
+  refundCredits,
+  InsufficientCreditsError,
+} from '@/lib/billing/gate';
 import { AgentExecutor } from '../agent/executor';
 import { ToolRegistry } from '../agent/tools/registry';
 import { AIRouter } from '../ai-providers/router';
@@ -20,6 +26,24 @@ import type {
   ExecutionPlan,
   AgentResult,
 } from '../agent/types';
+
+/**
+ * Floor on what one sandboxed skill run costs, in credits.
+ *
+ * `CustomSkill.estimatedCreditCost` is set by whoever published the skill and
+ * defaults to 0, so it cannot be the only input: a creator could publish a
+ * skill that boots a microVM on every call and costs the runner nothing.
+ * Comparable to BROWSER_FEATURE_CREDITS.SESSION_CREATE (50) for a browser
+ * session, discounted because a sandbox is shorter-lived.
+ */
+export const SKILL_EXECUTION_MIN_CREDITS = 25;
+
+/** What to charge for one javascript skill run. */
+export function javascriptSkillCost(estimatedCreditCost: unknown): number {
+  const declared = Number(estimatedCreditCost);
+  const safe = Number.isFinite(declared) && declared > 0 ? Math.ceil(declared) : 0;
+  return Math.max(SKILL_EXECUTION_MIN_CREDITS, safe);
+}
 
 export interface SkillExecutionOptions {
   skillId: string;
@@ -85,8 +109,16 @@ export class SkillExecutor {
           break;
 
         case 'javascript':
-          result = await this.executeJavaScriptSkill(skill, options);
-          creditsUsed = skill.estimatedCreditCost; // Flat cost for code execution
+          // Charged here, unlike 'config' above: a config skill runs through
+          // AgentExecutor, which already increments creditsUsed for the run,
+          // so billing it a second time here would double-charge. Nothing
+          // charges for a javascript skill — it boots a Vercel Sandbox microVM
+          // and, before this, returned a credit figure that was logged and
+          // then thrown away. Any authenticated user could run sandboxed
+          // compute in a loop for free.
+          const jsResult = await this.chargeAndRunJavaScriptSkill(skill, options);
+          result = jsResult.output;
+          creditsUsed = jsResult.creditsUsed;
           break;
 
         case 'python':
@@ -256,6 +288,53 @@ export class SkillExecutor {
    * arbitrary code inside it is expected and contained. If the sandbox is not
    * configured this refuses to run rather than falling back in-process.
    */
+  /**
+   * Reserve credits, run the sandboxed skill, refund if it does not complete.
+   *
+   * Reserved before the microVM boots rather than billed after, for the same
+   * reason as lib/media/image.ts: the cost is incurred the moment the sandbox
+   * starts, so charging afterwards means a failure — or a balance drained by a
+   * concurrent request — leaves us paying for compute nobody was billed for.
+   */
+  private async chargeAndRunJavaScriptSkill(
+    skill: any,
+    options: SkillExecutionOptions
+  ): Promise<{ output: any; creditsUsed: number }> {
+    const credits = javascriptSkillCost(skill.estimatedCreditCost);
+
+    const decision = await assertCanSpend(options.userId, credits);
+    if (!decision.allowed) {
+      throw new Error(
+        decision.reason === 'viewer_cannot_spend'
+          ? 'Viewers cannot spend the team credit pool'
+          : `Insufficient credits: this skill costs ${credits} credits`
+      );
+    }
+
+    await spendCredits(options.userId, credits, {
+      type: 'skill-execution',
+      description: `Skill execution: ${String(skill.name).substring(0, 50)}`,
+    });
+
+    try {
+      const output = await this.executeJavaScriptSkill(skill, options);
+      return { output, creditsUsed: credits };
+    } catch (error) {
+      try {
+        await refundCredits(options.userId, credits, 'run_failed', {
+          runId: String(skill.id),
+          description: `Skill execution failed: ${String(skill.name).substring(0, 50)}`,
+        });
+      } catch (refundError) {
+        console.error(
+          `[SkillExecutor] CREDIT LEAK: failed to refund ${credits} credits to ${options.userId}`,
+          refundError
+        );
+      }
+      throw error;
+    }
+  }
+
   private async executeJavaScriptSkill(
     skill: any,
     options: SkillExecutionOptions
